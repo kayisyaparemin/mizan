@@ -11,7 +11,7 @@
             <Label Text="Önümüzdeki 12 maaş döneminde finansal durumunun nasıl değişeceğini gör." Style="{StaticResource MutedText}" />
             <Border Padding="14"
                     IsVisible="{Binding HasInterestSummary}"
-                    BackgroundColor="{StaticResource InterestSurface}">
+                    BackgroundColor="{StaticResource SoftPink}">
                 <VerticalStackLayout Spacing="6">
                     <Label Text="12 Aylık Tahmini Faiz Yükü" Style="{StaticResource SectionTitle}" />
                     <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto" RowSpacing="5">
@@ -40,7 +40,7 @@
 
         <Border Grid.Row="1"
                 IsVisible="{Binding HasNoProjection}"
-                BackgroundColor="{StaticResource InfoSurface}"
+                BackgroundColor="{StaticResource SoftSky}"
                 VerticalOptions="Start">
             <VerticalStackLayout Spacing="10">
                 <Label Text="Henüz 12 aylık plan yok."

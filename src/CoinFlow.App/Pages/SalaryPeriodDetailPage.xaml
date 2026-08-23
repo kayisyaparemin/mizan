@@ -131,7 +131,7 @@
                 </VerticalStackLayout>
 
                 <Border IsVisible="{Binding Detail.IsSimulationScenario}"
-                        BackgroundColor="{StaticResource InsightSurface}">
+                        BackgroundColor="{StaticResource SoftSky}">
                     <VerticalStackLayout Spacing="13">
                         <Label Text="Bu dönemde ne olacak?"
                                Style="{StaticResource SectionTitle}" />
@@ -523,7 +523,7 @@
 
                 <VerticalStackLayout IsVisible="{Binding IsDevelopment}" Spacing="10">
                     <Label Text="Hesaplama Detayı (DEV)" Style="{StaticResource SectionTitle}" />
-                    <Border BackgroundColor="{StaticResource InfoSurface}">
+                    <Border BackgroundColor="{StaticResource SoftSky}">
                         <VerticalStackLayout BindableLayout.ItemsSource="{Binding Detail.DebugRows}"
                                              Spacing="7">
                             <BindableLayout.ItemTemplate>

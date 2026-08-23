@@ -110,18 +110,17 @@
                 <Border IsVisible="{Binding IsDevelopment}">
                     <VerticalStackLayout Spacing="8">
                         <Label Text="Geliştirme Sürümü" Style="{StaticResource SectionTitle}" />
-                        <Border BackgroundColor="{StaticResource DeficitSurface}" Padding="12">
+                        <Border BackgroundColor="{StaticResource SoftPink}" Padding="12">
                             <VerticalStackLayout Spacing="7">
                                 <Label Text="Verileri Sil" FontFamily="OpenSansSemibold" />
                                 <Label Text="Tüm kullanıcı finans verilerini siler ve uygulamayı boş başlangıç durumuna döndürür."
                                        Style="{StaticResource MutedText}" />
                                 <Button Text="Verileri Sil"
                                         Clicked="OnClearDevelopmentDataClicked"
-                                        BackgroundColor="{StaticResource DeficitSurface}"
-                                        TextColor="{StaticResource DeficitText}" />
+                                        BackgroundColor="{StaticResource SoftPink}" />
                             </VerticalStackLayout>
                         </Border>
-                        <Border BackgroundColor="{StaticResource InfoSurface}" Padding="12">
+                        <Border BackgroundColor="{StaticResource SoftSky}" Padding="12">
                             <VerticalStackLayout Spacing="7">
                                 <Label Text="Test Verisini Yükle" FontFamily="OpenSansSemibold" />
                                 <Label Text="Örnek finans kayıtlarını yükler. Aynı kayıtları yeniden oluşturmaz."

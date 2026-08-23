@@ -12,7 +12,7 @@
                 <Label Text="PLAN vs GERÇEK" Style="{StaticResource Eyebrow}" />
                 <Label Text="Geçmiş" Style="{StaticResource PageTitle}" />
                 <Label Text="Geçmiş planlar donmuş halde kalır; sonraki ayarlardan etkilenmez." Style="{StaticResource MutedText}" />
-                <Border IsVisible="{Binding HasSummary}" BackgroundColor="{StaticResource InfoSurface}" StrokeThickness="0">
+                <Border IsVisible="{Binding HasSummary}" BackgroundColor="{StaticResource SoftSky}" StrokeThickness="0">
                     <VerticalStackLayout Spacing="9">
                         <Label Text="{Binding SummaryTitle}" Style="{StaticResource SectionTitle}" />
                         <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8">
@@ -24,13 +24,13 @@
                 </Border>
                 <CollectionView ItemsSource="{Binding Periods}" SelectionMode="Single" SelectionChanged="OnSelectionChanged">
                     <CollectionView.EmptyView>
-                        <Border BackgroundColor="{StaticResource SurfaceWarm}" StrokeThickness="0"><VerticalStackLayout Spacing="6"><Label Text="Henüz kapanmış dönem yok" Style="{StaticResource SectionTitle}" /><Label Text="İlk güncel durumundan sonraki dönem kapandığında Plan vs Gerçek geçmişin burada başlayacak." Style="{StaticResource MutedText}" /></VerticalStackLayout></Border>
+                        <Border BackgroundColor="{StaticResource SoftPink}" StrokeThickness="0"><VerticalStackLayout Spacing="6"><Label Text="Henüz kapanmış dönem yok" Style="{StaticResource SectionTitle}" /><Label Text="İlk güncel durumundan sonraki dönem kapandığında Plan vs Gerçek geçmişin burada başlayacak." Style="{StaticResource MutedText}" /></VerticalStackLayout></Border>
                     </CollectionView.EmptyView>
                     <CollectionView.ItemTemplate>
                         <DataTemplate x:DataType="models:HistoryCardItem">
                             <Border Margin="0,0,0,10">
                                 <VerticalStackLayout Spacing="9">
-                                    <Grid ColumnDefinitions="*,Auto"><Label Text="{Binding Period}" Style="{StaticResource SectionTitle}" /><Border Grid.Column="1" BackgroundColor="{StaticResource PrimarySoft}" StrokeThickness="0" Padding="9,4"><Label Text="{Binding Status}" Style="{StaticResource Eyebrow}" /></Border></Grid>
+                                    <Grid ColumnDefinitions="*,Auto"><Label Text="{Binding Period}" Style="{StaticResource SectionTitle}" /><Border Grid.Column="1" BackgroundColor="{StaticResource SoftLavender}" StrokeThickness="0" Padding="9,4"><Label Text="{Binding Status}" Style="{StaticResource Eyebrow}" /></Border></Grid>
                                     <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8">
                                         <VerticalStackLayout><Label Text="PLANLANAN" Style="{StaticResource Eyebrow}" /><Label Text="{Binding Planned}" FontFamily="OpenSansSemibold" /></VerticalStackLayout>
                                         <VerticalStackLayout Grid.Column="1"><Label Text="GERÇEKLEŞEN" Style="{StaticResource Eyebrow}" /><Label Text="{Binding Actual}" FontFamily="OpenSansSemibold" /></VerticalStackLayout>

@@ -17,20 +17,20 @@
                 <Label Text="Plan vs Gerçek" Style="{StaticResource PageTitle}" />
                 <Label Text="{Binding PeriodText}" Style="{StaticResource MutedText}" />
                 <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8">
-                    <Border BackgroundColor="{StaticResource SurfaceWarm}" StrokeThickness="0" Padding="8,9">
+                    <Border BackgroundColor="{StaticResource SoftPink}" StrokeThickness="0" Padding="8,9">
                         <Label Text="{Binding PlanIndicator}" HorizontalTextAlignment="Center" FontFamily="OpenSansSemibold" FontSize="12" />
                     </Border>
-                    <Border Grid.Column="1" BackgroundColor="{StaticResource Surface}" StrokeThickness="0" Padding="8,9">
+                    <Border Grid.Column="1" BackgroundColor="{StaticResource SoftYellow}" StrokeThickness="0" Padding="8,9">
                         <Label Text="{Binding ActualIndicator}" HorizontalTextAlignment="Center" FontFamily="OpenSansSemibold" FontSize="12" />
                     </Border>
-                    <Border Grid.Column="2" BackgroundColor="{StaticResource InfoSurface}" StrokeThickness="0" Padding="8,9">
+                    <Border Grid.Column="2" BackgroundColor="{StaticResource SoftSky}" StrokeThickness="0" Padding="8,9">
                         <Label Text="{Binding ResultIndicator}" HorizontalTextAlignment="Center" FontFamily="OpenSansSemibold" FontSize="12" />
                     </Border>
                 </Grid>
             </VerticalStackLayout>
 
             <VerticalStackLayout IsVisible="{Binding IsStep1}" Spacing="14">
-                <Border BackgroundColor="{StaticResource SurfaceWarm}" StrokeThickness="0">
+                <Border BackgroundColor="{StaticResource SoftPink}" StrokeThickness="0">
                     <VerticalStackLayout Spacing="5">
                         <Label Text="1. Planın" Style="{StaticResource SectionTitle}" />
                         <Label Text="Dönem kapanmadan önceki son planın." Style="{StaticResource MutedText}" />
@@ -55,7 +55,7 @@
             </VerticalStackLayout>
 
             <VerticalStackLayout IsVisible="{Binding IsStep2}" Spacing="14">
-                <Border BackgroundColor="{StaticResource Surface}" StrokeThickness="0">
+                <Border BackgroundColor="{StaticResource SoftYellow}" StrokeThickness="0">
                     <VerticalStackLayout Spacing="5">
                         <Label Text="2. Gerçekte Ne Oldu?" Style="{StaticResource SectionTitle}" />
                         <Label Text="Planlanan ödemeleri yalnızca farklıysa değiştir." Style="{StaticResource MutedText}" />
@@ -89,7 +89,7 @@
                     </BindableLayout.ItemTemplate>
                 </VerticalStackLayout>
 
-                <Border BackgroundColor="{StaticResource SurfaceAlt}" StrokeThickness="0">
+                <Border BackgroundColor="{StaticResource SoftSky}" StrokeThickness="0">
                     <VerticalStackLayout Spacing="9">
                         <Label Text="Yaşam Giderleri" Style="{StaticResource SectionTitle}" />
                         <Label Text="Bu dönemde günlük yaşam için toplam ne kadar harcadın? Tek sayı yeterli." Style="{StaticResource MutedText}" />
@@ -107,7 +107,7 @@
                     </VerticalStackLayout>
                 </Border>
 
-                <Border BackgroundColor="{StaticResource ExpenseSurface}" StrokeThickness="0">
+                <Border BackgroundColor="{StaticResource SoftPeach}" StrokeThickness="0">
                     <VerticalStackLayout Spacing="8">
                         <Label Text="Plan Dışı Büyük Ödeme" Style="{StaticResource SectionTitle}" />
                         <Entry Text="{Binding NewPaymentName}" Placeholder="Ad" />
@@ -116,7 +116,7 @@
                         <Button Text="+ Ödeme Ekle" Command="{Binding AddUnplannedPaymentCommand}" Style="{StaticResource SecondaryButton}" />
                     </VerticalStackLayout>
                 </Border>
-                <Border BackgroundColor="{StaticResource PositiveSurface}" StrokeThickness="0">
+                <Border BackgroundColor="{StaticResource SoftPink}" StrokeThickness="0">
                     <VerticalStackLayout Spacing="8">
                         <Label Text="Plan Dışı Gelir" Style="{StaticResource SectionTitle}" />
                         <Entry Text="{Binding NewIncomeName}" Placeholder="Bonus, iade, ek gelir..." />
@@ -140,7 +140,7 @@
                     </BindableLayout.ItemTemplate>
                 </VerticalStackLayout>
 
-                <Border BackgroundColor="{StaticResource PrimarySoft}" StrokeThickness="0">
+                <Border BackgroundColor="{StaticResource SoftLavender}" StrokeThickness="0">
                     <VerticalStackLayout Spacing="8">
                         <Label Text="Güncel Finansal Durum" Style="{StaticResource SectionTitle}" />
                         <Label Text="Gelecek hesaplamaları bu tutardan devam eder." Style="{StaticResource MutedText}" />
@@ -155,11 +155,11 @@
             </VerticalStackLayout>
 
             <VerticalStackLayout IsVisible="{Binding IsStep3}" Spacing="14">
-                <Border BackgroundColor="{StaticResource InfoSurface}" StrokeThickness="0"><VerticalStackLayout Spacing="5"><Label Text="3. Sonuç" Style="{StaticResource SectionTitle}" /><Label Text="{Binding ComparisonSummary}" Style="{StaticResource MutedText}" /></VerticalStackLayout></Border>
+                <Border BackgroundColor="{StaticResource SoftSky}" StrokeThickness="0"><VerticalStackLayout Spacing="5"><Label Text="3. Sonuç" Style="{StaticResource SectionTitle}" /><Label Text="{Binding ComparisonSummary}" Style="{StaticResource MutedText}" /></VerticalStackLayout></Border>
                 <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8">
-                    <Border BackgroundColor="{StaticResource SurfaceWarm}" StrokeThickness="0"><VerticalStackLayout><Label Text="PLANLANAN" Style="{StaticResource Eyebrow}" /><Label Text="{Binding ComparisonPlannedEnding}" FontFamily="OpenSansSemibold" /></VerticalStackLayout></Border>
-                    <Border Grid.Column="1" BackgroundColor="{StaticResource Surface}" StrokeThickness="0"><VerticalStackLayout><Label Text="GERÇEKLEŞEN" Style="{StaticResource Eyebrow}" /><Label Text="{Binding ComparisonActualEnding}" FontFamily="OpenSansSemibold" /></VerticalStackLayout></Border>
-                    <Border Grid.Column="2" BackgroundColor="{StaticResource PrimarySoft}" StrokeThickness="0"><VerticalStackLayout><Label Text="FARK" Style="{StaticResource Eyebrow}" /><Label Text="{Binding ComparisonDifference}" FontFamily="OpenSansSemibold" /></VerticalStackLayout></Border>
+                    <Border BackgroundColor="{StaticResource SoftPink}" StrokeThickness="0"><VerticalStackLayout><Label Text="PLANLANAN" Style="{StaticResource Eyebrow}" /><Label Text="{Binding ComparisonPlannedEnding}" FontFamily="OpenSansSemibold" /></VerticalStackLayout></Border>
+                    <Border Grid.Column="1" BackgroundColor="{StaticResource SoftYellow}" StrokeThickness="0"><VerticalStackLayout><Label Text="GERÇEKLEŞEN" Style="{StaticResource Eyebrow}" /><Label Text="{Binding ComparisonActualEnding}" FontFamily="OpenSansSemibold" /></VerticalStackLayout></Border>
+                    <Border Grid.Column="2" BackgroundColor="{StaticResource SoftLavender}" StrokeThickness="0"><VerticalStackLayout><Label Text="FARK" Style="{StaticResource Eyebrow}" /><Label Text="{Binding ComparisonDifference}" FontFamily="OpenSansSemibold" /></VerticalStackLayout></Border>
                 </Grid>
                 <VerticalStackLayout BindableLayout.ItemsSource="{Binding ComparisonLines}" Spacing="8">
                     <BindableLayout.ItemTemplate><DataTemplate x:DataType="models:ComparisonUiLine"><Border><Grid ColumnDefinitions="1.2*,*,*,*" ColumnSpacing="5"><Label Text="{Binding Category}" Style="{StaticResource MutedText}" /><Label Grid.Column="1" Text="{Binding Planned}" FontSize="12" HorizontalTextAlignment="End" /><Label Grid.Column="2" Text="{Binding Actual}" FontSize="12" HorizontalTextAlignment="End" /><Label Grid.Column="3" Text="{Binding Difference}" FontSize="12" FontFamily="OpenSansSemibold" HorizontalTextAlignment="End" /></Grid></Border></DataTemplate></BindableLayout.ItemTemplate>
@@ -169,7 +169,7 @@
             </VerticalStackLayout>
 
             <VerticalStackLayout IsVisible="{Binding IsSuccess}" Spacing="16">
-                <Border BackgroundColor="{StaticResource InfoSurface}" StrokeThickness="0" Padding="22"><VerticalStackLayout Spacing="8"><Label Text="Güncel durumun kaydedildi" Style="{StaticResource PageTitle}" /><Label Text="Geçen dönem Plan vs Gerçek geçmişine eklendi." Style="{StaticResource MutedText}" /><Label Text="{Binding SuccessText}" FontFamily="OpenSansSemibold" /><Label Text="{Binding ComparisonSummary}" Style="{StaticResource MutedText}" /></VerticalStackLayout></Border>
+                <Border BackgroundColor="{StaticResource SoftSky}" StrokeThickness="0" Padding="22"><VerticalStackLayout Spacing="8"><Label Text="Güncel durumun kaydedildi" Style="{StaticResource PageTitle}" /><Label Text="Geçen dönem Plan vs Gerçek geçmişine eklendi." Style="{StaticResource MutedText}" /><Label Text="{Binding SuccessText}" FontFamily="OpenSansSemibold" /><Label Text="{Binding ComparisonSummary}" Style="{StaticResource MutedText}" /></VerticalStackLayout></Border>
                 <Button Text="Yeni Planı Gör" Clicked="OnViewPlanClicked" />
                 <Button Text="Ana Sayfaya Dön" Clicked="OnReturnHomeClicked" Style="{StaticResource SecondaryButton}" />
             </VerticalStackLayout>
