@@ -34,7 +34,7 @@
             </Border>
 
             <Border IsVisible="{Binding HasPreview}"
-                    BackgroundColor="{StaticResource SoftSky}">
+                    BackgroundColor="{StaticResource InfoSurface}">
                 <VerticalStackLayout Spacing="8">
                     <Label Text="Geçiş Önizlemesi"
                            Style="{StaticResource SectionTitle}" />

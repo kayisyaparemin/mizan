@@ -14,7 +14,7 @@
                    FontFamily="OpenSansSemibold" />
 
             <Border IsVisible="{Binding IsPlanUnavailable}"
-                    BackgroundColor="{StaticResource SoftSky}">
+                    BackgroundColor="{StaticResource InfoSurface}">
                 <VerticalStackLayout Spacing="10">
                     <Label Text="Simülasyon henüz kullanılamıyor."
                            Style="{StaticResource SectionTitle}" />
@@ -153,7 +153,7 @@
             </Border>
 
             <VerticalStackLayout IsVisible="{Binding HasCurrentResults}" Spacing="14">
-                <Border BackgroundColor="{StaticResource SoftSky}">
+                <Border BackgroundColor="{StaticResource InsightSurface}">
                     <VerticalStackLayout Spacing="10">
                         <Label Text="BU PLANLA ÖNÜNDE NE VAR?" Style="{StaticResource Eyebrow}" />
                         <Label Text="Bu planla önünde ne var?" Style="{StaticResource SectionTitle}" />

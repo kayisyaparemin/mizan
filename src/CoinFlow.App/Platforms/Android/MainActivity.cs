@@ -1,6 +1,7 @@
 ﻿using Android.App;
 using Android.Content.PM;
 using Android.OS;
+using AndroidX.Core.Content;
 using AndroidX.Core.View;
 
 namespace CoinFlow.App;
@@ -17,11 +18,11 @@ public class MainActivity : MauiAppCompatActivity
             return;
         }
 
-        Window.SetStatusBarColor(Android.Graphics.Color.ParseColor("#FFCABF"));
-        Window.SetNavigationBarColor(Android.Graphics.Color.ParseColor("#FFFACF"));
+        Window.SetStatusBarColor(new Android.Graphics.Color(ContextCompat.GetColor(this, Resource.Color.colorPrimaryDark)));
+        Window.SetNavigationBarColor(new Android.Graphics.Color(ContextCompat.GetColor(this, Resource.Color.navigationBar)));
 
         var controller = WindowCompat.GetInsetsController(Window, Window.DecorView);
-        controller.AppearanceLightStatusBars = true;
+        controller.AppearanceLightStatusBars = false;
         controller.AppearanceLightNavigationBars = true;
     }
 }

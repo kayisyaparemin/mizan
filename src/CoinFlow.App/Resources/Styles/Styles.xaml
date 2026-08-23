@@ -13,11 +13,12 @@
     <Style x:Key="PageTitle" TargetType="Label">
         <Setter Property="FontFamily" Value="OpenSansSemibold" />
         <Setter Property="FontSize" Value="30" />
-        <Setter Property="TextColor" Value="{StaticResource Ink}" />
+        <Setter Property="TextColor" Value="{StaticResource Primary}" />
     </Style>
     <Style x:Key="SectionTitle" TargetType="Label">
         <Setter Property="FontFamily" Value="OpenSansSemibold" />
         <Setter Property="FontSize" Value="19" />
+        <Setter Property="TextColor" Value="{StaticResource Primary}" />
     </Style>
     <Style x:Key="Eyebrow" TargetType="Label">
         <Setter Property="FontFamily" Value="OpenSansSemibold" />
@@ -28,7 +29,7 @@
     <Style x:Key="HeroNumber" TargetType="Label">
         <Setter Property="FontFamily" Value="OpenSansSemibold" />
         <Setter Property="FontSize" Value="36" />
-        <Setter Property="TextColor" Value="{StaticResource Ink}" />
+        <Setter Property="TextColor" Value="{StaticResource Primary}" />
     </Style>
     <Style x:Key="MutedText" TargetType="Label">
         <Setter Property="TextColor" Value="{StaticResource Muted}" />
@@ -47,56 +48,58 @@
         <Setter Property="StrokeShape" Value="RoundRectangle 18" />
     </Style>
     <Style TargetType="Entry">
-        <Setter Property="BackgroundColor" Value="{StaticResource SoftYellow}" />
+        <Setter Property="BackgroundColor" Value="{StaticResource InputSurface}" />
         <Setter Property="TextColor" Value="{StaticResource Ink}" />
         <Setter Property="PlaceholderColor" Value="{StaticResource Muted}" />
         <Setter Property="MinimumHeightRequest" Value="48" />
     </Style>
     <Style TargetType="Editor">
-        <Setter Property="BackgroundColor" Value="{StaticResource SoftYellow}" />
+        <Setter Property="BackgroundColor" Value="{StaticResource InputSurface}" />
         <Setter Property="TextColor" Value="{StaticResource Ink}" />
         <Setter Property="PlaceholderColor" Value="{StaticResource Muted}" />
     </Style>
     <Style TargetType="Picker">
-        <Setter Property="BackgroundColor" Value="{StaticResource SoftYellow}" />
+        <Setter Property="BackgroundColor" Value="{StaticResource InputSurface}" />
         <Setter Property="TextColor" Value="{StaticResource Ink}" />
         <Setter Property="TitleColor" Value="{StaticResource Muted}" />
         <Setter Property="MinimumHeightRequest" Value="48" />
     </Style>
     <Style TargetType="DatePicker">
-        <Setter Property="BackgroundColor" Value="{StaticResource SoftYellow}" />
+        <Setter Property="BackgroundColor" Value="{StaticResource InputSurface}" />
         <Setter Property="TextColor" Value="{StaticResource Ink}" />
         <Setter Property="MinimumHeightRequest" Value="48" />
     </Style>
     <Style TargetType="Button">
-        <Setter Property="BackgroundColor" Value="{StaticResource SoftLavender}" />
-        <Setter Property="TextColor" Value="{StaticResource PrimaryDeep}" />
+        <Setter Property="BackgroundColor" Value="{StaticResource Primary}" />
+        <Setter Property="TextColor" Value="{StaticResource PrimaryOn}" />
         <Setter Property="FontFamily" Value="OpenSansSemibold" />
         <Setter Property="CornerRadius" Value="14" />
         <Setter Property="MinimumHeightRequest" Value="50" />
         <Setter Property="Padding" Value="18,12" />
     </Style>
     <Style x:Key="SecondaryButton" TargetType="Button">
-        <Setter Property="BackgroundColor" Value="{StaticResource SoftSky}" />
-        <Setter Property="TextColor" Value="{StaticResource Ink}" />
+        <Setter Property="BackgroundColor" Value="{StaticResource SurfaceAlt}" />
+        <Setter Property="TextColor" Value="{StaticResource Primary}" />
+        <Setter Property="BorderColor" Value="{StaticResource Border}" />
+        <Setter Property="BorderWidth" Value="1" />
     </Style>
     <Style TargetType="Switch">
-        <Setter Property="OnColor" Value="{StaticResource SoftLavender}" />
-        <Setter Property="ThumbColor" Value="{StaticResource SoftYellow}" />
+        <Setter Property="OnColor" Value="{StaticResource Primary}" />
+        <Setter Property="ThumbColor" Value="{StaticResource Surface}" />
     </Style>
     <Style TargetType="ProgressBar">
-        <Setter Property="ProgressColor" Value="{StaticResource SoftPink}" />
-        <Setter Property="BackgroundColor" Value="{StaticResource SoftPeach}" />
+        <Setter Property="ProgressColor" Value="{StaticResource Primary}" />
+        <Setter Property="BackgroundColor" Value="{StaticResource SurfaceAlt}" />
         <Setter Property="HeightRequest" Value="8" />
     </Style>
     <Style TargetType="ActivityIndicator">
-        <Setter Property="Color" Value="{StaticResource InkSoft}" />
+        <Setter Property="Color" Value="{StaticResource Primary}" />
     </Style>
     <Style TargetType="Shell">
-        <Setter Property="Shell.BackgroundColor" Value="{StaticResource SoftPink}" />
-        <Setter Property="Shell.ForegroundColor" Value="{StaticResource PrimaryDeep}" />
-        <Setter Property="Shell.TitleColor" Value="{StaticResource Ink}" />
-        <Setter Property="Shell.UnselectedColor" Value="{StaticResource Muted}" />
-        <Setter Property="Shell.FlyoutBackgroundColor" Value="{StaticResource SoftYellow}" />
+        <Setter Property="Shell.BackgroundColor" Value="{StaticResource Primary}" />
+        <Setter Property="Shell.ForegroundColor" Value="{StaticResource PrimaryOn}" />
+        <Setter Property="Shell.TitleColor" Value="{StaticResource PrimaryOn}" />
+        <Setter Property="Shell.UnselectedColor" Value="{StaticResource Beige400}" />
+        <Setter Property="Shell.FlyoutBackgroundColor" Value="{StaticResource Background}" />
     </Style>
 </ResourceDictionary>

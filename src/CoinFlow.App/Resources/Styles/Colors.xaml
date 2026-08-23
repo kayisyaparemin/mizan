@@ -2,45 +2,66 @@
 <?xaml-comp compile="true" ?>
 <ResourceDictionary xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
                     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml">
-    <!-- Gönderilen görseldeki SOFT paleti -->
-    <Color x:Key="SoftPink">#FFCABF</Color>
-    <Color x:Key="SoftPeach">#FFE4BF</Color>
-    <Color x:Key="SoftYellow">#FFFACF</Color>
-    <Color x:Key="SoftSky">#BFEAFF</Color>
-    <Color x:Key="SoftLavender">#BFCFFF</Color>
+    <!-- Midnight Blue + Warm Beige visual system -->
+    <Color x:Key="Midnight900">#0D1B2A</Color>
+    <Color x:Key="Midnight800">#14283D</Color>
+    <Color x:Key="Midnight700">#1C344C</Color>
+    <Color x:Key="Midnight600">#29445F</Color>
+    <Color x:Key="Beige100">#F7F2EC</Color>
+    <Color x:Key="Beige200">#EFE6DC</Color>
+    <Color x:Key="Beige300">#E8DDCF</Color>
+    <Color x:Key="Beige400">#D8C9B8</Color>
+    <Color x:Key="Beige500">#C7B49F</Color>
+
+    <Color x:Key="Primary">#0D1B2A</Color>
+    <Color x:Key="PrimaryPressed">#14283D</Color>
+    <Color x:Key="PrimarySoft">#E6EDF3</Color>
+    <Color x:Key="PrimaryOn">#F7F2EC</Color>
+    <Color x:Key="Background">#F7F2EC</Color>
+    <Color x:Key="CardSurface">#FFFCF8</Color>
+    <Color x:Key="SurfaceAlt">#EFE6DC</Color>
+    <Color x:Key="SurfaceWarm">#E8DDCF</Color>
+    <Color x:Key="InputSurface">#FFF9F2</Color>
+    <Color x:Key="Border">#D6CBC0</Color>
+    <Color x:Key="TextPrimary">#17212B</Color>
+    <Color x:Key="TextSecondary">#66717C</Color>
+    <Color x:Key="TextTertiary">#7A838C</Color>
+    <Color x:Key="InfoSurface">#E6EDF3</Color>
+    <Color x:Key="InfoText">#1C344C</Color>
+    <Color x:Key="InsightSurface">#E8DDCF</Color>
 
     <!-- Saf siyah kullanılmadan okunabilir metin tonları -->
-    <Color x:Key="Ink">#585762</Color>
-    <Color x:Key="InkSoft">#716F79</Color>
-    <Color x:Key="Muted">#7E7A83</Color>
-    <Color x:Key="Error">#936E76</Color>
+    <Color x:Key="Ink">#17212B</Color>
+    <Color x:Key="InkSoft">#3B4651</Color>
+    <Color x:Key="Muted">#66717C</Color>
+    <Color x:Key="Error">#7A3934</Color>
 
     <!-- Dönem detayı için düşük doygunluklu semantik tonlar -->
-    <Color x:Key="PositiveSurface">#DDEDE4</Color>
-    <Color x:Key="PositiveText">#355F50</Color>
-    <Color x:Key="DebtSurface">#F3DCD6</Color>
-    <Color x:Key="DebtText">#7B4A44</Color>
-    <Color x:Key="DeficitSurface">#F3D9DD</Color>
-    <Color x:Key="DeficitText">#7D4550</Color>
-    <Color x:Key="InterestSurface">#F5E2CF</Color>
-    <Color x:Key="InterestText">#76502F</Color>
-    <Color x:Key="ExpenseSurface">#F6E7CF</Color>
-    <Color x:Key="ExpenseText">#72582F</Color>
-    <Color x:Key="ProjectionSurface">#E1E5F5</Color>
-    <Color x:Key="ProjectionText">#4D567E</Color>
-    <Color x:Key="WarningSurface">#F6E8C9</Color>
-    <Color x:Key="WarningText">#6F5727</Color>
+    <Color x:Key="PositiveSurface">#E0EEE6</Color>
+    <Color x:Key="PositiveText">#285947</Color>
+    <Color x:Key="DebtSurface">#EEE1D6</Color>
+    <Color x:Key="DebtText">#6A4634</Color>
+    <Color x:Key="DeficitSurface">#F0DDD8</Color>
+    <Color x:Key="DeficitText">#7A3934</Color>
+    <Color x:Key="InterestSurface">#EFE2D4</Color>
+    <Color x:Key="InterestText">#6B4E2E</Color>
+    <Color x:Key="ExpenseSurface">#F1E4D8</Color>
+    <Color x:Key="ExpenseText">#68513A</Color>
+    <Color x:Key="ProjectionSurface">#E6EDF3</Color>
+    <Color x:Key="ProjectionText">#1C344C</Color>
+    <Color x:Key="WarningSurface">#F0E2C9</Color>
+    <Color x:Key="WarningText">#634C22</Color>
 
-    <Color x:Key="Canvas">#FFFACF</Color>
-    <Color x:Key="Surface">#FFE4BF</Color>
-    <Color x:Key="HeroSurface">#BFCFFF</Color>
-    <Color x:Key="FlyoutHeaderSurface">#FFCABF</Color>
-    <Color x:Key="Mint">#BFEAFF</Color>
-    <Color x:Key="MintStrong">#6C6B78</Color>
-    <Color x:Key="PrimaryDeep">#585762</Color>
-    <Color x:Key="Lime">#FFCABF</Color>
-    <Color x:Key="Sun">#FFE4BF</Color>
-    <Color x:Key="SoftBlue">#BFEAFF</Color>
-    <Color x:Key="Line">#BFCFFF</Color>
-    <Color x:Key="White">#FFFACF</Color>
+    <Color x:Key="Canvas">#F7F2EC</Color>
+    <Color x:Key="Surface">#FFFCF8</Color>
+    <Color x:Key="HeroSurface">#E8DDCF</Color>
+    <Color x:Key="FlyoutHeaderSurface">#0D1B2A</Color>
+    <Color x:Key="Mint">#E0EEE6</Color>
+    <Color x:Key="MintStrong">#285947</Color>
+    <Color x:Key="PrimaryDeep">#0D1B2A</Color>
+    <Color x:Key="Lime">#E8DDCF</Color>
+    <Color x:Key="Sun">#EFE6DC</Color>
+    <Color x:Key="SoftBlue">#E6EDF3</Color>
+    <Color x:Key="Line">#D6CBC0</Color>
+    <Color x:Key="White">#FFFCF8</Color>
 </ResourceDictionary>

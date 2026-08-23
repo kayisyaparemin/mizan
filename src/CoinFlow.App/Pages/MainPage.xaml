@@ -21,7 +21,7 @@
             <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" />
 
             <Border IsVisible="{Binding HasPendingReview}"
-                    BackgroundColor="{StaticResource SoftPink}"
+                    BackgroundColor="{StaticResource WarningSurface}"
                     StrokeThickness="0">
                 <VerticalStackLayout Spacing="8">
                     <Label Text="{Binding PendingReviewTitle}"
@@ -34,7 +34,7 @@
             </Border>
 
             <Border IsVisible="{Binding IsEmptyState}"
-                    BackgroundColor="{StaticResource SoftSky}">
+                    BackgroundColor="{StaticResource InfoSurface}">
                 <VerticalStackLayout Spacing="10">
                     <Label Text="Henüz finansal plan oluşturulmadı."
                            Style="{StaticResource SectionTitle}" />
@@ -47,7 +47,7 @@
 
             <VerticalStackLayout IsVisible="{Binding HasFinancialPlan}"
                                  Spacing="16">
-            <Border BackgroundColor="{StaticResource SoftSky}">
+            <Border BackgroundColor="{StaticResource SurfaceAlt}">
                 <VerticalStackLayout Spacing="8">
                     <Label Text="GÜNCEL FİNANSAL DURUM" Style="{StaticResource Eyebrow}" />
                     <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" RowSpacing="7">
@@ -100,7 +100,7 @@
                 </VerticalStackLayout>
             </Border>
 
-            <Border IsVisible="{Binding HasPreFirstSalaryPayments}" BackgroundColor="{StaticResource SoftPink}">
+            <Border IsVisible="{Binding HasPreFirstSalaryPayments}" BackgroundColor="{StaticResource WarningSurface}">
                 <VerticalStackLayout Spacing="9">
                     <Label Text="Sonraki Maaştan Önce" Style="{StaticResource SectionTitle}" />
                     <Label Text="Bu ödemelerin son ödeme tarihi bir sonraki maaştan önce." Style="{StaticResource MutedText}" />
@@ -127,7 +127,7 @@
                 </VerticalStackLayout>
             </Border>
 
-            <Border IsVisible="{Binding HasUndeterminedCardPayment}" BackgroundColor="{StaticResource SoftPink}">
+            <Border IsVisible="{Binding HasUndeterminedCardPayment}" BackgroundColor="{StaticResource WarningSurface}">
                 <Label Text="Bazı kart ödemeleri henüz seçilmedi. Bu dönemlerin tahmini eksik olabilir." />
             </Border>
 
@@ -152,7 +152,7 @@
                 </VerticalStackLayout>
             </VerticalStackLayout>
 
-            <Border BackgroundColor="{StaticResource SoftSky}">
+            <Border BackgroundColor="{StaticResource InfoSurface}">
                 <VerticalStackLayout Spacing="8">
                     <Label Text="12 AY SONRA" Style="{StaticResource Eyebrow}" />
                     <Label Text="Tahmini finansal durum" Style="{StaticResource MutedText}" />

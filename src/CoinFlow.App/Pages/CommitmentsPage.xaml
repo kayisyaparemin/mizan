@@ -11,11 +11,13 @@
             <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
                 <Button Text="Gelirler"
                         Command="{Binding ShowIncomeCommand}"
-                        BackgroundColor="{StaticResource SoftSky}" />
+                        BackgroundColor="{StaticResource InfoSurface}"
+                        TextColor="{StaticResource Primary}" />
                 <Button Grid.Column="1"
                         Text="Ödemeler"
                         Command="{Binding ShowPaymentsCommand}"
-                        BackgroundColor="{StaticResource SoftPink}" />
+                        BackgroundColor="{StaticResource SurfaceWarm}"
+                        TextColor="{StaticResource Primary}" />
             </Grid>
 
             <Border>
@@ -226,7 +228,8 @@
                                             Clicked="OnDeleteClicked"
                                             MinimumHeightRequest="38"
                                             Padding="12,5"
-                                            BackgroundColor="{StaticResource SoftPink}" />
+                                            BackgroundColor="{StaticResource DeficitSurface}"
+                                            TextColor="{StaticResource DeficitText}" />
                                 </HorizontalStackLayout>
                             </VerticalStackLayout>
                         </Border>
