@@ -9,7 +9,7 @@ on:
       version:
         description: Version name for signing smoke test
         required: false
-        default: '1.0.1'
+        default: '1.0.3'
 
 permissions:
   contents: write
@@ -201,14 +201,17 @@ jobs:
           cat > release-notes.md <<NOTES
           # Mizan $version
 
-          Bu sürüm Simülatör'ün ileriye dönük finansal görünümünü daha anlaşılır hale getirir.
+          Bu sürüm Mizan'ın ilk kurulum, Ana Sayfa, Finansal Yapı ve kredi kartı yönetim akışlarını sadeleştirir.
 
           ### Değişiklikler
 
-          - Simülatör artık girdiğin planı tekrar etmek yerine önündeki dönemlerde finansal olarak ne yaşayacağını öne çıkarır.
-          - Sıkışık dönemler, gelirlerin yetmediği aylar, finansman açığı ve toparlanma daha anlaşılır gösterilir.
-          - Dönem detaylarında gelir, toplam ihtiyaç ve dönem sonu görünümü sadeleştirildi.
-          - Çeşitli stabilite ve geliştirme süreci iyileştirmeleri yapıldı.
+          - İlk kullanımda Mizan'ı adım adım hazırlayan onboarding akışı eklendi.
+          - Development sürümünde örnek kurulum onboarding üzerinden doldurulabilir hale geldi.
+          - Ana Sayfa tek tek açılan modüllerden oluşan daha sakin bir kontrol merkezine dönüştürüldü.
+          - Gelir ve ödeme yönetimi Finansal Yapı altında anlamlı gruplara ayrıldı.
+          - Global + Ekle akışı gelir, kredi, ödeme ve kart harcaması eklemeyi hızlandırdı.
+          - Kredi kartı ödeme tercihi, fallback seçimi ve gelecek harcamalar için odaklı kart kontrol ekranı eklendi.
+          - Kullanıcı dili Mevcut Tutar, Güncel Durum, Son Güncelleme ve Dönem kavramları etrafında sadeleştirildi.
           NOTES
 
       - name: Upload signed APK artifact
