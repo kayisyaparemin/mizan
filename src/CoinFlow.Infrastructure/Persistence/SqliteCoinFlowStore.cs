@@ -592,6 +592,62 @@ public sealed class SqliteCoinFlowStore : ICoinFlowStore, IAsyncDisposable
         });
     }
 
+    public async Task ApplyOnboardingSetupAsync(
+        OnboardingPersistenceBatch batch,
+        CancellationToken cancellationToken = default)
+    {
+        await InitializeAsync(cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        await _database.RunInTransactionAsync(connection =>
+        {
+            UpdateSettings(connection, batch.Settings);
+
+            foreach (var salary in batch.Salaries)
+            {
+                connection.InsertOrReplace(ToRow(salary));
+            }
+
+            foreach (var income in batch.OtherIncomes)
+            {
+                connection.InsertOrReplace(ToRow(income));
+            }
+
+            foreach (var loan in batch.Loans)
+            {
+                connection.InsertOrReplace(ToRow(loan));
+            }
+
+            foreach (var plan in batch.PaymentPlans)
+            {
+                InsertPaymentPlan(connection, plan);
+            }
+
+            foreach (var card in batch.CreditCards)
+            {
+                InsertCreditCard(connection, card);
+            }
+
+            foreach (var expense in batch.PlannedLargeExpenses)
+            {
+                connection.InsertOrReplace(ToRow(expense));
+            }
+
+            foreach (var strategy in batch.PaymentAssignmentStrategies)
+            {
+                connection.InsertOrReplace(ToRow(strategy));
+            }
+
+            connection.Execute(
+                "UPDATE financial_snapshots SET IsCurrent = 0 WHERE IsCurrent = 1");
+            connection.Insert(ToRow(batch.CurrentSnapshot with
+            {
+                IsCurrent = true
+            }));
+            InsertPlan(connection, batch.CurrentPlan);
+        });
+    }
+
     public async Task<FinancialHistoryData> GetFinancialHistoryAsync(
         CancellationToken cancellationToken = default)
     {
@@ -1387,9 +1443,29 @@ public sealed class SqliteCoinFlowStore : ICoinFlowStore, IAsyncDisposable
     private static void InsertActual(SQLiteConnection connection, PeriodActual actual)
     {
         connection.Insert(ToRow(actual));
-        foreach (var payment in actual.Payments) connection.Insert(ToRow(payment with { PeriodActualId = actual.Id }));
-        foreach (var flow in actual.Flows) connection.Insert(ToRow(flow with { PeriodActualId = actual.Id }));
-        foreach (var item in actual.LivingBreakdown) connection.Insert(ToRow(item with { PeriodActualId = actual.Id }));
+        foreach (var payment in actual.Payments)
+        {
+            connection.Insert(ToRow(payment with
+            {
+                PeriodActualId = actual.Id
+            }));
+        }
+
+        foreach (var flow in actual.Flows)
+        {
+            connection.Insert(ToRow(flow with
+            {
+                PeriodActualId = actual.Id
+            }));
+        }
+
+        foreach (var item in actual.LivingBreakdown)
+        {
+            connection.Insert(ToRow(item with
+            {
+                PeriodActualId = actual.Id
+            }));
+        }
     }
 
     private static void InsertRevision(
@@ -1418,28 +1494,53 @@ public sealed class SqliteCoinFlowStore : ICoinFlowStore, IAsyncDisposable
             OriginalAmount = plan.OriginalAmount,
             TotalRepaymentAmount = plan.TotalRepaymentAmount
         });
-        connection.Execute("DELETE FROM payment_installments WHERE PlanId = ?", Key(plan.Id));
+        connection.Execute(
+            "DELETE FROM payment_installments WHERE PlanId = ?",
+            Key(plan.Id));
         foreach (var installment in plan.Installments)
         {
-            connection.Insert(ToRow(installment with { PlanId = plan.Id }));
+            connection.Insert(ToRow(installment with
+            {
+                PlanId = plan.Id
+            }));
         }
     }
 
     private static void InsertCreditCard(SQLiteConnection connection, CreditCard card)
     {
         connection.InsertOrReplace(ToRow(card));
-        connection.Execute("DELETE FROM card_installments WHERE CreditCardId = ?", Key(card.Id));
-        foreach (var charge in card.Charges) connection.Insert(ToRow(charge with { CreditCardId = card.Id }));
-        connection.Execute("DELETE FROM credit_card_payment_plans WHERE CreditCardId = ?", Key(card.Id));
-        foreach (var payment in card.PaymentPlans) connection.Insert(ToRow(payment with { CreditCardId = card.Id }));
+        connection.Execute(
+            "DELETE FROM card_installments WHERE CreditCardId = ?",
+            Key(card.Id));
+        foreach (var charge in card.Charges)
+        {
+            connection.Insert(ToRow(charge with
+            {
+                CreditCardId = card.Id
+            }));
+        }
+
+        connection.Execute(
+            "DELETE FROM credit_card_payment_plans WHERE CreditCardId = ?",
+            Key(card.Id));
+        foreach (var payment in card.PaymentPlans)
+        {
+            connection.Insert(ToRow(payment with
+            {
+                CreditCardId = card.Id
+            }));
+        }
     }
 
     private static void UpdateSettings(SQLiteConnection connection, UserSettings settings)
     {
         var row = connection.Table<SettingsRow>().First();
-        row.SalaryDay = settings.SalaryDay; row.MonthlyLivingBudget = settings.MonthlyLivingBudget;
+        row.SalaryDay = settings.SalaryDay;
+        row.MonthlyLivingBudget = settings.MonthlyLivingBudget;
         row.ProjectionStartingSavings = settings.ProjectionStartingSavings;
-        row.ProjectionAnchorDate = settings.ProjectionAnchorDate == default ? null : FormatDate(settings.ProjectionAnchorDate);
+        row.ProjectionAnchorDate = settings.ProjectionAnchorDate == default
+            ? null
+            : FormatDate(settings.ProjectionAnchorDate);
         row.CreditCardCarryInterestRate = settings.CreditCardCarryInterestRate;
         row.DeficitFinancingInterestRate = settings.DeficitFinancingInterestRate;
         row.SchemaVersion = CurrentSchemaVersion;
@@ -1491,7 +1592,7 @@ public sealed class SqliteCoinFlowStore : ICoinFlowStore, IAsyncDisposable
                 CreatedAt = new DateTimeOffset(
                     _migrationDate.ToDateTime(TimeOnly.MinValue),
                     TimeSpan.Zero),
-                Note = "İlk maaş kullanım düzeni"
+                Note = "İlk gelir kullanım düzeni"
             }));
     }
 

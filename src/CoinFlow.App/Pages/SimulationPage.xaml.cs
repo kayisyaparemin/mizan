@@ -47,7 +47,7 @@ public partial class SimulationPage : ContentPage
                 result.Message,
                 result.Destination == SimulationApplyDestination.Settings
                     ? "Ayarlarda Gör"
-                    : "Gelir & Ödemelerde Gör",
+                    : "Finansal Yapıda Gör",
                 "Tamam");
             if (showRecord)
             {
@@ -61,7 +61,12 @@ public partial class SimulationPage : ContentPage
         {
             SimulationApplyDestination.CreditCard =>
                 Shell.Current.GoToAsync(
-                    $"//commitments/commitments-content?section=payment&cardId={result.EntityId}"),
+                    AppShell.CardControlRoute,
+                    new ShellNavigationQueryParameters
+                    {
+                        [CardControlViewModel.CardIdQueryKey] =
+                            result.EntityId.ToString("D")
+                    }),
             SimulationApplyDestination.Payments =>
                 Shell.Current.GoToAsync(
                     "//commitments/commitments-content?section=payment"),

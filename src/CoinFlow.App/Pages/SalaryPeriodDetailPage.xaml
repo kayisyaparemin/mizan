@@ -354,7 +354,7 @@
                                FontFamily="OpenSansSemibold"
                                FontSize="25"
                                TextColor="{StaticResource DeficitText}" />
-                        <Label Text="Bu maaşın önce bu açığı kapatması gerekiyor."
+                        <Label Text="Bu dönem gelirinin önce bu açığı kapatması gerekiyor."
                                TextColor="{StaticResource InkSoft}" />
                         <Label Text="{Binding Detail.Deficit.CoveredText}"
                                IsVisible="{Binding Detail.Deficit.HasCoveredAmount}"
@@ -487,7 +487,7 @@
                                                     Margin="0,0,6,3"
                                                     IsVisible="{Binding IsBeforeFundingSalary}"
                                                     BackgroundColor="{StaticResource WarningSurface}">
-                                                <Label Text="Maaştan Önce"
+                                                <Label Text="Dönemden Önce"
                                                        FontSize="11"
                                                        TextColor="{StaticResource WarningText}" />
                                             </Border>
@@ -513,7 +513,7 @@
                             </DataTemplate>
                         </BindableLayout.ItemTemplate>
                     </VerticalStackLayout>
-                    <Label Text="Maaştan Önce: Son ödeme tarihi, bu ödemeyi karşılayan maaştan önce."
+                    <Label Text="Dönemden Önce: Son ödeme tarihi, bu ödemeyi karşılayan dönem gelirinden önce."
                            IsVisible="{Binding Detail.HasBeforeSalaryPayments}"
                            Style="{StaticResource MutedText}" />
                     <Label Text="Tahmini: Gerçek kart ödeme planı girilmediği için seçtiğin gelecek hesaplama tercihi kullanıldı."

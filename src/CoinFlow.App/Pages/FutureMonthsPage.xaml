@@ -3,17 +3,17 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="CoinFlow.App.Pages.FutureMonthsPage"
              x:Name="PageRoot"
-             Title="12 Aylık">
+             Title="12 Dönem">
     <Grid RowDefinitions="Auto,*" Padding="20,18,20,12" RowSpacing="14">
         <VerticalStackLayout Spacing="10">
             <Label Text="FİNANSAL GÖRÜNÜM" Style="{StaticResource Eyebrow}" />
-            <Label Text="12 Aylık" Style="{StaticResource PageTitle}" />
-            <Label Text="Önümüzdeki 12 maaş döneminde finansal durumunun nasıl değişeceğini gör." Style="{StaticResource MutedText}" />
+            <Label Text="12 Dönem" Style="{StaticResource PageTitle}" />
+            <Label Text="Önümüzdeki 12 dönemde finansal durumunun nasıl değişeceğini gör." Style="{StaticResource MutedText}" />
             <Border Padding="14"
                     IsVisible="{Binding HasInterestSummary}"
                     BackgroundColor="{StaticResource SoftPink}">
                 <VerticalStackLayout Spacing="6">
-                    <Label Text="12 Aylık Tahmini Faiz Yükü" Style="{StaticResource SectionTitle}" />
+                    <Label Text="12 Dönem Tahmini Faiz Yükü" Style="{StaticResource SectionTitle}" />
                     <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto" RowSpacing="5">
                         <Label Text="Kredi kartı" Style="{StaticResource MutedText}" />
                         <Label Grid.Column="1" Text="{Binding TotalCreditCardInterest}" />
@@ -43,11 +43,11 @@
                 BackgroundColor="{StaticResource SoftSky}"
                 VerticalOptions="Start">
             <VerticalStackLayout Spacing="10">
-                <Label Text="Henüz 12 aylık plan yok."
+                <Label Text="Henüz 12 dönemlik plan yok."
                        Style="{StaticResource SectionTitle}" />
                 <Label Text="{Binding EmptyStateMessage}"
                        Style="{StaticResource MutedText}" />
-                <Button Text="Gelir &amp; Ödemelere Git"
+                <Button Text="Finansal Yapıya Git"
                         Command="{Binding OpenCommitmentsCommand}" />
             </VerticalStackLayout>
         </Border>

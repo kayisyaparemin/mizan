@@ -18,15 +18,15 @@ public partial class InitialStrategyPage : ContentPage
         InitializeComponent();
         _viewModel = viewModel;
         PreviousDescription =
-            $"{DateText(setup.ExampleSalaryDate)} maaşıyla " +
+            $"{DateText(setup.ExampleSalaryDate)} dönemiyle " +
             $"{DateText(setup.PreviousExampleStart)}–" +
             $"{DateText(setup.ExampleSalaryDate)} dönemindeki ödemeleri kapatırım.";
         UpcomingDescription =
-            $"{DateText(setup.ExampleSalaryDate)} maaşıyla " +
+            $"{DateText(setup.ExampleSalaryDate)} dönemiyle " +
             $"{DateText(setup.ExampleSalaryDate)}–" +
             $"{DateText(setup.UpcomingExampleEnd)} dönemindeki ödemeleri karşılarım.";
         EffectiveDescription =
-            $"İlk kararın {setup.EffectiveSalaryDate:dd.MM.yyyy} maaşından itibaren geçerli olacak. Planlama başlangıcı: {setup.ProjectionAnchorDate:dd.MM.yyyy}.";
+            $"İlk kararın {setup.EffectiveSalaryDate:dd.MM.yyyy} döneminden itibaren geçerli olacak. Son güncelleme: {setup.ProjectionAnchorDate:dd.MM.yyyy}.";
         BindingContext = this;
     }
 

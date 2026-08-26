@@ -30,6 +30,104 @@ public sealed class CoinFlowService(
         CancellationToken cancellationToken = default) =>
         store.LoadCanonicalDevelopmentDataAsync(cancellationToken);
 
+    public async Task<bool> IsOnboardingRequiredAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var plan = await LoadFinancialPlanCoreAsync(cancellationToken);
+        var history = await store.GetFinancialHistoryAsync(cancellationToken);
+        if (FinancialSnapshotService.LatestCurrent(history) is not null)
+        {
+            return false;
+        }
+
+        if (!CanBuildProjection(plan))
+        {
+            return true;
+        }
+
+        await snapshotService.EnsureInitialSnapshotAsync(
+            plan,
+            cancellationToken);
+        return false;
+    }
+
+    public async Task InitializeFromOnboardingAsync(
+        OnboardingDraft draft,
+        CancellationToken cancellationToken = default)
+    {
+        ValidateOnboardingDraft(draft);
+
+        var settings = draft.Settings with
+        {
+            ProjectionAnchorDate = draft.Settings.ProjectionAnchorDate == default
+                ? clock.Today
+                : draft.Settings.ProjectionAnchorDate
+        };
+        var paymentPlans = draft.PaymentPlans
+            .Select(NormalizePaymentPlan)
+            .ToArray();
+        var cards = draft.CreditCards
+            .Select(NormalizeCreditCard)
+            .ToArray();
+        var strategy = new PaymentAssignmentStrategy
+        {
+            Mode = draft.InitialPaymentAssignmentMode,
+            EffectiveFromSalaryDate = salaryPeriodCalculator
+                .GetFirstSalaryOnOrAfter(
+                    settings.ProjectionAnchorDate,
+                    settings.SalaryDay),
+            CreatedAt = clock.UtcNow,
+            Note = "İlk gelir kullanım düzeni"
+        };
+        var plan = new FinancialPlan
+        {
+            Settings = settings,
+            Salaries = draft.Salaries
+                .OrderBy(x => x.EffectiveDate)
+                .ToArray(),
+            OtherIncomes = draft.OtherIncomes
+                .OrderBy(x => x.ExactDate)
+                .ToArray(),
+            Loans = draft.Loans
+                .OrderBy(x => x.NextPaymentDate)
+                .ToArray(),
+            PaymentPlans = paymentPlans
+                .OrderBy(x => x.Installments.Min(i => i.DueDate))
+                .ToArray(),
+            CreditCards = cards
+                .OrderBy(x => x.Bank)
+                .ThenBy(x => x.Name)
+                .ToArray(),
+            PlannedLargeExpenses = draft.PlannedLargeExpenses
+                .OrderBy(x => x.ExactDate)
+                .ToArray(),
+            PaymentAssignmentStrategies = [strategy]
+        };
+        var bundle = snapshotService.Build(
+            plan,
+            settings.ProjectionStartingSavings,
+            settings.ProjectionAnchorDate,
+            FinancialSnapshotSource.Initial,
+            string.IsNullOrWhiteSpace(draft.SnapshotNote)
+                ? "İlk güncel finansal durum"
+                : draft.SnapshotNote,
+            null);
+
+        await store.ApplyOnboardingSetupAsync(
+            new OnboardingPersistenceBatch(
+                bundle.UpdatedSettings,
+                plan.Salaries,
+                plan.OtherIncomes,
+                plan.Loans,
+                plan.PaymentPlans,
+                plan.CreditCards,
+                plan.PlannedLargeExpenses,
+                plan.PaymentAssignmentStrategies,
+                bundle.Snapshot,
+                bundle.Plan),
+            cancellationToken);
+    }
+
     public async Task<FinancialPlan> GetFinancialPlanAsync(
         CancellationToken cancellationToken = default)
     {
@@ -153,7 +251,7 @@ public sealed class CoinFlowService(
         if (!CanBuildProjection(query.Plan))
         {
             throw new InvalidOperationException(
-                "Simülasyon yapabilmek için önce maaşını ve maaş kullanım düzenini oluştur.");
+                "Simülasyon yapabilmek için önce gelirini ve gelir kullanım düzenini oluştur.");
         }
 
         return simulationCalculator.Calculate(
@@ -263,7 +361,7 @@ public sealed class CoinFlowService(
         if (conflictingSalary is not null)
         {
             throw new InvalidOperationException(
-                "Bu tarihte zaten bir maaş kaydı var. Geçmişi korumak için farklı bir geçerlilik tarihi seçin.");
+                "Bu tarihte zaten bir gelir kaydı var. Geçmişi korumak için farklı bir geçerlilik tarihi seçin.");
         }
 
         var conflictingStrategy = requests.FirstOrDefault(request =>
@@ -274,7 +372,7 @@ public sealed class CoinFlowService(
         if (conflictingStrategy is not null)
         {
             throw new InvalidOperationException(
-                "Bu maaş tarihinde zaten bir kullanım düzeni var. Önceki kayıt değiştirilemez.");
+                "Bu dönem tarihinde zaten bir kullanım düzeni var. Önceki kayıt değiştirilemez.");
         }
     }
 
@@ -357,13 +455,13 @@ public sealed class CoinFlowService(
                         request,
                         batch.Salaries.Single().Id,
                         SimulationApplyDestination.SalaryHistory,
-                        "Maaş değişikliği kaydedildi."),
+                        "Gelir değişikliği kaydedildi."),
                 SimulationScenarioType.PaymentStrategyChange =>
                     AppliedResult(
                         request,
                         batch.PaymentAssignmentStrategies.Single().Id,
                         SimulationApplyDestination.Settings,
-                        "Maaş kullanım düzeni kaydedildi."),
+                        "Gelir kullanım düzeni kaydedildi."),
                 _ => throw new ArgumentOutOfRangeException(nameof(requests))
             };
         }
@@ -417,11 +515,11 @@ public sealed class CoinFlowService(
             SimulationScenarioType.SalaryChange
                 when plan.Salaries.Any(x => x.Id == entityId) =>
                 AppliedResult(request, entityId, SimulationApplyDestination.SalaryHistory,
-                    "Maaş değişikliği daha önce kaydedildi."),
+                    "Gelir değişikliği daha önce kaydedildi."),
             SimulationScenarioType.PaymentStrategyChange
                 when plan.PaymentAssignmentStrategies.Any(x => x.Id == entityId) =>
                 AppliedResult(request, entityId, SimulationApplyDestination.Settings,
-                    "Maaş kullanım düzeni değişikliği daha önce kaydedildi."),
+                    "Gelir kullanım düzeni değişikliği daha önce kaydedildi."),
             _ => null
         };
     }
@@ -444,12 +542,12 @@ public sealed class CoinFlowService(
         if (entry.Amount <= 0m)
         {
             throw new InvalidOperationException(
-                "Maaş tutarı sıfırdan büyük olmalıdır.");
+                "Gelir tutarı sıfırdan büyük olmalıdır.");
         }
 
         await store.UpsertSalaryAsync(entry, cancellationToken);
         await CapturePlanningChangeAsync(
-            "Maaş planı değişti",
+            "Gelir planı değişti",
             cancellationToken);
         return await GetInitialPaymentStrategySetupAsync(cancellationToken);
     }
@@ -498,19 +596,19 @@ public sealed class CoinFlowService(
         if (!Enum.IsDefined(mode))
         {
             throw new InvalidOperationException(
-                "Maaş kullanım düzeni geçersiz.");
+                "Gelir kullanım düzeni geçersiz.");
         }
 
         var setup = await GetInitialPaymentStrategySetupAsync(
             cancellationToken) ?? throw new InvalidOperationException(
-                "İlk maaş kullanım düzeni kurulumu gerekli değil veya zaten tamamlandı.");
+                "İlk gelir kullanım düzeni kurulumu gerekli değil veya zaten tamamlandı.");
         await store.UpsertPaymentAssignmentStrategyAsync(
             new PaymentAssignmentStrategy
             {
                 Mode = mode,
                 EffectiveFromSalaryDate = setup.EffectiveSalaryDate,
                 CreatedAt = clock.UtcNow,
-                Note = "İlk maaş kullanım düzeni"
+                Note = "İlk gelir kullanım düzeni"
             },
             cancellationToken);
         await GetFinancialPlanAsync(cancellationToken);
@@ -522,7 +620,7 @@ public sealed class CoinFlowService(
     {
         await store.DeleteSalaryAsync(id, cancellationToken);
         await CapturePlanningChangeAsync(
-            "Maaş planı değişti",
+            "Gelir planı değişti",
             cancellationToken);
     }
 
@@ -931,7 +1029,7 @@ public sealed class CoinFlowService(
         var request = CreateStrategySimulationRequest(
             newMode,
             effectiveSalaryDate,
-            "Maaş kullanım düzeni önizlemesi");
+            "Gelir kullanım düzeni önizlemesi");
         var firstSalary =
             query.Boundary?.FirstUnrealizedSalaryDate ??
             salaryPeriodCalculator.GetFirstSalaryOnOrAfter(
@@ -967,7 +1065,7 @@ public sealed class CoinFlowService(
         if (!Enum.IsDefined(strategy.Mode))
         {
             throw new InvalidOperationException(
-                "Maaş kullanım düzeni geçersiz.");
+                "Gelir kullanım düzeni geçersiz.");
         }
 
         var existing = plan.PaymentAssignmentStrategies
@@ -990,7 +1088,7 @@ public sealed class CoinFlowService(
                 !confirmedHistoricalCorrection)
             {
                 throw new InvalidOperationException(
-                    "Bu maaş tarihindeki geçmiş kayıt yalnızca onaylı düzeltme ile değiştirilebilir.");
+                    "Bu dönem tarihindeki geçmiş kayıt yalnızca onaylı düzeltme ile değiştirilebilir.");
             }
 
             await store.DeletePaymentAssignmentStrategyAsync(
@@ -1005,7 +1103,7 @@ public sealed class CoinFlowService(
             },
             cancellationToken);
         await CapturePlanningChangeAsync(
-            "Maaş kullanım düzeni değişti",
+            "Gelir kullanım düzeni değişti",
             cancellationToken);
     }
 
@@ -1042,7 +1140,7 @@ public sealed class CoinFlowService(
             firstSalary);
         await store.DeletePaymentAssignmentStrategyAsync(id, cancellationToken);
         await CapturePlanningChangeAsync(
-            "Maaş kullanım düzeni değişti",
+            "Gelir kullanım düzeni değişti",
             cancellationToken);
     }
 
@@ -1066,7 +1164,7 @@ public sealed class CoinFlowService(
                 plan.Settings.SalaryDay))
         {
             throw new InvalidOperationException(
-                "Düzen değişikliği yalnızca bir maaş tarihinde başlayabilir.");
+                "Düzen değişikliği yalnızca bir dönem tarihinde başlayabilir.");
         }
     }
 
@@ -1133,6 +1231,119 @@ public sealed class CoinFlowService(
     private sealed record ProjectionQueryPlan(
         FinancialPlan Plan,
         ProjectionBoundary? Boundary);
+
+    private static void ValidateOnboardingDraft(OnboardingDraft draft)
+    {
+        CalendarRules.ValidateDay(draft.Settings.SalaryDay);
+        if (draft.Settings.MonthlyLivingBudget < 0m)
+        {
+            throw new InvalidOperationException(
+                "Yaşam gideri negatif olamaz.");
+        }
+
+        if (draft.Settings.CreditCardCarryInterestRate is < 0m or > 1m ||
+            draft.Settings.DeficitFinancingInterestRate is < 0m or > 1m)
+        {
+            throw new InvalidOperationException(
+                "Faiz varsayımları %0 ile %100 arasında olmalıdır.");
+        }
+
+        if (draft.Salaries.Count == 0)
+        {
+            throw new InvalidOperationException(
+                "Başlamak için en az bir gelir eklemelisin.");
+        }
+
+        if (draft.Salaries.Any(x => x.Amount <= 0m))
+        {
+            throw new InvalidOperationException(
+                "Gelir tutarı sıfırdan büyük olmalıdır.");
+        }
+
+        if (draft.OtherIncomes.Any(x => x.Amount <= 0m))
+        {
+            throw new InvalidOperationException(
+                "Tek seferlik gelir tutarı sıfırdan büyük olmalıdır.");
+        }
+
+        foreach (var loan in draft.Loans)
+        {
+            if (loan.MonthlyPayment <= 0m ||
+                loan.RemainingInstallmentCount < 1)
+            {
+                throw new InvalidOperationException(
+                    "Kredi taksiti ve kalan taksit sayısı pozitif olmalıdır.");
+            }
+
+            CalendarRules.ValidateDay(loan.PaymentDay);
+        }
+
+        foreach (var plan in draft.PaymentPlans)
+        {
+            if (plan.Installments.Count == 0 ||
+                plan.Installments.Any(x => x.Amount <= 0m))
+            {
+                throw new InvalidOperationException(
+                    "Ödeme planında en az bir pozitif ödeme olmalıdır.");
+            }
+        }
+
+        foreach (var card in draft.CreditCards)
+        {
+            if (card.Limit <= 0m)
+            {
+                throw new InvalidOperationException(
+                    "Kart limiti sıfırdan büyük olmalıdır.");
+            }
+
+            if (card.CarriedBalance < 0m ||
+                card.UnbilledSpending < 0m ||
+                card.MinimumPaymentRate is <= 0m or > 1m ||
+                card.Charges.Any(x => x.Amount <= 0m))
+            {
+                throw new InvalidOperationException(
+                    "Kart tutarları ve asgari oran geçersiz.");
+            }
+
+            ValidateCreditCardPaymentSettings(card);
+        }
+
+        if (draft.PlannedLargeExpenses.Any(x => x.Amount <= 0m))
+        {
+            throw new InvalidOperationException(
+                "Planlı ödeme tutarı sıfırdan büyük olmalıdır.");
+        }
+
+        if (!Enum.IsDefined(draft.InitialPaymentAssignmentMode))
+        {
+            throw new InvalidOperationException(
+                "Gelir kullanım düzeni geçersiz.");
+        }
+    }
+
+    private static TemporaryPaymentPlan NormalizePaymentPlan(
+        TemporaryPaymentPlan plan) => plan with
+        {
+            Installments = plan.Installments
+                .OrderBy(x => x.DueDate)
+                .Select(x => x with { PlanId = plan.Id })
+                .ToArray()
+        };
+
+    private CreditCard NormalizeCreditCard(CreditCard card) => card with
+    {
+        BalanceAsOfDate = card.BalanceAsOfDate == default
+            ? clock.Today
+            : card.BalanceAsOfDate,
+        Charges = card.Charges
+            .OrderBy(x => x.PostingDate)
+            .Select(x => x with { CreditCardId = card.Id })
+            .ToArray(),
+        PaymentPlans = card.PaymentPlans
+            .OrderBy(x => x.DueDate)
+            .Select(x => x with { CreditCardId = card.Id })
+            .ToArray()
+    };
 
     private static void ValidateCreditCardPaymentSettings(CreditCard card)
     {

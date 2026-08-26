@@ -458,7 +458,7 @@ public sealed class SimulationTests
         var reversed = calculator.Calculate(
             plan,
             new DateOnly(2026, 8, 20),
-            requests.Reverse().ToArray());
+            Enumerable.Reverse(requests).ToArray());
 
         Assert.Equal(
             forward.Scenario.Select(x => x.MandatoryOutflow),
@@ -532,7 +532,7 @@ public sealed class SimulationTests
                     plan,
                     new DateOnly(2026, 8, 20),
                     requests));
-        Assert.Contains("iki farklı maaş değişikliği", exception.Message);
+        Assert.Contains("iki farklı gelir değişikliği", exception.Message);
     }
 
     [Fact]
@@ -661,7 +661,7 @@ public sealed class SimulationTests
         var reversed = calculator.Calculate(
             plan,
             new DateOnly(2026, 8, 20),
-            requests.Reverse().ToArray());
+            Enumerable.Reverse(requests).ToArray());
         var target = ReachableTarget(forward.Scenario);
         var targetCalculator = new TargetAmountCalculator();
 

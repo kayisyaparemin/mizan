@@ -26,8 +26,8 @@ public partial class SimulationViewModel(
         new("Tek seferlik ödeme", SimulationScenarioType.FutureOneTimePayment),
         new("Düzenli ödeme", SimulationScenarioType.RecurringPayment),
         new("Tek seferlik gelir", SimulationScenarioType.FutureIncome),
-        new("Maaş değişikliği", SimulationScenarioType.SalaryChange),
-        new("Maaş kullanım düzeni değişikliği", SimulationScenarioType.PaymentStrategyChange),
+        new("Gelir değişikliği", SimulationScenarioType.SalaryChange),
+        new("Gelir kullanım düzeni değişikliği", SimulationScenarioType.PaymentStrategyChange),
         new("Kart ekstresini tamamen kapat", SimulationScenarioType.CreditCardFullPayment)
     ];
 
@@ -166,7 +166,7 @@ public partial class SimulationViewModel(
             {
                 EmptyStateMessage = plan.Salaries.Count == 0
                     ? "Simülasyon yapabilmek için önce temel finans planını oluştur."
-                    : "Simülasyon için maaş kullanım düzenini seçerek finans planını tamamla.";
+                    : "Simülasyon için gelir kullanım düzenini seçerek finans planını tamamla.";
                 AssignmentModeText = string.Empty;
                 CreditCards.Clear();
                 StrategySalaryDates.Clear();
@@ -189,13 +189,13 @@ public partial class SimulationViewModel(
 
             var currentMode = overview.Current?.Mode ??
                               throw new InvalidOperationException(
-                                  "Maaş kullanım düzeni bulunamadı.");
+                                  "Gelir kullanım düzeni bulunamadı.");
             AssignmentModeText = AssignmentModeLabel(currentMode);
             StrategySalaryDates.Clear();
             foreach (var date in overview.AvailableEffectiveSalaryDates)
             {
                 StrategySalaryDates.Add(new SelectionOption<DateOnly>(
-                    $"{date.ToString("dd MMMM yyyy", TurkishCulture)} maaşı",
+                    $"{date.ToString("dd MMMM yyyy", TurkishCulture)} dönemi",
                     date));
             }
             SelectedStrategySalaryDate ??= StrategySalaryDates.FirstOrDefault();
@@ -294,11 +294,11 @@ public partial class SimulationViewModel(
             SimulationScenarioType.RecurringPayment =>
                 "Girilen tutar, belirtilen dönem sayısı boyunca aylık tekrarlanır.",
             SimulationScenarioType.FutureIncome =>
-                "Gelir, seçtiğin tarihin dahil olduğu maaş dönemine eklenir.",
+                "Gelir, seçtiğin tarihin dahil olduğu döneme eklenir.",
             SimulationScenarioType.SalaryChange =>
-                "Yeni maaş, seçtiğin tarihten itibaren kullanılır.",
+                "Yeni gelir, seçtiğin tarihten itibaren kullanılır.",
             SimulationScenarioType.PaymentStrategyChange =>
-                "Yeni düzen yalnızca seçtiğin maaştan itibaren hesaplanır; Simülasyon Yap finans kayıtlarını değiştirmez.",
+                "Yeni düzen yalnızca seçtiğin dönemden itibaren hesaplanır; Simülasyon Yap finans kayıtlarını değiştirmez.",
             SimulationScenarioType.CreditCardFullPayment =>
                 "Seçilen tarihte ekstrenin tamamı ödenir; sonraki dönemlerde kart faizi ve nakit akışı yeniden projekte edilir.",
             _ => string.Empty
@@ -562,7 +562,7 @@ public partial class SimulationViewModel(
             IsStrategyChange
                 ? SelectedStrategySalaryDate?.Value ??
                   throw new InvalidOperationException(
-                      "Planın başlayacağı maaşı seçmelisin.")
+                      "Planın başlayacağı dönemi seçmelisin.")
                 : DateOnly.FromDateTime(StartDate),
             count,
             NeedsFirstPayment
@@ -613,7 +613,7 @@ public partial class SimulationViewModel(
                 SimulationScenarioType.RecurringPayment =>
                 $"{request.PaymentCount} ödeme\nİlk ödeme: {request.FirstPaymentDate:dd MMMM yyyy}",
             SimulationScenarioType.PaymentStrategyChange =>
-                $"Başlangıç maaşı: {request.EffectiveSalaryDate:dd MMMM yyyy}",
+                $"Başlangıç dönemi: {request.EffectiveSalaryDate:dd MMMM yyyy}",
             _ => $"Tarih: {request.StartDate:dd MMMM yyyy}"
         };
         return $"Bu plan gerçek finans planına eklenecek.\n\n{summary}\n{detail}";
@@ -658,7 +658,7 @@ public partial class SimulationViewModel(
             { FirstReachedPeriod: { } reached } =>
                 $"Bu planla {Money(target)} seviyesine ilk kez {TargetPeriodText(reached.Period)} döneminde ulaşıyorsun.",
             _ =>
-                $"Bu planla {Money(target)} seviyesine 12 aylık görünüm içinde ulaşılamıyor."
+                $"Bu planla {Money(target)} seviyesine 12 dönemlik görünüm içinde ulaşılamıyor."
         };
         HasTargetResult = true;
     }
@@ -705,9 +705,9 @@ public partial class SimulationViewModel(
             SimulationScenarioType.FutureIncome =>
                 $"{amount} • Tek seferlik gelir",
             SimulationScenarioType.SalaryChange =>
-                $"{amount} • Yeni maaş",
+                $"{amount} • Yeni gelir",
             SimulationScenarioType.PaymentStrategyChange =>
-                $"{StrategyModeLabel(request.NewPaymentAssignmentMode)} • {request.EffectiveSalaryDate:dd MMMM yyyy} maaşı",
+                $"{StrategyModeLabel(request.NewPaymentAssignmentMode)} • {request.EffectiveSalaryDate:dd MMMM yyyy} dönemi",
             SimulationScenarioType.CreditCardFullPayment =>
                 $"{CardLabel(request.CreditCardId)} • Ekstre tam ödeme",
             _ => request.Name
@@ -725,8 +725,8 @@ public partial class SimulationViewModel(
             SimulationScenarioType.FutureOneTimePayment => "Tek seferlik ödeme",
             SimulationScenarioType.RecurringPayment => "Düzenli ödeme",
             SimulationScenarioType.FutureIncome => "Tek seferlik gelir",
-            SimulationScenarioType.SalaryChange => "Maaş değişikliği",
-            SimulationScenarioType.PaymentStrategyChange => "Maaş kullanım düzeni",
+            SimulationScenarioType.SalaryChange => "Gelir değişikliği",
+            SimulationScenarioType.PaymentStrategyChange => "Gelir kullanım düzeni",
             SimulationScenarioType.CreditCardFullPayment => "Kart ekstresini kapat",
             _ => "Koşul"
         };
@@ -826,18 +826,18 @@ public partial class SimulationViewModel(
         EndingDifference = Money(scenarioEnding - baselineEnding);
         AssignmentModeText = AssignmentModeLabel(
             result.Scenario[0].PaymentAssignmentMode);
-        TightestPeriod = SalaryText(result.Risk.LowestPeriod.Start);
+        TightestPeriod = PeriodTitle(result.Risk.LowestPeriod.Start);
         LowestAvailable = Money(result.Risk.LowestAvailableAfterMandatory);
         LowestSavingsCapacity = Money(result.Risk.LowestSavingsCapacity);
         LowestProjectedSavings = Money(result.Risk.LowestProjectedSavings);
         FirstNegativePeriod =
             result.Risk.FirstDeficitPeriod is { } negative
-                ? SalaryText(negative.Start)
-                : "12 aylık görünümde finansman açığı oluşmuyor.";
+                ? PeriodTitle(negative.Start)
+                : "12 dönemlik görünümde finansman açığı oluşmuyor.";
         MaximumCarryOverDeficit = Money(
             result.Risk.MaximumCarryOverDeficit);
         RecoveryPeriod = result.Risk.RecoveryPeriod is { } recovery
-            ? SalaryText(recovery.Start)
+            ? PeriodTitle(recovery.Start)
             : result.Risk.MaximumCarryOverDeficit > 0m
                 ? "Gösterilen dönemde kapanmıyor"
                 : "Gerekmedi";
@@ -870,7 +870,7 @@ public partial class SimulationViewModel(
         StrategyTransitionSummary = transition is null
             ? string.Empty
             : string.Join(Environment.NewLine,
-                $"Geçiş maaşı: {SalaryText(transition.PeriodStart)}",
+                $"Geçiş dönemi: {PeriodTitle(transition.PeriodStart)}",
                 $"Normal zorunlu ödemeler: {Money(result.Baseline.Single(x => x.PeriodStart == transition.PeriodStart).MandatoryOutflow)}",
                 $"Geçmiş düzenden kapanacak: {Money(transition.TransitionCatchUpAmount)}",
                 $"İleri dönem için ayrılacak: {Money(transition.ForwardFundedAmount)}",
@@ -897,16 +897,16 @@ public partial class SimulationViewModel(
         }
     }
 
-    private static string SalaryText(DateOnly salaryDate) =>
-        $"{salaryDate.ToString("dd MMMM yyyy", TurkishCulture)} Maaşı";
+    private static string PeriodTitle(DateOnly salaryDate) =>
+        $"{salaryDate.ToString("dd MMMM yyyy", TurkishCulture)} Dönemi";
 
     private static string TargetPeriodText(SalaryPeriod period) =>
         period.Start.ToString("MMMM yyyy", TurkishCulture);
 
     private static string AssignmentModeLabel(PaymentAssignmentMode mode) =>
         mode == PaymentAssignmentMode.PreviousPeriod
-            ? "Maaş kullanımı: Geçmiş dönemi kapatırım"
-            : "Maaş kullanımı: Gelecek dönemi karşılarım";
+            ? "Gelir kullanımı: Geçmiş dönemi kapatırım"
+            : "Gelir kullanımı: Gelecek dönemi karşılarım";
 
     private static decimal? ResolveMonthlyBurden(
         IReadOnlyList<SimulationRequest> requests,

@@ -79,7 +79,7 @@ public sealed record DetailPaymentRow(
         : "Ödeme belirlenmedi";
     public string AssignedSalaryText => AssignedSalaryDate == default
         ? string.Empty
-        : $"Karşılayan maaş: {AssignedSalaryDate.ToString("dd MMMM", TurkishCulture)}";
+        : $"Karşılayan dönem: {AssignedSalaryDate.ToString("dd MMMM", TurkishCulture)}";
     public bool HasAssignedSalary => AssignedSalaryDate != default;
     public bool IsExpense => Semantic == DetailSemanticType.Expense;
 }

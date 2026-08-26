@@ -21,7 +21,7 @@ public partial class FutureMonthsViewModel(
     [ObservableProperty] private bool hasProjection;
     [ObservableProperty] private bool hasNoProjection = true;
     [ObservableProperty] private string emptyStateMessage =
-        "12 aylık planı oluşturmak için önce maaş bilgisi ekle.";
+        "12 dönemlik planı oluşturmak için önce gelir bilgisi ekle.";
     [ObservableProperty] private string totalCreditCardInterest = "—";
     [ObservableProperty] private string totalDeficitInterest = "—";
     [ObservableProperty] private string totalInterestCost = "—";
@@ -52,7 +52,7 @@ public partial class FutureMonthsViewModel(
                                             x.PaymentBeforeSalary);
                 Periods.Add(new ProjectionLine(
                     row,
-                    SalaryText(row),
+                    PeriodTitle(row),
                     AssignmentText(row),
                     Money(row.AvailableAfterMandatory),
                     Money(-row.CarryOverDeficit),
@@ -63,7 +63,7 @@ public partial class FutureMonthsViewModel(
                     Money(row.EndingProjectedSavings),
                     beforeSalaryCount == 0
                         ? string.Empty
-                        : $"Maaştan önce vadesi gelen {beforeSalaryCount} ödeme",
+                        : $"Dönem gelirinden önce vadesi gelen {beforeSalaryCount} ödeme",
                     beforeSalaryCount > 0,
                     row.IsEstimatedCardPayment,
                     row.HasUndeterminedCardPayment));
@@ -79,8 +79,8 @@ public partial class FutureMonthsViewModel(
             HasInterestSummary = interest.TotalInterestCost > 0m;
             HasTargetResult = false;
             EmptyStateMessage = plan.Salaries.Count == 0
-                ? "12 aylık planı oluşturmak için önce maaş bilgisi ekle."
-                : "12 aylık plan için maaş kullanım düzenini seç.";
+                ? "12 dönemlik planı oluşturmak için önce gelir bilgisi ekle."
+                : "12 dönemlik plan için gelir kullanım düzenini seç.";
         }
         catch (Exception exception)
         {
@@ -139,7 +139,7 @@ public partial class FutureMonthsViewModel(
                 { FirstReachedPeriod: { } reached } =>
                     $"Mevcut planla {Money(target)} seviyesine ilk kez {PeriodText(reached.Period)} döneminde ulaşıyorsun.",
                 _ =>
-                    $"Mevcut planla {Money(target)} seviyesine 12 aylık görünüm içinde ulaşılamıyor."
+                    $"Mevcut planla {Money(target)} seviyesine 12 dönemlik görünüm içinde ulaşılamıyor."
             };
             HasTargetResult = true;
             SetStatus(string.Empty);
@@ -154,8 +154,8 @@ public partial class FutureMonthsViewModel(
     private static string PeriodText(SalaryPeriod period) =>
         $"{period.Start.ToString("dd MMM", TurkishCulture)} → {period.End.ToString("dd MMM yyyy", TurkishCulture)}";
 
-    private static string SalaryText(SalaryPeriodProjection row) =>
-        $"{row.PeriodStart.ToString("dd MMMM yyyy", TurkishCulture)} Maaşı";
+    private static string PeriodTitle(SalaryPeriodProjection row) =>
+        $"{row.PeriodStart.ToString("dd MMMM yyyy", TurkishCulture)} Dönemi";
 
     private static string AssignmentText(SalaryPeriodProjection row)
     {

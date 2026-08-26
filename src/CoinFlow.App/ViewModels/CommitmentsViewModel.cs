@@ -46,6 +46,11 @@ public partial class CommitmentsViewModel(
     ];
 
     public ObservableCollection<FinancialRecordLine> Items { get; } = [];
+    public ObservableCollection<FinancialRecordLine> IncomeItems { get; } = [];
+    public ObservableCollection<FinancialRecordLine> CreditCardItems { get; } = [];
+    public ObservableCollection<FinancialRecordLine> LoanItems { get; } = [];
+    public ObservableCollection<FinancialRecordLine> RegularPaymentItems { get; } = [];
+    public ObservableCollection<FinancialRecordLine> OneTimePaymentItems { get; } = [];
     public ObservableCollection<DatedAmountLine> PlanInstallments { get; } = [];
     public ObservableCollection<DatedAmountLine> CardFutureCharges { get; } = [];
     public ObservableCollection<CardPaymentPlanLine> CardPaymentPlans { get; } = [];
@@ -65,6 +70,16 @@ public partial class CommitmentsViewModel(
     [ObservableProperty] private bool isCard;
     [ObservableProperty] private bool isLargeExpense;
     [ObservableProperty] private bool hasNoSalary;
+    [ObservableProperty] private bool hasActiveForm;
+    [ObservableProperty] private string formTitle = "Yeni kayıt";
+    [ObservableProperty] private string formLead = string.Empty;
+    [ObservableProperty] private string structureSummary = "—";
+    [ObservableProperty] private bool hasIncomeItems;
+    [ObservableProperty] private bool hasCreditCardItems;
+    [ObservableProperty] private bool hasLoanItems;
+    [ObservableProperty] private bool hasRegularPaymentItems;
+    [ObservableProperty] private bool hasOneTimePaymentItems;
+    [ObservableProperty] private Guid? firstCardId;
 
     [ObservableProperty] private string name = string.Empty;
     [ObservableProperty] private string bank = string.Empty;
@@ -115,12 +130,12 @@ public partial class CommitmentsViewModel(
                 salary.Id,
                 ManagementSection.Income,
                 FinancialRecordKind.Salary,
-                salary.Description.Length == 0 ? "Maaş" : salary.Description,
+                salary.Description.Length == 0 ? "Gelir" : salary.Description,
                 $"Geçerli: {salary.EffectiveDate:dd.MM.yyyy}",
                 Money(salary.Amount),
                 salary.EffectiveDate > DateOnly.FromDateTime(DateTime.Today)
-                    ? "Planlanan maaş"
-                    : "Maaş"));
+                    ? "Planlanan gelir"
+                    : "Gelir"));
         }
 
         var initialSetup = await service
@@ -212,6 +227,7 @@ public partial class CommitmentsViewModel(
                 "Planlı büyük ödeme"));
         }
 
+        RefreshGroupedItems();
         RefreshRecordTypes();
         RefreshVisibleItems();
         SelectedPaymentStrategy ??= PaymentStrategies[0];
@@ -228,7 +244,7 @@ public partial class CommitmentsViewModel(
             await service.CompleteInitialPaymentStrategySetupAsync(mode);
             SetStatus(string.Empty);
             await feedback.ShowSuccessAsync(
-                "Maaş kullanım düzeni kaydedildi.");
+                "Gelir kullanım düzeni kaydedildi.");
             return true;
         }
         catch (Exception exception)
@@ -264,13 +280,49 @@ public partial class CommitmentsViewModel(
 
     public void SelectPaymentSection() => ShowPayments();
 
+    public void StartAdd(string recordType)
+    {
+        ResetForm();
+        IsIncomeSection = recordType is "salary" or "income";
+        IsPaymentSection = !IsIncomeSection;
+        RefreshRecordTypes();
+        SelectedRecordType = RecordTypes.SingleOrDefault(x =>
+            x.Value == recordType) ?? RecordTypes.FirstOrDefault();
+        HasActiveForm = true;
+        FormTitle = recordType switch
+        {
+            "salary" => "Gelir Ekle",
+            "income" => "Tek Seferlik Gelir Ekle",
+            "loan" => "Kredi Ekle",
+            "card" => "Kredi Kartı Ekle",
+            "temporary" => "Geçici Ödeme Ekle",
+            "recurring" => "Düzenli Ödeme Ekle",
+            "installment" => "Taksit / Finansman Ekle",
+            "large" => "Tek Seferlik Ödeme Ekle",
+            _ => "Yeni Kayıt"
+        };
+        FormLead = recordType switch
+        {
+            "salary" => "Düzenli gelir veya gelir değişikliği.",
+            "income" => "Belirli tarihte gelecek tek seferlik gelir.",
+            "loan" => "Aylık kredi taksitleri.",
+            "card" => "Kart limiti, borç ve ödeme tercihleri.",
+            "temporary" => "Tarihleri belli geçici ödemeler.",
+            "recurring" => "Tekrarlayan düzenli ödemeler.",
+            "installment" => "Taksit veya finansman planı.",
+            "large" => "Belirli tarihte ödenecek tek seferlik tutar.",
+            _ => string.Empty
+        };
+        SaveButtonText = "Kaydet";
+    }
+
     partial void OnSelectedRecordTypeChanged(
         SelectionOption<string>? value)
     {
         IsSalary = value?.Value == "salary";
         IsOtherIncome = value?.Value == "income";
         IsLoan = value?.Value == "loan";
-        IsPlan = value?.Value is "temporary" or "installment";
+        IsPlan = value?.Value is "temporary" or "installment" or "recurring";
         IsCard = value?.Value == "card";
         IsLargeExpense = value?.Value == "large";
     }
@@ -392,6 +444,9 @@ public partial class CommitmentsViewModel(
         IsPaymentSection = true;
         RefreshRecordTypes();
         SelectedRecordType = RecordTypes.Single(x => x.Value == "card");
+        HasActiveForm = true;
+        FormTitle = "Kart Bilgilerini Düzenle";
+        FormLead = "Sık kararlar kart kontrol ekranında; burada kartın temel bilgileri var.";
         IsEditingCard = true;
         SaveButtonText = "Değişiklikleri Kaydet";
         Name = card.Name;
@@ -534,11 +589,11 @@ public partial class CommitmentsViewModel(
             case "salary":
                 var salary = new SalaryScheduleEntry
                 {
-                    Amount = RequirePositive(ParseMoney(Amount, "Maaş"), "Maaş"),
+                    Amount = RequirePositive(ParseMoney(Amount, "Gelir"), "Gelir"),
                     EffectiveDate = DateOnly.FromDateTime(EffectiveDate),
-                    Description = string.IsNullOrWhiteSpace(Name) ? "Maaş" : Name.Trim()
+                    Description = string.IsNullOrWhiteSpace(Name) ? "Gelir" : Name.Trim()
                 };
-                successMessage = "Maaş kaydedildi.";
+                successMessage = "Gelir kaydedildi.";
                 return () => service.SaveSalaryAsync(salary);
             case "income":
                 var income = new OneTimeIncome
@@ -557,10 +612,14 @@ public partial class CommitmentsViewModel(
                 return () => service.SaveLoanAsync(loan);
             case "temporary":
             case "installment":
+            case "recurring":
                 var plan = BuildPlan();
-                successMessage = plan.Kind == PaymentPlanKind.Installment
-                    ? "Taksit planı kaydedildi."
-                    : "Geçici ödeme planı kaydedildi.";
+                successMessage = plan.Kind switch
+                {
+                    PaymentPlanKind.Installment => "Taksit planı kaydedildi.",
+                    PaymentPlanKind.Recurring => "Düzenli ödeme kaydedildi.",
+                    _ => "Geçici ödeme planı kaydedildi."
+                };
                 return () => service.SavePaymentPlanAsync(plan);
             case "card":
                 var wasEditingCard = IsEditingCard;
@@ -590,6 +649,7 @@ public partial class CommitmentsViewModel(
         _editingCardId = null;
         _editingCardBalanceDate = null;
         IsEditingCard = false;
+        HasActiveForm = false;
         SaveButtonText = "Kaydet";
         CardFutureCharges.Clear();
         CardPaymentPlans.Clear();
@@ -633,9 +693,12 @@ public partial class CommitmentsViewModel(
         {
             Id = id,
             Name = RequireName(),
-            Kind = SelectedRecordType?.Value == "temporary"
-                ? PaymentPlanKind.Temporary
-                : PaymentPlanKind.Installment,
+            Kind = SelectedRecordType?.Value switch
+            {
+                "temporary" => PaymentPlanKind.Temporary,
+                "recurring" => PaymentPlanKind.Recurring,
+                _ => PaymentPlanKind.Installment
+            },
             Installments = PlanInstallments
                 .OrderBy(x => x.Date)
                 .Select(x => new TemporaryPaymentInstallment
@@ -720,16 +783,17 @@ public partial class CommitmentsViewModel(
         RecordTypes.Clear();
         if (IsIncomeSection)
         {
-            RecordTypes.Add(new SelectionOption<string>("Maaş / Maaş değişikliği", "salary"));
-            RecordTypes.Add(new SelectionOption<string>("Diğer gelir", "income"));
+            RecordTypes.Add(new SelectionOption<string>("Gelir / Gelir değişikliği", "salary"));
+            RecordTypes.Add(new SelectionOption<string>("Tek seferlik gelir", "income"));
         }
         else
         {
             RecordTypes.Add(new SelectionOption<string>("Kredi", "loan"));
             RecordTypes.Add(new SelectionOption<string>("Kredi kartı", "card"));
             RecordTypes.Add(new SelectionOption<string>("Geçici ödeme planı", "temporary"));
+            RecordTypes.Add(new SelectionOption<string>("Düzenli ödeme", "recurring"));
             RecordTypes.Add(new SelectionOption<string>("Taksit / finansman", "installment"));
-            RecordTypes.Add(new SelectionOption<string>("Planlı büyük ödeme", "large"));
+            RecordTypes.Add(new SelectionOption<string>("Tek seferlik ödeme", "large"));
         }
 
         SelectedRecordType =
@@ -762,6 +826,51 @@ public partial class CommitmentsViewModel(
         CardPaymentPlans.Clear();
         _cardChargeDescriptions.Clear();
         CancelEditingCard();
+    }
+
+    private void RefreshGroupedItems()
+    {
+        IncomeItems.Clear();
+        CreditCardItems.Clear();
+        LoanItems.Clear();
+        RegularPaymentItems.Clear();
+        OneTimePaymentItems.Clear();
+
+        foreach (var item in _allItems)
+        {
+            switch (item.Kind)
+            {
+                case FinancialRecordKind.Salary:
+                case FinancialRecordKind.OtherIncome:
+                    IncomeItems.Add(item);
+                    break;
+                case FinancialRecordKind.CreditCard:
+                    CreditCardItems.Add(item);
+                    break;
+                case FinancialRecordKind.Loan:
+                    LoanItems.Add(item);
+                    break;
+                case FinancialRecordKind.InstallmentPlan:
+                    RegularPaymentItems.Add(item);
+                    break;
+                case FinancialRecordKind.TemporaryPlan:
+                case FinancialRecordKind.LargeExpense:
+                    OneTimePaymentItems.Add(item);
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        HasIncomeItems = IncomeItems.Count > 0;
+        HasCreditCardItems = CreditCardItems.Count > 0;
+        HasLoanItems = LoanItems.Count > 0;
+        HasRegularPaymentItems = RegularPaymentItems.Count > 0;
+        HasOneTimePaymentItems = OneTimePaymentItems.Count > 0;
+        FirstCardId = CreditCardItems.FirstOrDefault()?.Id;
+        StructureSummary =
+            $"{IncomeItems.Count} gelir • {CreditCardItems.Count} kart • " +
+            $"{LoanItems.Count} kredi • {RegularPaymentItems.Count + OneTimePaymentItems.Count} ödeme";
     }
 
     private string RequireName() =>

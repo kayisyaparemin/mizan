@@ -10,6 +10,7 @@ public partial class CommitmentsPage : ContentPage, IQueryAttributable
     private bool _isShowingInitialStrategySetup;
     private string? _requestedSection;
     private Guid? _requestedCardId;
+    private bool _requestedCardDetailsEdit;
     private readonly IUserFeedbackService _feedback;
 
     public CommitmentsPage(
@@ -65,12 +66,20 @@ public partial class CommitmentsPage : ContentPage, IQueryAttributable
 
         if (_requestedCardId is Guid cardId)
         {
-            await _viewModel.EditCardAsync(cardId);
-            await PageScroll.ScrollToAsync(0, 0, false);
+            if (_requestedCardDetailsEdit)
+            {
+                await _viewModel.EditCardAsync(cardId);
+                await PageScroll.ScrollToAsync(0, 0, false);
+            }
+            else
+            {
+                await OpenCardControlAsync(cardId);
+            }
         }
 
         _requestedSection = null;
         _requestedCardId = null;
+        _requestedCardDetailsEdit = false;
     }
 
     public void ApplyQueryAttributes(IDictionary<string, object> query)
@@ -82,6 +91,81 @@ public partial class CommitmentsPage : ContentPage, IQueryAttributable
                            Guid.TryParse(cardId?.ToString(), out var parsed)
             ? parsed
             : null;
+        _requestedCardDetailsEdit =
+            query.TryGetValue("editCard", out var editCard) &&
+            bool.TryParse(editCard?.ToString(), out var parsedEdit) &&
+            parsedEdit;
+    }
+
+    private async void OnAddClicked(object? sender, EventArgs eventArgs)
+    {
+        var options = new List<string>
+        {
+            "Gelir",
+            "Kredi Kartı",
+            "Kredi",
+            "Tek Seferlik Ödeme",
+            "Düzenli Ödeme"
+        };
+        if (_viewModel.FirstCardId is not null)
+        {
+            options.Add("Kart Harcaması");
+        }
+
+        var choice = await DisplayActionSheet(
+            "Ne eklemek istiyorsun?",
+            "Vazgeç",
+            null,
+            options.ToArray());
+        switch (choice)
+        {
+            case "Gelir":
+                _viewModel.StartAdd("salary");
+                break;
+            case "Kredi Kartı":
+                _viewModel.StartAdd("card");
+                break;
+            case "Kredi":
+                _viewModel.StartAdd("loan");
+                break;
+            case "Tek Seferlik Ödeme":
+                _viewModel.StartAdd("large");
+                break;
+            case "Düzenli Ödeme":
+                _viewModel.StartAdd("recurring");
+                break;
+            case "Kart Harcaması":
+                var cards = _viewModel.CreditCardItems.ToArray();
+                if (cards.Length == 1)
+                {
+                    await OpenCardControlAsync(cards[0].Id);
+                    return;
+                }
+
+                if (cards.Length > 1)
+                {
+                    var cardChoice = await DisplayActionSheet(
+                        "Kart seç",
+                        "Vazgeç",
+                        null,
+                        cards.Select(x => x.Title).ToArray());
+                    var selectedCard = cards.FirstOrDefault(x =>
+                        x.Title == cardChoice);
+                    if (selectedCard is not null)
+                    {
+                        await OpenCardControlAsync(selectedCard.Id);
+                    }
+
+                    return;
+                }
+
+                break;
+        }
+
+        if (!string.IsNullOrWhiteSpace(choice) && choice != "Vazgeç")
+        {
+            await PageScroll.ScrollToAsync(0, 0, true);
+        }
     }
 
     private void OnRemovePlanPaymentClicked(
@@ -127,9 +211,16 @@ public partial class CommitmentsPage : ContentPage, IQueryAttributable
             return;
         }
 
-        await _viewModel.EditCardAsync(item.Id);
-        await PageScroll.ScrollToAsync(0, 0, true);
+        await OpenCardControlAsync(item.Id);
     }
+
+    private Task OpenCardControlAsync(Guid cardId) =>
+        Shell.Current.GoToAsync(
+            AppShell.CardControlRoute,
+            new ShellNavigationQueryParameters
+            {
+                [CardControlViewModel.CardIdQueryKey] = cardId.ToString("D")
+            });
 
     private async void OnDeleteClicked(
         object? sender,

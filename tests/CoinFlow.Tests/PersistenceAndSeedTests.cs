@@ -1,3 +1,5 @@
+using System.Globalization;
+using CoinFlow.Application.Models;
 using CoinFlow.Domain.Calculations;
 using CoinFlow.Domain.Models;
 using CoinFlow.Infrastructure.Persistence;
@@ -70,6 +72,94 @@ public sealed class PersistenceAndSeedTests
                 ProjectionFallbackStrategy.Minimum,
                 axess.ProjectionFallbackStrategy);
             Assert.Empty(axess.PaymentPlans);
+        });
+    }
+
+    [Fact]
+    public async Task CanonicalOnboardingSample_MatchesDevelopmentSeedProjection()
+    {
+        await WithStore(true, async seededStore =>
+        {
+            var onboardingPath = TempPath();
+            try
+            {
+                await using var onboardingStore = new SqliteCoinFlowStore(
+                    onboardingPath,
+                    false,
+                    Today);
+                var seeded = TestFactory.Service(seededStore);
+                await seeded.LoadCanonicalDevelopmentDataAsync();
+                var onboarding = TestFactory.Service(onboardingStore);
+                await onboarding.InitializeFromOnboardingAsync(
+                    CanonicalDevelopmentOnboardingFixture.Create());
+
+                var seedPlan = await seeded.GetFinancialPlanAsync();
+                var onboardingPlan = await onboarding.GetFinancialPlanAsync();
+                AssertEquivalentCanonicalState(seedPlan, onboardingPlan);
+
+                var seedPeriods = await seeded.GetFuturePeriodsAsync(
+                    Today,
+                    12);
+                var onboardingPeriods = await onboarding.GetFuturePeriodsAsync(
+                    Today,
+                    12);
+                Assert.Equal(
+                    seedPeriods.Select(ProjectionSignature).ToArray(),
+                    onboardingPeriods.Select(ProjectionSignature).ToArray());
+            }
+            finally
+            {
+                DeleteDatabase(onboardingPath);
+            }
+        });
+    }
+
+    [Fact]
+    public async Task OnboardingExactPeriodDay_PreviousPeriod_DoesNotCrash()
+    {
+        await WithStore(false, async store =>
+        {
+            var service = TestFactory.Service(
+                store,
+                new DateOnly(2026, 9, 10));
+            await service.InitializeFromOnboardingAsync(
+                new OnboardingDraft
+                {
+                    Settings = new UserSettings
+                    {
+                        SalaryDay = 10,
+                        MonthlyLivingBudget = 30_000m,
+                        ProjectionStartingSavings = 4_013m,
+                        ProjectionAnchorDate = new DateOnly(2026, 9, 10)
+                    },
+                    Salaries =
+                    [
+                        new SalaryScheduleEntry
+                        {
+                            Amount = 100_000m,
+                            EffectiveDate = new DateOnly(2026, 9, 10),
+                            Description = "Gelir"
+                        }
+                    ],
+                    InitialPaymentAssignmentMode =
+                        PaymentAssignmentMode.PreviousPeriod
+                });
+
+            var plan = await service.GetFinancialPlanAsync();
+            var strategy = Assert.Single(plan.PaymentAssignmentStrategies);
+            Assert.Equal(
+                PaymentAssignmentMode.PreviousPeriod,
+                strategy.Mode);
+            Assert.Equal(new DateOnly(2026, 9, 10),
+                strategy.EffectiveFromSalaryDate);
+            Assert.Equal(new DateOnly(2026, 9, 10),
+                plan.Settings.ProjectionAnchorDate);
+            Assert.Single(plan.Salaries);
+            Assert.NotNull(await service.GetDashboardAsync(
+                new DateOnly(2026, 9, 10)));
+            Assert.NotEmpty(await service.GetFuturePeriodsAsync(
+                new DateOnly(2026, 9, 10),
+                12));
         });
     }
 
@@ -687,6 +777,103 @@ public sealed class PersistenceAndSeedTests
             DeleteDatabase(path);
         }
     }
+
+    private static void AssertEquivalentCanonicalState(
+        FinancialPlan expected,
+        FinancialPlan actual)
+    {
+        Assert.Equal(expected.Settings, actual.Settings);
+        Assert.Equal(
+            expected.Salaries
+                .Select(x => (x.Amount, x.EffectiveDate, x.Description))
+                .OrderBy(x => x.EffectiveDate)
+                .ToArray(),
+            actual.Salaries
+                .Select(x => (x.Amount, x.EffectiveDate, x.Description))
+                .OrderBy(x => x.EffectiveDate)
+                .ToArray());
+        Assert.Equal(
+            expected.Loans
+                .Select(x => (
+                    x.Name,
+                    x.Bank,
+                    x.MonthlyPayment,
+                    x.PaymentDay,
+                    x.NextPaymentDate,
+                    x.RemainingInstallmentCount,
+                    x.RemainingDebt))
+                .OrderBy(x => x.Bank)
+                .ToArray(),
+            actual.Loans
+                .Select(x => (
+                    x.Name,
+                    x.Bank,
+                    x.MonthlyPayment,
+                    x.PaymentDay,
+                    x.NextPaymentDate,
+                    x.RemainingInstallmentCount,
+                    x.RemainingDebt))
+                .OrderBy(x => x.Bank)
+                .ToArray());
+        Assert.Equal(
+            expected.PaymentPlans.Select(PaymentPlanSignature).ToArray(),
+            actual.PaymentPlans.Select(PaymentPlanSignature).ToArray());
+        Assert.Equal(
+            expected.CreditCards.Select(CardSignature).ToArray(),
+            actual.CreditCards.Select(CardSignature).ToArray());
+        Assert.Equal(
+            expected.PaymentAssignmentStrategies
+                .Select(x => (x.Mode, x.EffectiveFromSalaryDate))
+                .ToArray(),
+            actual.PaymentAssignmentStrategies
+                .Select(x => (x.Mode, x.EffectiveFromSalaryDate))
+                .ToArray());
+    }
+
+    private static string PaymentPlanSignature(
+        TemporaryPaymentPlan plan) =>
+        string.Join("|",
+            plan.Name,
+            plan.Kind,
+            string.Join(";",
+                plan.Installments
+                    .OrderBy(x => x.DueDate)
+                    .Select(x => $"{x.DueDate:yyyy-MM-dd}:{Money(x.Amount)}:{x.IsPaid}")));
+
+    private static string CardSignature(CreditCard card) =>
+        string.Join("|",
+            card.Name,
+            card.Bank,
+            Money(card.Limit),
+            Money(card.CarriedBalance),
+            Money(card.UnbilledSpending),
+            card.BalanceAsOfDate.ToString("yyyy-MM-dd"),
+            card.StatementClosingDay,
+            card.PaymentDueDay,
+            Money(card.MinimumPaymentRate),
+            card.PaymentStrategy,
+            card.ProjectionFallbackStrategy,
+            string.Join(";",
+                card.Charges
+                    .OrderBy(x => x.PostingDate)
+                    .Select(x => $"{x.PostingDate:yyyy-MM-dd}:{Money(x.Amount)}:{x.Description}")));
+
+    private static string ProjectionSignature(SalaryPeriodProjection row) =>
+        string.Join("|",
+            row.PeriodStart.ToString("yyyy-MM-dd"),
+            row.PeriodEnd.ToString("yyyy-MM-dd"),
+            Money(row.TotalIncome),
+            Money(row.MandatoryOutflow),
+            Money(row.AvailableAfterMandatory),
+            Money(row.LivingBudget),
+            Money(row.EstimatedSavingsCapacity),
+            Money(row.EndingProjectedSavings),
+            Money(row.CardInterestGenerated),
+            Money(row.DeficitFinancingInterest),
+            row.PaymentAssignmentMode);
+
+    private static string Money(decimal value) =>
+        value.ToString("0.00", CultureInfo.InvariantCulture);
 
     private static string TempPath() => Path.Combine(
         Path.GetTempPath(),

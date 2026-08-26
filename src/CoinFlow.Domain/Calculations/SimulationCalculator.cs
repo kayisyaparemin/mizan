@@ -278,12 +278,12 @@ public sealed class SimulationCalculator(
                 plan.Settings.SalaryDay) != effectiveDate)
         {
             throw new InvalidOperationException(
-                "Düzen değişikliği yalnızca bir maaş tarihinde başlayabilir.");
+                "Düzen değişikliği yalnızca bir dönem tarihinde başlayabilir.");
         }
 
         var mode = request.NewPaymentAssignmentMode ??
                    throw new InvalidOperationException(
-                       "Yeni maaş kullanım düzeni seçilmelidir.");
+                       "Yeni dönem kullanım düzeni seçilmelidir.");
         return plan with
         {
             PaymentAssignmentStrategies = plan.PaymentAssignmentStrategies
@@ -547,7 +547,7 @@ public sealed class SimulationCalculator(
         }
         else
         {
-            parts.Add("12 aylık görünümde finansman açığı oluşmuyor.");
+            parts.Add("12 dönemlik görünümde finansman açığı oluşmuyor.");
         }
 
         parts.Add(additionalInterestCost switch
@@ -589,7 +589,7 @@ public sealed class SimulationCalculator(
              request.EffectiveSalaryDate is null))
         {
             throw new InvalidOperationException(
-                "Yeni düzen ve geçerli maaş tarihi seçilmelidir.");
+                "Yeni düzen ve geçerli dönem tarihi seçilmelidir.");
         }
 
         var needsCount = request.Type is
@@ -656,7 +656,7 @@ public sealed class SimulationCalculator(
         if (conflictingSalary is not null)
         {
             throw new InvalidOperationException(
-                $"{conflictingSalary.Key.ToString("dd MMMM yyyy", TurkishCulture)} için iki farklı maaş değişikliği var. Simülasyonu çalıştırmadan önce birini düzenle veya kaldır.");
+                $"{conflictingSalary.Key.ToString("dd MMMM yyyy", TurkishCulture)} için iki farklı gelir değişikliği var. Simülasyonu çalıştırmadan önce birini düzenle veya kaldır.");
         }
 
         var conflictingStrategy = requests
@@ -666,7 +666,7 @@ public sealed class SimulationCalculator(
         if (conflictingStrategy is not null)
         {
             throw new InvalidOperationException(
-                $"{conflictingStrategy.Key.ToString("dd MMMM yyyy", TurkishCulture)} maaşı için iki farklı kullanım düzeni değişikliği var. Simülasyonu çalıştırmadan önce birini düzenle veya kaldır.");
+                $"{conflictingStrategy.Key.ToString("dd MMMM yyyy", TurkishCulture)} dönemi için iki farklı kullanım düzeni değişikliği var. Simülasyonu çalıştırmadan önce birini düzenle veya kaldır.");
         }
     }
 }

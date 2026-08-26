@@ -76,6 +76,9 @@ public interface ICoinFlowStore
     Task ApplySimulationBatchAsync(
         SimulationPersistenceBatch batch,
         CancellationToken cancellationToken = default);
+    Task ApplyOnboardingSetupAsync(
+        OnboardingPersistenceBatch batch,
+        CancellationToken cancellationToken = default);
 
     Task<FinancialHistoryData> GetFinancialHistoryAsync(
         CancellationToken cancellationToken = default);

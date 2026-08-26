@@ -24,7 +24,7 @@ Ortam: Windows, .NET SDK 8.0.424, JDK 17.0.20, Android SDK/Build Tools 34
 - APK imzası: v1/v2/v3 doğrulandı; development debug certificate
 - APK zip alignment: başarılı
 - Shell Flyout Android XAML/C# derlemesi: başarılı; bottom TabBar kaldırıldı
-- 12 Aylık / Simulator compact kart → ortak full-screen Dönem Detayı route ve Android XAML binding derlemesi: başarılı
+- 12 Dönem / Simulator compact kart → ortak full-screen Dönem Detayı route ve Android XAML binding derlemesi: başarılı
 - Git diff whitespace kontrolü: başarılı
 - GitHub Actions development/stable workflow'ları test, APK doğrulama ve release asset üretimi için korunuyor
 - İlk current snapshot, frozen plan ve history'siz first-install davranışı doğrulandı.
@@ -44,7 +44,7 @@ Ortam: Windows, .NET SDK 8.0.424, JDK 17.0.20, Android SDK/Build Tools 34
 - `UpcomingPeriod` ve `PreviousPeriod` boundary tabloları doğrulandı.
 - Kartlar `PaymentDueDate`, krediler ve planlar kendi exact date değerleri üzerinden atanıyor.
 - Maaş günü ödemesi iki modda da aynı maaş bütçesinde kalıyor.
-- `PaymentBeforeSalary`, restart persistence, legacy migration, Dashboard/12 Aylık yeniden hesaplama ve simulator override testleri başarılı.
+- `PaymentBeforeSalary`, restart persistence, legacy migration, Dashboard/12 Dönem yeniden hesaplama ve simulator override testleri başarılı.
 - `Previous → Upcoming → Previous` history çözümlemesi eski event'leri değiştirmeden doğrulandı.
 - Negatif `EndingProjectedSavings`, yeni obligation veya kart bakiyesi oluşturmadan sonraki dönemin opening değerine taşınıyor; double-count yok.
 

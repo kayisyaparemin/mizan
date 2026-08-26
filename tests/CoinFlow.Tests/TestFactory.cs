@@ -143,7 +143,7 @@ internal static class TestFactory
                 EffectiveFromSalaryDate = new DateOnly(2026, 9, 10),
                 CreatedAt = new DateTimeOffset(
                     2026, 8, 20, 0, 0, 0, TimeSpan.Zero),
-                Note = "İlk maaş kullanım düzeni"
+                Note = "İlk gelir kullanım düzeni"
             }
         ]
     };

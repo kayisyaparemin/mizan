@@ -8,7 +8,7 @@
         <VerticalStackLayout Padding="20,18,20,36" Spacing="16">
             <Label Text="PLANLAMADAN ÖNCE DENE" Style="{StaticResource Eyebrow}" />
             <Label Text="Simülatör" Style="{StaticResource PageTitle}" />
-            <Label Text="Simülasyon Yap, finans kayıtlarını değiştirmeden seçtiğin planla oluşan 12 aylık görünümü hesaplar." Style="{StaticResource MutedText}" />
+            <Label Text="Simülasyon Yap, finans kayıtlarını değiştirmeden seçtiğin planla oluşan 12 dönemlik görünümü hesaplar." Style="{StaticResource MutedText}" />
             <Label Text="{Binding AssignmentModeText}"
                    IsVisible="{Binding IsPlanAvailable}"
                    FontFamily="OpenSansSemibold" />
@@ -20,7 +20,7 @@
                            Style="{StaticResource SectionTitle}" />
                     <Label Text="{Binding EmptyStateMessage}"
                            Style="{StaticResource MutedText}" />
-                    <Button Text="Gelir &amp; Ödemelere Git"
+                    <Button Text="Finansal Yapıya Git"
                             Command="{Binding OpenCommitmentsCommand}" />
                 </VerticalStackLayout>
             </Border>
@@ -46,7 +46,7 @@
                         <Label Text="Yeni düzen" Style="{StaticResource FieldLabel}" />
                         <Picker ItemsSource="{Binding StrategyModes}"
                                 SelectedItem="{Binding SelectedStrategyMode}" />
-                        <Label Text="Geçerli olacağı maaş" Style="{StaticResource FieldLabel}" />
+                        <Label Text="Geçerli olacağı dönem" Style="{StaticResource FieldLabel}" />
                         <Picker ItemsSource="{Binding StrategySalaryDates}"
                                 SelectedItem="{Binding SelectedStrategySalaryDate}" />
                     </VerticalStackLayout>
@@ -228,7 +228,7 @@
                     </VerticalStackLayout>
                 </Border>
 
-                <Label Text="12 Aylık Finansal Görünüm" Style="{StaticResource SectionTitle}" />
+                <Label Text="12 Dönem Finansal Görünüm" Style="{StaticResource SectionTitle}" />
                 <VerticalStackLayout BindableLayout.ItemsSource="{Binding Results}" Spacing="8">
                     <BindableLayout.ItemTemplate>
                         <DataTemplate>

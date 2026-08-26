@@ -317,7 +317,7 @@ public sealed class FinancialProjectionCalculator(
             firstSalary)
         {
             throw new InvalidOperationException(
-                "Projection başlangıç maaşı geçerli bir maaş tarihi olmalıdır.");
+                "Projection başlangıç dönemi geçerli bir dönem tarihi olmalıdır.");
         }
 
         var earliest = salaryPeriodCalculator.GetFirstSalaryOnOrAfter(
@@ -326,7 +326,7 @@ public sealed class FinancialProjectionCalculator(
         if (firstSalary < earliest)
         {
             throw new InvalidOperationException(
-                "Projection başlangıç maaşı planlama anchor tarihinden önce olamaz.");
+                "Projection başlangıç dönemi planlama anchor tarihinden önce olamaz.");
         }
     }
 

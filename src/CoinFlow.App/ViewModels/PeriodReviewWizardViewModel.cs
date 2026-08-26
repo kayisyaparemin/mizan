@@ -267,7 +267,7 @@ public partial class PeriodReviewWizardViewModel(
             var result = await service.FinalizePeriodReviewAsync(draft);
             ComparisonSummary = result.Comparison.Summary;
             SuccessText =
-                $"{result.NewSnapshot.SnapshotDate:dd MMMM yyyy} itibarıyla yeni 12 aylık planın güncellendi.";
+                $"{result.NewSnapshot.SnapshotDate:dd MMMM yyyy} itibarıyla yeni 12 dönemlik planın güncellendi.";
             await feedback.ShowSuccessAsync("Dönem bilgileri kaydedildi.");
             IsSuccess = true;
         }

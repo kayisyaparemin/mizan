@@ -85,17 +85,17 @@ public partial class SettingsViewModel(
             : ModeText(overview.Current.Mode);
         CurrentStrategySinceText = overview.Current is null
             ? plan.Salaries.Count == 0
-                ? "İlk maaşını eklediğinde kullanım düzenini seçersin."
-                : "Maaş kullanım düzenini seçerek 12 aylık planı tamamla."
+                ? "İlk gelirini eklediğinde kullanım düzenini seçersin."
+                : "Gelir kullanım düzenini seçerek 12 dönemlik planı tamamla."
             : overview.Current.EffectiveFromSalaryDate >
               DateOnly.FromDateTime(DateTime.Today)
-                ? $"{overview.Current.EffectiveFromSalaryDate.ToString("dd MMMM yyyy", TurkishCulture)} maaşından itibaren"
-                : $"{overview.Current.EffectiveFromSalaryDate.ToString("dd MMMM yyyy", TurkishCulture)} maaşından beri";
+                ? $"{overview.Current.EffectiveFromSalaryDate.ToString("dd MMMM yyyy", TurkishCulture)} döneminden itibaren"
+                : $"{overview.Current.EffectiveFromSalaryDate.ToString("dd MMMM yyyy", TurkishCulture)} döneminden beri";
         _pendingStrategy = overview.Pending;
         HasPendingStrategy = overview.Pending is not null;
         PendingStrategyText = overview.Pending is null
             ? string.Empty
-            : $"{overview.Pending.EffectiveFromSalaryDate.ToString("dd MMMM yyyy", TurkishCulture)} maaşından itibaren {ModeText(overview.Pending.Mode)}";
+            : $"{overview.Pending.EffectiveFromSalaryDate.ToString("dd MMMM yyyy", TurkishCulture)} döneminden itibaren {ModeText(overview.Pending.Mode)}";
 
         StrategyHistory.Clear();
         foreach (var strategy in overview.History.OrderByDescending(x =>
@@ -115,7 +115,7 @@ public partial class SettingsViewModel(
         foreach (var date in overview.AvailableEffectiveSalaryDates)
         {
             EffectiveSalaryDates.Add(new SelectionOption<DateOnly>(
-                $"{date.ToString("dd MMMM yyyy", TurkishCulture)} maaşı",
+                $"{date.ToString("dd MMMM yyyy", TurkishCulture)} dönemi",
                 date));
         }
 
@@ -139,7 +139,7 @@ public partial class SettingsViewModel(
         if (!CanManageStrategy)
         {
             SetStatus(
-                "Önce maaşını ekleyip ilk maaş kullanım düzenini seçmelisin.");
+                "Önce gelirini ekleyip ilk gelir kullanım düzenini seçmelisin.");
             return;
         }
 
@@ -160,9 +160,9 @@ public partial class SettingsViewModel(
                 SelectedStrategyMode?.Value ?? throw new InvalidOperationException(
                     "Yeni düzen seçilmelidir."),
                 SelectedEffectiveSalary?.Value ?? throw new InvalidOperationException(
-                    "Geçerli maaş tarihi seçilmelidir."));
+                    "Geçerli dönem tarihi seçilmelidir."));
             PreviewText = string.Join(Environment.NewLine,
-                $"Başlangıç maaşı: {preview.EffectiveSalaryDate:dd.MM.yyyy}",
+                $"Başlangıç dönemi: {preview.EffectiveSalaryDate:dd.MM.yyyy}",
                 $"Mevcut düzen: {ModeText(preview.CurrentMode)}",
                 $"Yeni düzen: {ModeText(preview.NewMode)}",
                 $"Normal zorunlu ödemeler: {Money(preview.Baseline.MandatoryOutflow)}",
@@ -190,7 +190,7 @@ public partial class SettingsViewModel(
         {
             var date = SelectedEffectiveSalary?.Value ??
                        throw new InvalidOperationException(
-                           "Geçerli maaş tarihi seçilmelidir.");
+                           "Geçerli dönem tarihi seçilmelidir.");
             var mode = SelectedStrategyMode?.Value ??
                        throw new InvalidOperationException(
                            "Yeni düzen seçilmelidir.");
@@ -205,7 +205,7 @@ public partial class SettingsViewModel(
             await LoadAsync();
             SetStatus(string.Empty);
             await feedback.ShowSuccessAsync(
-                "Maaş kullanım düzeni planlandı.");
+                "Gelir kullanım düzeni planlandı.");
             return true;
         }
         catch (Exception exception)
@@ -336,7 +336,7 @@ public partial class SettingsViewModel(
         if (!int.TryParse(SalaryDay, out var day) || day is < 1 or > 31)
         {
             throw new InvalidOperationException(
-                "Maaş günü 1 ile 31 arasında olmalıdır.");
+                "Dönem günü 1 ile 31 arasında olmalıdır.");
         }
 
         return new UserSettings
@@ -347,7 +347,7 @@ public partial class SettingsViewModel(
                 "Aylık tahmini yaşam bütçesi"),
             ProjectionStartingSavings = ParseMoney(
                 ProjectionStartingSavings,
-                "Planlama başlangıç durumu"),
+                "Mevcut tutar"),
             ProjectionAnchorDate = _projectionAnchorDate,
             CreditCardCarryInterestRate = ParseRate(
                 CreditCardCarryInterestRate,
@@ -374,7 +374,7 @@ public partial class SettingsViewModel(
             (settings.DeficitFinancingInterestRate * 100m)
             .ToString("N2", TurkishCulture);
         ProjectionAnchorText = settings.ProjectionAnchorDate == default
-            ? "İlk maaş kaydıyla oluşturulacak"
+            ? "İlk gelir kaydıyla oluşturulacak"
             : settings.ProjectionAnchorDate.ToString(
                 "dd MMMM yyyy", TurkishCulture);
         _isUpdatingSettingsForm = false;

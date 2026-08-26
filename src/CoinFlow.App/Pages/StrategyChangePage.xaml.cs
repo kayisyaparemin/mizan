@@ -23,7 +23,7 @@ public partial class StrategyChangePage : ContentPage
     {
         var confirmed = await _feedback.ConfirmAsync(
             "Düzen değişikliğini planla",
-            "Önizlemedeki düzen seçilen maaş tarihinde başlayacak. Geçmiş kayıtlar değiştirilmeyecek.",
+            "Önizlemedeki düzen seçilen dönemde başlayacak. Geçmiş kayıtlar değiştirilmeyecek.",
             "Planla",
             "Vazgeç");
         if (confirmed && await _viewModel.ApplyStrategyAsync())

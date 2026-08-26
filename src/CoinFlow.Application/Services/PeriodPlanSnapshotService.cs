@@ -47,7 +47,7 @@ public sealed class PeriodPlanSnapshotService(
                 PlannedAmount = item.Amount,
                 IsEstimate = item.IsEstimate,
                 Detail = item.IsPreFirstSalaryObligation
-                    ? "İlk projection maaşından önce vadesi geliyordu."
+                    ? "İlk dönem gelirinden önce vadesi geliyordu."
                     : item.Detail
             })
             .ToList();

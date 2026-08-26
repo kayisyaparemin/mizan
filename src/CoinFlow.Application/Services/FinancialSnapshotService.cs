@@ -121,7 +121,7 @@ public sealed class FinancialSnapshotService(
         if (!CanBuildProjection(plan))
         {
             throw new InvalidOperationException(
-                "Güncel durum için maaş, maaş kullanım düzeni ve planlama tarihi gereklidir.");
+                "Güncel durum için gelir, gelir kullanım düzeni ve son güncelleme tarihi gereklidir.");
         }
 
         var updatedSettings = plan.Settings with

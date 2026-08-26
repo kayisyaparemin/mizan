@@ -112,11 +112,11 @@ public sealed class SimulatorInsightService
                 $"{Month(firstDeficit)} döneminde finansman açığı oluşuyor; dönem sonu tahmini açık {Money(Math.Abs(firstDeficit.EndingSituation))}.");
             sentences.Add(deficitRecovery is not null
                 ? $"Açığın {Month(deficitRecovery)} döneminde kapanması bekleniyor."
-                : "Açık 12 aylık görünüm içinde kapanmıyor.");
+                : "Açık 12 dönemlik görünüm içinde kapanmıyor.");
         }
         else
         {
-            sentences.Add("12 aylık görünümde finansman açığı oluşmuyor.");
+            sentences.Add("12 dönemlik görünümde finansman açığı oluşmuyor.");
         }
 
         if (firstIncomeInsufficient is not null &&
@@ -317,7 +317,7 @@ public sealed class SimulatorInsightService
     }
 
     private static string SalaryText(DateOnly salaryDate) =>
-        $"{salaryDate.ToString("dd MMMM yyyy", TurkishCulture)} Maaşı";
+        $"{salaryDate.ToString("dd MMMM yyyy", TurkishCulture)} Dönemi";
 
     private static string AssignmentText(SalaryPeriodProjection row)
     {

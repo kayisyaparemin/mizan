@@ -5,12 +5,20 @@ namespace CoinFlow.App;
 public sealed class AppShell : Shell
 {
     public const string PeriodDetailRoute = "salary-period-detail";
+    public const string OnboardingRoute = "onboarding";
+    public const string CardControlRoute = "card-control";
 
     public AppShell(IServiceProvider services)
     {
         Routing.RegisterRoute(
             PeriodDetailRoute,
             typeof(SalaryPeriodDetailPage));
+        Routing.RegisterRoute(
+            OnboardingRoute,
+            typeof(OnboardingPage));
+        Routing.RegisterRoute(
+            CardControlRoute,
+            typeof(CardControlPage));
         FlyoutBehavior = FlyoutBehavior.Flyout;
         Shell.SetNavBarIsVisible(this, true);
 
@@ -20,7 +28,7 @@ public sealed class AppShell : Shell
             "dashboard-content",
             () => services.GetRequiredService<MainPage>()));
         Items.Add(CreateFlyoutItem(
-            "12 Aylık",
+            "12 Dönem",
             "projection",
             "future-months-content",
             () => services.GetRequiredService<FutureMonthsPage>()));
@@ -30,7 +38,7 @@ public sealed class AppShell : Shell
             "simulation-content",
             () => services.GetRequiredService<SimulationPage>()));
         Items.Add(CreateFlyoutItem(
-            "Gelir & Ödemeler",
+            "Finansal Yapı",
             "commitments",
             "commitments-content",
             () => services.GetRequiredService<CommitmentsPage>()));

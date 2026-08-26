@@ -65,7 +65,9 @@ public static class MauiProgram
         builder.Services.AddSingleton<IUserFeedbackService, UserFeedbackService>();
 
         builder.Services.AddTransient<DashboardViewModel>();
+        builder.Services.AddTransient<OnboardingViewModel>();
         builder.Services.AddTransient<CommitmentsViewModel>();
+        builder.Services.AddTransient<CardControlViewModel>();
         builder.Services.AddTransient<FutureMonthsViewModel>();
         builder.Services.AddTransient<SimulationViewModel>();
         builder.Services.AddTransient<SalaryPeriodDetailViewModel>();
@@ -74,7 +76,9 @@ public static class MauiProgram
         builder.Services.AddTransient<HistoryViewModel>();
         builder.Services.AddTransient<HistoryDetailViewModel>();
         builder.Services.AddTransient<MainPage>();
+        builder.Services.AddTransient<OnboardingPage>();
         builder.Services.AddTransient<CommitmentsPage>();
+        builder.Services.AddTransient<CardControlPage>();
         builder.Services.AddTransient<FutureMonthsPage>();
         builder.Services.AddTransient<SimulationPage>();
         builder.Services.AddTransient<SalaryPeriodDetailPage>();

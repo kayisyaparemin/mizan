@@ -56,11 +56,27 @@ public partial class DashboardViewModel(
     [ObservableProperty] private bool isEmptyState = true;
     [ObservableProperty]
     private string emptyStateMessage =
-        "Başlamak için maaşını ekle.";
-    [ObservableProperty] private string emptyStateAction = "Maaş Ekle";
+        "Başlamak için gelirini ekle.";
+    [ObservableProperty] private string emptyStateAction = "Gelir Ekle";
     [ObservableProperty] private bool hasPendingReview;
     [ObservableProperty] private string pendingReviewTitle = string.Empty;
     [ObservableProperty] private string pendingReviewMessage = string.Empty;
+    [ObservableProperty] private bool shouldShowOnboarding;
+    [ObservableProperty] private string expandedModule = string.Empty;
+    [ObservableProperty] private bool isCurrentModuleExpanded;
+    [ObservableProperty] private bool isPeriodModuleExpanded;
+    [ObservableProperty] private bool isTwelveModuleExpanded;
+    [ObservableProperty] private bool isUpcomingModuleExpanded;
+    [ObservableProperty] private bool isStructureModuleExpanded;
+    [ObservableProperty] private bool isHistoryModuleExpanded;
+    [ObservableProperty] private bool isSimulatorModuleExpanded;
+    [ObservableProperty] private string currentModuleSummary = "—";
+    [ObservableProperty] private string periodModuleSummary = "—";
+    [ObservableProperty] private string twelveModuleSummary = "—";
+    [ObservableProperty] private string upcomingModuleSummary = "—";
+    [ObservableProperty] private string structureModuleSummary = "—";
+    [ObservableProperty] private string historyModuleSummary = "—";
+    [ObservableProperty] private string simulatorModuleSummary = "—";
 
     public bool IsDevelopment => BuildInfo.IsDevelopment;
 
@@ -76,6 +92,27 @@ public partial class DashboardViewModel(
         {
             IsBusy = true;
             SetStatus(string.Empty);
+            ShouldShowOnboarding =
+                await service.IsOnboardingRequiredAsync();
+            if (ShouldShowOnboarding)
+            {
+                HasFinancialPlan = false;
+                IsEmptyState = true;
+                HasPendingReview = false;
+                HasPreFirstSalaryPayments = false;
+                HasUpcomingPayments = false;
+                HasNoUpcomingPayments = true;
+                HasUndeterminedCardPayment = false;
+                HasPendingStrategy = false;
+                HasTwelveMonthInterest = false;
+                PreFirstSalaryPayments.Clear();
+                UpcomingPayments.Clear();
+                EmptyStateMessage =
+                    "İlk kurulumla gelirini, dönemini ve mevcut tutarını birlikte kaydedelim.";
+                EmptyStateAction = "Kuruluma Başla";
+                return;
+            }
+
             var review = await service.GetPeriodReviewAvailabilityAsync();
             HasPendingReview = review.IsDue;
             PendingReviewTitle = review.IsDue
@@ -99,13 +136,18 @@ public partial class DashboardViewModel(
                 PreFirstSalaryPayments.Clear();
                 UpcomingPayments.Clear();
                 EmptyStateMessage = plan.Salaries.Count == 0
-                    ? "Henüz finansal plan oluşturulmadı. Başlamak için maaşını ekle."
-                    : "Maaş kullanım düzenini seçerek 12 aylık planı tamamla.";
+                    ? "Henüz finansal plan oluşturulmadı. Başlamak için gelirini ekle."
+                    : "Gelir kullanım düzenini seçerek 12 dönemlik planı tamamla.";
                 EmptyStateAction = plan.Salaries.Count == 0
-                    ? "Maaş Ekle"
+                    ? "Gelir Ekle"
                     : "Düzeni Seç";
                 return;
             }
+
+            var currentPlan = await service.GetFinancialPlanAsync();
+            var futurePeriods = await service.GetFuturePeriodsAsync(
+                periodCount: 12);
+            var history = await service.GetHistorySummaryAsync(1);
 
             HasFinancialPlan = true;
             IsEmptyState = false;
@@ -119,7 +161,7 @@ public partial class DashboardViewModel(
             PlanningStartingState = Money(
                 dashboard.ProjectionStartingSavings);
             CurrentPeriodText =
-                $"{current.PeriodStart.ToString("dd MMMM yyyy", TurkishCulture)} Maaşı";
+                $"{current.PeriodStart.ToString("dd MMMM yyyy", TurkishCulture)} Dönemi";
             AssignmentModeText = current.PaymentAssignmentMode ==
                                  CoinFlow.Domain.Models.PaymentAssignmentMode.PreviousPeriod
                 ? "Geçmiş dönemi kapatırım"
@@ -165,7 +207,7 @@ public partial class DashboardViewModel(
             HasPendingStrategy = dashboard.PendingStrategy is not null;
             PendingStrategyText = dashboard.PendingStrategy is null
                 ? string.Empty
-                : $"{dashboard.PendingStrategy.EffectiveFromSalaryDate.ToString("dd MMMM yyyy", TurkishCulture)} maaşından itibaren " +
+                : $"{dashboard.PendingStrategy.EffectiveFromSalaryDate.ToString("dd MMMM yyyy", TurkishCulture)} döneminden itibaren " +
                   ModeText(dashboard.PendingStrategy.Mode);
 
             PreFirstSalaryPayments.Clear();
@@ -173,7 +215,7 @@ public partial class DashboardViewModel(
             {
                 PreFirstSalaryPayments.Add(ToLine(
                     payment,
-                    "Son ödeme tarihi maaştan önce"));
+                    "Son ödeme tarihi dönem gelirinden önce"));
             }
             HasPreFirstSalaryPayments = PreFirstSalaryPayments.Count > 0;
 
@@ -194,7 +236,7 @@ public partial class DashboardViewModel(
                         _ => "Planlı ödeme"
                     };
                 var assignmentWarning = payment.PaymentBeforeSalary
-                    ? $" • ⚠ Karşılayan maaş: {payment.AssignedSalaryDate.ToString("dd MMM", TurkishCulture)}; son ödeme: {payment.DueDate.ToString("dd MMM", TurkishCulture)}"
+                    ? $" • ⚠ Karşılayan dönem: {payment.AssignedSalaryDate.ToString("dd MMM", TurkishCulture)}; son ödeme: {payment.DueDate.ToString("dd MMM", TurkishCulture)}"
                     : string.Empty;
                 UpcomingPayments.Add(new UpcomingPaymentLine(
                     payment.DueDate.ToString("dd MMM", TurkishCulture),
@@ -206,6 +248,25 @@ public partial class DashboardViewModel(
             HasUpcomingPayments = UpcomingPayments.Count > 0;
             HasNoUpcomingPayments = !HasUpcomingPayments;
             CalculationDetails = BuildDetails(current);
+            CurrentModuleSummary =
+                $"{PlanningStartingState} • Son güncelleme {CurrentSnapshotDate}";
+            PeriodModuleSummary =
+                $"{CurrentPeriodText} • dönem sonu {EndingSavings}";
+            TwelveModuleSummary =
+                $"{TwelveMonthSavings} • en düşük {TightestValue}";
+            UpcomingModuleSummary = HasUpcomingPayments
+                ? $"{UpcomingPayments.Count} yaklaşan ödeme"
+                : "Yaklaşan ödeme yok";
+            StructureModuleSummary =
+                $"{currentPlan.Salaries.Count} gelir • {currentPlan.CreditCards.Count} kart • " +
+                $"{currentPlan.Loans.Count} kredi • {currentPlan.PaymentPlans.Count + currentPlan.PlannedLargeExpenses.Count} ödeme";
+            HistoryModuleSummary = history is null
+                ? "Henüz kapanan dönem yok"
+                : $"Son dönem: plan {Money(history.Planned)} • gerçekleşen {Money(history.Actual)}";
+            SimulatorModuleSummary =
+                futurePeriods.Count == 0
+                    ? "Simülasyon için plan gerekiyor"
+                    : "Planı değiştirmeden karar dene";
         }
         catch (Exception exception)
         {
@@ -230,6 +291,44 @@ public partial class DashboardViewModel(
         Shell.Current.GoToAsync("//commitments/commitments-content");
 
     [RelayCommand]
+    private Task OpenEmptyStateAsync() =>
+        ShouldShowOnboarding
+            ? OpenOnboardingAsync()
+            : OpenCommitmentsAsync();
+
+    [RelayCommand]
+    private Task OpenFutureMonthsAsync() =>
+        Shell.Current.GoToAsync("//projection/future-months-content");
+
+    [RelayCommand]
+    private Task OpenHistoryAsync() =>
+        Shell.Current.GoToAsync("//history/history-content");
+
+    [RelayCommand]
+    private async Task OpenOnboardingAsync()
+    {
+        var page = services.GetRequiredService<OnboardingPage>();
+        await Shell.Current.Navigation.PushModalAsync(
+            new NavigationPage(page));
+        if (await page.Completion)
+        {
+            await LoadAsync();
+        }
+    }
+
+    [RelayCommand]
+    private void ToggleModule(string module)
+    {
+        ExpandedModule = string.Equals(
+            ExpandedModule,
+            module,
+            StringComparison.OrdinalIgnoreCase)
+            ? string.Empty
+            : module;
+        RefreshModuleExpansion();
+    }
+
+    [RelayCommand]
     public Task OpenPeriodReviewAsync()
     {
         var page = services.GetRequiredService<PeriodReviewPage>();
@@ -245,7 +344,7 @@ public partial class DashboardViewModel(
             $"{x.DueDate:dd.MM} {x.Name}: {Money(x.Amount, 2)}" +
             (x.IsEstimate ? " (tahmini)" : string.Empty) +
             (x.PaymentBeforeSalary
-                ? $" • ⚠ {x.AssignedSalaryDate:dd.MM} maaşı; gerçek vade önce"
+                ? $" • ⚠ {x.AssignedSalaryDate:dd.MM} dönemi; gerçek vade önce"
                 : string.Empty));
         var calculation = new[]
         {
@@ -297,4 +396,15 @@ public partial class DashboardViewModel(
 
     private static string PeriodText(SalaryPeriod period) =>
         $"{period.Start.ToString("dd MMM", TurkishCulture)} → {period.End.ToString("dd MMM yyyy", TurkishCulture)}";
+
+    private void RefreshModuleExpansion()
+    {
+        IsCurrentModuleExpanded = ExpandedModule == "current";
+        IsPeriodModuleExpanded = ExpandedModule == "period";
+        IsTwelveModuleExpanded = ExpandedModule == "twelve";
+        IsUpcomingModuleExpanded = ExpandedModule == "upcoming";
+        IsStructureModuleExpanded = ExpandedModule == "structure";
+        IsHistoryModuleExpanded = ExpandedModule == "history";
+        IsSimulatorModuleExpanded = ExpandedModule == "simulator";
+    }
 }

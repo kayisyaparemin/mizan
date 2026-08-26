@@ -18,7 +18,7 @@ public sealed class SalaryPeriodDetailPresenter
         if (baseline is not null && baseline.Period != scenario.Period)
         {
             throw new InvalidOperationException(
-                "Mevcut Plan ile Yeni Plan aynı maaş dönemine ait olmalıdır.");
+                "Mevcut Plan ile Yeni Plan aynı döneme ait olmalıdır.");
         }
 
         var flow = BuildFlow(scenario);
@@ -41,7 +41,7 @@ public sealed class SalaryPeriodDetailPresenter
 
         return new SalaryPeriodDetailData(
             scenario.PeriodStart,
-            $"{scenario.PeriodStart.ToString("dd MMMM yyyy", TurkishCulture)} Maaşı",
+            $"{scenario.PeriodStart.ToString("dd MMMM yyyy", TurkishCulture)} Dönemi",
             PaymentWindowText(scenario),
             scenario.PaymentAssignmentMode == PaymentAssignmentMode.PreviousPeriod
                 ? "Geçmiş dönemi kapatır"
