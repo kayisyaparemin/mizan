@@ -3,16 +3,20 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CoinFlow.App.Models;
 using CoinFlow.App.Services;
+using CoinFlow.Application.Abstractions;
 using CoinFlow.Application.Models;
 using CoinFlow.Application.Services;
 using CoinFlow.Domain.Calculations;
 using CoinFlow.Domain.Models;
+using Microsoft.Maui.Devices;
+using Microsoft.Maui.Storage;
 
 namespace CoinFlow.App.ViewModels;
 
 public partial class CommitmentsViewModel(
     CoinFlowService service,
     CreditCardStatementCalculator cardCalculator,
+    ICreditCardStatementImporter statementImporter,
     IUserFeedbackService feedback) : ViewModelBase
 {
     public event Action<InitialPaymentStrategySetup>?
@@ -45,6 +49,14 @@ public partial class CommitmentsViewModel(
         new("Özel tutar", CreditCardPaymentType.FixedAmount)
     ];
 
+    public ObservableCollection<SelectionOption<CurrentStatementPaymentMode>>
+        CurrentStatementPaymentModes { get; } =
+    [
+        new("Asgari", CurrentStatementPaymentMode.Minimum),
+        new("Tamamı", CurrentStatementPaymentMode.Full),
+        new("Başka tutar", CurrentStatementPaymentMode.Custom)
+    ];
+
     public ObservableCollection<FinancialRecordLine> Items { get; } = [];
     public ObservableCollection<FinancialRecordLine> IncomeItems { get; } = [];
     public ObservableCollection<FinancialRecordLine> CreditCardItems { get; } = [];
@@ -59,6 +71,10 @@ public partial class CommitmentsViewModel(
     private readonly Dictionary<Guid, string> _cardChargeDescriptions = [];
     private Guid? _editingCardId;
     private DateOnly? _editingCardBalanceDate;
+    private CreditCardStatement? _editingCardStatement;
+    private string? _cardStatementFingerprint;
+    private CreditCardStatementSource _cardStatementSource =
+        CreditCardStatementSource.Manual;
 
     [ObservableProperty] private bool isIncomeSection = true;
     [ObservableProperty] private bool isPaymentSection;
@@ -97,9 +113,22 @@ public partial class CommitmentsViewModel(
     [ObservableProperty] private string planPaymentAmount = string.Empty;
 
     [ObservableProperty] private string cardLimit = string.Empty;
+    [ObservableProperty] private bool cardHasActualStatement;
+    [ObservableProperty] private bool isLegacyCardSetup = true;
     [ObservableProperty] private string carriedBalance = string.Empty;
     [ObservableProperty] private string unbilledSpending = string.Empty;
     [ObservableProperty] private DateTime cardBalanceDate = DateTime.Today;
+    [ObservableProperty] private string cardStatementAmount = string.Empty;
+    [ObservableProperty] private string cardStatementMinimum = string.Empty;
+    [ObservableProperty] private DateTime cardStatementDate = DateTime.Today;
+    [ObservableProperty] private DateTime cardStatementDueDate = DateTime.Today;
+    [ObservableProperty] private string cardNextStatementDate = string.Empty;
+    [ObservableProperty] private string cardNextDueDate = string.Empty;
+    [ObservableProperty] private string cardStatementImportWarnings = string.Empty;
+    [ObservableProperty] private bool hasCardStatementImportWarnings;
+    [ObservableProperty] private SelectionOption<CurrentStatementPaymentMode>? selectedCurrentStatementPaymentMode;
+    [ObservableProperty] private string currentStatementCustomPayment = string.Empty;
+    [ObservableProperty] private bool isCurrentStatementCustomPayment;
     [ObservableProperty] private string closingDay = "25";
     [ObservableProperty] private string dueDay = "5";
     [ObservableProperty] private string minimumRate = "40";
@@ -202,9 +231,14 @@ public partial class CommitmentsViewModel(
                 card,
                 1,
                 useProjectionFallback: true)[0];
-            var paymentText = upcoming.Payment is decimal payment
-                ? $"Yaklaşan tahmini ödeme: {Money(payment)} • Son ödeme: {upcoming.PaymentDueDate:dd.MM.yyyy}"
-                : "Yaklaşan ödeme henüz belirlenmedi";
+            var paymentText = card.CurrentStatement is { } statement
+                ? $"Ekstre: {Money(statement.StatementAmount)} • Son ödeme: {statement.DueDate:dd MMM}"
+                : upcoming.Payment is decimal payment
+                    ? $"Yaklaşan tahmini ödeme: {Money(payment)} • Son ödeme: {upcoming.PaymentDueDate:dd.MM.yyyy}"
+                    : "Yaklaşan ödeme henüz belirlenmedi";
+            var badgeText = card.CurrentStatement is not null
+                ? $"Plan: {CurrentStatementPlanLabel(card.CurrentStatementPaymentPlan)}"
+                : $"Ödeme tercihi: {StrategyLabel(card.PaymentStrategy)} • Henüz karar vermediğim ekstrelerde: {FallbackLabel(card.ProjectionFallbackStrategy)}";
             _allItems.Add(new FinancialRecordLine(
                 card.Id,
                 ManagementSection.Payment,
@@ -212,7 +246,7 @@ public partial class CommitmentsViewModel(
                 $"{card.Bank} {card.Name}".Trim(),
                 paymentText,
                 Money(card.KnownTotalDebt),
-                $"Ödeme tercihi: {StrategyLabel(card.PaymentStrategy)} • Henüz karar vermediğim ekstrelerde: {FallbackLabel(card.ProjectionFallbackStrategy)}"));
+                badgeText));
         }
 
         foreach (var expense in plan.PlannedLargeExpenses)
@@ -234,6 +268,8 @@ public partial class CommitmentsViewModel(
         SelectedProjectionFallbackStrategy ??=
             ProjectionFallbackStrategies[0];
         SelectedPaymentPlanType ??= PaymentPlanTypes[0];
+        SelectedCurrentStatementPaymentMode ??=
+            CurrentStatementPaymentModes[0];
     }
 
     public async Task<bool> CompleteInitialStrategySetupAsync(
@@ -342,6 +378,14 @@ public partial class CommitmentsViewModel(
         IsFixedPaymentPlan =
             value?.Value == CreditCardPaymentType.FixedAmount;
 
+    partial void OnCardHasActualStatementChanged(bool value) =>
+        IsLegacyCardSetup = !value;
+
+    partial void OnSelectedCurrentStatementPaymentModeChanged(
+        SelectionOption<CurrentStatementPaymentMode>? value) =>
+        IsCurrentStatementCustomPayment =
+            value?.Value == CurrentStatementPaymentMode.Custom;
+
     [RelayCommand]
     private void AddPlanPayment()
     {
@@ -386,6 +430,68 @@ public partial class CommitmentsViewModel(
         catch (Exception exception)
         {
             SetStatus(UserFacingMessages.FromException(exception));
+        }
+    }
+
+    [RelayCommand]
+    private void UseActualStatementForCard()
+    {
+        CardHasActualStatement = true;
+        CardStatementDate = DateTime.Today;
+        CardStatementDueDate = DateTime.Today;
+    }
+
+    [RelayCommand]
+    private void UseLegacyCardSetup()
+    {
+        CardHasActualStatement = false;
+        HasCardStatementImportWarnings = false;
+        CardStatementImportWarnings = string.Empty;
+    }
+
+    [RelayCommand]
+    private async Task ImportCardStatementPdfAsync()
+    {
+        if (IsBusy)
+        {
+            return;
+        }
+
+        try
+        {
+            var file = await FilePicker.Default.PickAsync(new PickOptions
+            {
+                PickerTitle = "Ekstre PDF seç",
+                FileTypes = FilePickerFileType.Pdf
+            });
+            if (file is null)
+            {
+                return;
+            }
+
+            IsBusy = true;
+            SetStatus(string.Empty);
+            await using var stream = await file.OpenReadAsync();
+            var result = await statementImporter.ImportPdfAsync(stream);
+            ApplyStatementImport(result);
+            if (!result.HasRequiredFields)
+            {
+                await feedback.ShowErrorAsync(
+                    "Bilgileri elle girebilirsin.",
+                    "Ekstre Otomatik Okunamadı");
+            }
+        }
+        catch (Exception exception)
+        {
+            var message = UserFacingMessages.FromException(exception);
+            SetStatus(message);
+            await feedback.ShowErrorAsync(
+                "Bilgileri elle girebilirsin.",
+                "Ekstre Kaydedilemedi");
+        }
+        finally
+        {
+            IsBusy = false;
         }
     }
 
@@ -440,6 +546,11 @@ public partial class CommitmentsViewModel(
             .Single(x => x.Id == cardId);
         _editingCardId = card.Id;
         _editingCardBalanceDate = card.BalanceAsOfDate;
+        _editingCardStatement = card.CurrentStatement;
+        _cardStatementFingerprint =
+            card.CurrentStatement?.SourceDocumentFingerprint;
+        _cardStatementSource =
+            card.CurrentStatement?.Source ?? CreditCardStatementSource.Manual;
         IsIncomeSection = false;
         IsPaymentSection = true;
         RefreshRecordTypes();
@@ -452,9 +563,44 @@ public partial class CommitmentsViewModel(
         Name = card.Name;
         Bank = card.Bank;
         CardLimit = card.Limit.ToString("N2", TurkishCulture);
+        CardHasActualStatement = card.CurrentStatement is not null;
         CarriedBalance = card.CarriedBalance.ToString("N2", TurkishCulture);
         UnbilledSpending = card.UnbilledSpending.ToString("N2", TurkishCulture);
         CardBalanceDate = card.BalanceAsOfDate.ToDateTime(TimeOnly.MinValue);
+        if (card.CurrentStatement is { } statement)
+        {
+            CardStatementAmount = statement.StatementAmount
+                .ToString("N2", TurkishCulture);
+            CardStatementMinimum = statement.MinimumPaymentAmount
+                .ToString("N2", TurkishCulture);
+            CardStatementDate =
+                statement.StatementDate.ToDateTime(TimeOnly.MinValue);
+            CardStatementDueDate =
+                statement.DueDate.ToDateTime(TimeOnly.MinValue);
+            CardNextStatementDate =
+                statement.NextStatementDate?.ToString("dd.MM.yyyy") ??
+                string.Empty;
+            CardNextDueDate =
+                statement.NextDueDate?.ToString("dd.MM.yyyy") ??
+                string.Empty;
+            SelectedCurrentStatementPaymentMode =
+                CurrentStatementPaymentModes.Single(x =>
+                    x.Value == (card.CurrentStatementPaymentPlan?.Mode ??
+                                CurrentStatementPaymentMode.Minimum));
+            CurrentStatementCustomPayment =
+                card.CurrentStatementPaymentPlan?.CustomAmount
+                    ?.ToString("N2", TurkishCulture) ?? string.Empty;
+        }
+        else
+        {
+            CardStatementAmount = string.Empty;
+            CardStatementMinimum = string.Empty;
+            CardNextStatementDate = string.Empty;
+            CardNextDueDate = string.Empty;
+            SelectedCurrentStatementPaymentMode =
+                CurrentStatementPaymentModes[0];
+            CurrentStatementCustomPayment = string.Empty;
+        }
         ClosingDay = card.StatementClosingDay.ToString(TurkishCulture);
         DueDay = card.PaymentDueDay.ToString(TurkishCulture);
         MinimumRate = (card.MinimumPaymentRate * 100m).ToString("N2", TurkishCulture);
@@ -648,6 +794,9 @@ public partial class CommitmentsViewModel(
     {
         _editingCardId = null;
         _editingCardBalanceDate = null;
+        _editingCardStatement = null;
+        _cardStatementFingerprint = null;
+        _cardStatementSource = CreditCardStatementSource.Manual;
         IsEditingCard = false;
         HasActiveForm = false;
         SaveButtonText = "Kaydet";
@@ -726,16 +875,28 @@ public partial class CommitmentsViewModel(
         var fallback = SelectedProjectionFallbackStrategy?.Value
             ?? ProjectionFallbackStrategy.None;
         var cardId = _editingCardId ?? Guid.NewGuid();
+        var actualStatement = CardHasActualStatement
+            ? BuildCurrentStatement(cardId)
+            : null;
+        var currentStatementPaymentPlan = actualStatement is null
+            ? null
+            : BuildCurrentStatementPaymentPlan(
+                actualStatement.StatementAmount);
         var card = new CreditCard
         {
             Id = cardId,
             Name = RequireName(),
             Bank = Bank.Trim(),
             Limit = RequirePositive(ParseMoney(CardLimit, "Kart limiti"), "Kart limiti"),
-            CarriedBalance = Math.Max(0m, ParseMoney(CarriedBalance, "Devreden bakiye")),
-            UnbilledSpending = Math.Max(0m, ParseMoney(UnbilledSpending, "Ekstreleşmemiş harcama")),
-            BalanceAsOfDate = _editingCardBalanceDate ??
-                DateOnly.FromDateTime(CardBalanceDate),
+            CarriedBalance = actualStatement is null
+                ? Math.Max(0m, ParseMoney(CarriedBalance, "Devreden bakiye"))
+                : 0m,
+            UnbilledSpending = actualStatement is null
+                ? Math.Max(0m, ParseMoney(UnbilledSpending, "Ekstreleşmemiş harcama"))
+                : 0m,
+            BalanceAsOfDate = actualStatement?.StatementDate ??
+                (_editingCardBalanceDate ??
+                 DateOnly.FromDateTime(CardBalanceDate)),
             StatementClosingDay = closeDay,
             PaymentDueDay = paymentDueDay,
             MinimumPaymentRate = minimumRatePercent / 100m,
@@ -751,6 +912,8 @@ public partial class CommitmentsViewModel(
                         "Gelecek hesaplamada kullanılacak sabit tutar"),
                         "Gelecek hesaplamada kullanılacak sabit tutar")
                     : null,
+            CurrentStatement = actualStatement,
+            CurrentStatementPaymentPlan = currentStatementPaymentPlan,
             Charges = CardFutureCharges
                 .OrderBy(x => x.Date)
                 .Select(x => new CardCharge
@@ -775,6 +938,67 @@ public partial class CommitmentsViewModel(
                 .ToArray()
         };
         return card;
+    }
+
+    private CreditCardStatement BuildCurrentStatement(Guid cardId)
+    {
+        var amount = RequirePositive(
+            ParseMoney(CardStatementAmount, "Ekstre tutarı"),
+            "Ekstre tutarı");
+        var minimum = ParseMoney(CardStatementMinimum, "Asgari ödeme");
+        if (minimum < 0m || minimum > amount)
+        {
+            throw new InvalidOperationException(
+                "Asgari ödeme 0 ile ekstre tutarı arasında olmalıdır.");
+        }
+
+        return new CreditCardStatement
+        {
+            Id = _editingCardStatement?.Id ?? Guid.NewGuid(),
+            CreditCardId = cardId,
+            StatementDate = DateOnly.FromDateTime(CardStatementDate),
+            DueDate = DateOnly.FromDateTime(CardStatementDueDate),
+            StatementAmount = amount,
+            MinimumPaymentAmount = minimum,
+            NextStatementDate = ParseOptionalDate(
+                CardNextStatementDate,
+                "Bir sonraki kesim tarihi"),
+            NextDueDate = ParseOptionalDate(
+                CardNextDueDate,
+                "Bir sonraki son ödeme tarihi"),
+            Source = _cardStatementSource,
+            SourceDocumentFingerprint = _cardStatementFingerprint,
+            ImportedAt = _cardStatementSource == CreditCardStatementSource.PdfImport
+                ? _editingCardStatement?.ImportedAt ?? DateTimeOffset.UtcNow
+                : null,
+            CreatedAt = _editingCardStatement?.CreatedAt ??
+                        DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+    }
+
+    private CurrentStatementPaymentPlan BuildCurrentStatementPaymentPlan(
+        decimal statementAmount)
+    {
+        var mode = SelectedCurrentStatementPaymentMode?.Value ??
+                   CurrentStatementPaymentMode.Minimum;
+        var custom = mode == CurrentStatementPaymentMode.Custom
+            ? ParseMoney(
+                CurrentStatementCustomPayment,
+                "Bu ekstre için özel ödeme")
+            : (decimal?)null;
+        if (custom is decimal customAmount &&
+            (customAmount < 0m || customAmount > statementAmount))
+        {
+            throw new InvalidOperationException(
+                "Bu ekstre için ödeme tutarı 0 ile ekstre tutarı arasında olmalıdır.");
+        }
+
+        return new CurrentStatementPaymentPlan
+        {
+            Mode = mode,
+            CustomAmount = custom
+        };
     }
 
     private void RefreshRecordTypes()
@@ -825,6 +1049,18 @@ public partial class CommitmentsViewModel(
         CardFutureCharges.Clear();
         CardPaymentPlans.Clear();
         _cardChargeDescriptions.Clear();
+        CardHasActualStatement = false;
+        CardStatementAmount = string.Empty;
+        CardStatementMinimum = string.Empty;
+        CardStatementDate = DateTime.Today;
+        CardStatementDueDate = DateTime.Today;
+        CardNextStatementDate = string.Empty;
+        CardNextDueDate = string.Empty;
+        CardStatementImportWarnings = string.Empty;
+        HasCardStatementImportWarnings = false;
+        CurrentStatementCustomPayment = string.Empty;
+        SelectedCurrentStatementPaymentMode =
+            CurrentStatementPaymentModes[0];
         CancelEditingCard();
     }
 
@@ -873,6 +1109,52 @@ public partial class CommitmentsViewModel(
             $"{LoanItems.Count} kredi • {RegularPaymentItems.Count + OneTimePaymentItems.Count} ödeme";
     }
 
+    private void ApplyStatementImport(
+        CreditCardStatementImportResult result)
+    {
+        CardHasActualStatement = true;
+        _cardStatementSource = CreditCardStatementSource.PdfImport;
+        _cardStatementFingerprint = result.SourceDocumentFingerprint;
+        if (!string.IsNullOrWhiteSpace(result.DetectedBank) &&
+            string.IsNullOrWhiteSpace(Bank))
+        {
+            Bank = result.DetectedBank;
+        }
+
+        if (string.IsNullOrWhiteSpace(Name))
+        {
+            Name = result.DetectedBank.Contains(
+                "Bonus",
+                StringComparison.OrdinalIgnoreCase)
+                ? "Bonus"
+                : "Axess";
+        }
+
+        CardStatementDate = (result.StatementDate ??
+                             DateOnly.FromDateTime(DateTime.Today))
+            .ToDateTime(TimeOnly.MinValue);
+        CardStatementDueDate = (result.DueDate ??
+                                DateOnly.FromDateTime(DateTime.Today))
+            .ToDateTime(TimeOnly.MinValue);
+        CardStatementAmount =
+            result.StatementAmount?.ToString("N2", TurkishCulture) ??
+            CardStatementAmount;
+        CardStatementMinimum =
+            result.MinimumPaymentAmount?.ToString("N2", TurkishCulture) ??
+            CardStatementMinimum;
+        CardNextStatementDate =
+            result.NextStatementDate?.ToString("dd.MM.yyyy") ??
+            CardNextStatementDate;
+        CardNextDueDate =
+            result.NextDueDate?.ToString("dd.MM.yyyy") ??
+            CardNextDueDate;
+        SelectedCurrentStatementPaymentMode ??=
+            CurrentStatementPaymentModes[0];
+        CardStatementImportWarnings =
+            string.Join(Environment.NewLine, result.Warnings);
+        HasCardStatementImportWarnings = result.Warnings.Count > 0;
+    }
+
     private string RequireName() =>
         string.IsNullOrWhiteSpace(Name)
             ? throw new InvalidOperationException("Kayıt adı gereklidir.")
@@ -907,4 +1189,42 @@ public partial class CommitmentsViewModel(
             ProjectionFallbackStrategy.FixedAmount => "Sabit tutar üzerinden hesapla",
             _ => "—"
         };
+
+    private static string CurrentStatementPlanLabel(
+        CurrentStatementPaymentPlan? plan) => plan?.Mode switch
+    {
+        CurrentStatementPaymentMode.Full => "Tamamı",
+        CurrentStatementPaymentMode.Custom =>
+            $"Başka tutar {Money(plan.CustomAmount.GetValueOrDefault())}",
+        CurrentStatementPaymentMode.Minimum => "Asgari",
+        _ => "Henüz seçilmedi"
+    };
+
+    private static DateOnly? ParseOptionalDate(
+        string? value,
+        string field)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        if (DateOnly.TryParseExact(
+                value.Trim(),
+                "dd.MM.yyyy",
+                TurkishCulture,
+                System.Globalization.DateTimeStyles.None,
+                out var date) ||
+            DateOnly.TryParse(
+                value,
+                TurkishCulture,
+                System.Globalization.DateTimeStyles.None,
+                out date))
+        {
+            return date;
+        }
+
+        throw new InvalidOperationException(
+            $"{field} gg.aa.yyyy formatında olmalıdır.");
+    }
 }

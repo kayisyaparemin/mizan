@@ -13,57 +13,193 @@
             </VerticalStackLayout>
 
             <Border BackgroundColor="{StaticResource SoftSky}">
-                <VerticalStackLayout Spacing="8">
-                    <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto" RowSpacing="7">
+                <VerticalStackLayout Spacing="10">
+                    <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" RowSpacing="7">
                         <Label Text="Toplam bilinen borç" Style="{StaticResource MutedText}" />
                         <Label Grid.Column="1" Text="{Binding KnownDebt}" FontFamily="OpenSansSemibold" />
                         <Label Grid.Row="1" Text="Limit" Style="{StaticResource MutedText}" />
                         <Label Grid.Row="1" Grid.Column="1" Text="{Binding LimitText}" FontFamily="OpenSansSemibold" />
-                        <Label Grid.Row="2" Grid.ColumnSpan="2" Text="{Binding StatementText}" Style="{StaticResource MutedText}" />
                     </Grid>
                 </VerticalStackLayout>
             </Border>
 
             <Border>
                 <VerticalStackLayout Spacing="10">
-                    <Label Text="Ekstreyi Nasıl Ödeyeceksin?"
+                    <Label Text="Kesilmiş Ekstre"
                            Style="{StaticResource SectionTitle}" />
-                    <Label Text="{Binding PaymentPreferenceText}"
+                    <Label Text="{Binding StatementText}"
+                           FontSize="22"
                            FontFamily="OpenSansSemibold" />
+                    <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto" RowSpacing="7">
+                        <Label Text="Kesim" Style="{StaticResource MutedText}" />
+                        <Label Grid.Column="1" Text="{Binding StatementDateText}" FontFamily="OpenSansSemibold" />
+                        <Label Grid.Row="1" Text="Son ödeme" Style="{StaticResource MutedText}" />
+                        <Label Grid.Row="1" Grid.Column="1" Text="{Binding StatementDueText}" FontFamily="OpenSansSemibold" />
+                        <Label Grid.Row="2" Text="Asgari" Style="{StaticResource MutedText}" />
+                        <Label Grid.Row="2" Grid.Column="1" Text="{Binding StatementMinimumText}" FontFamily="OpenSansSemibold" />
+                    </Grid>
                     <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
-                        <Button Text="Asgari"
-                                Command="{Binding PayMinimumCommand}" />
+                        <Button Text="Ekstreden İçeri Aktar"
+                                Command="{Binding ImportStatementCommand}" />
                         <Button Grid.Column="1"
-                                Text="Tamamı"
-                                Command="{Binding PayFullCommand}"
+                                Text="Elle Gir"
+                                Command="{Binding StartManualStatementCommand}"
                                 Style="{StaticResource SecondaryButton}" />
                     </Grid>
-                    <Button Text="Her Ekstrede Sor"
-                            Command="{Binding AskEachStatementCommand}"
-                            BackgroundColor="{StaticResource SoftPink}" />
+                    <Label Text="Kesilmiş ekstre yoksa eski başlangıç bilgileriyle hesaplama sürer."
+                           Style="{StaticResource MutedText}"
+                           IsVisible="{Binding HasNoActualStatement}" />
+                </VerticalStackLayout>
+            </Border>
+
+            <Border IsVisible="{Binding HasStatementDraft}"
+                    BackgroundColor="{StaticResource SoftPink}">
+                <VerticalStackLayout Spacing="10">
+                    <Label Text="{Binding StatementDraftTitle}"
+                           Style="{StaticResource SectionTitle}" />
+                    <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
+                        <Label Text="Kart" Style="{StaticResource MutedText}" />
+                        <Label Grid.Column="1"
+                               Text="{Binding StatementDraftBank}"
+                               FontFamily="OpenSansSemibold" />
+                        <Label Grid.Row="1"
+                               Text="Kart no"
+                               Style="{StaticResource MutedText}"
+                               IsVisible="{Binding HasStatementDraftLast4}" />
+                        <Label Grid.Row="1"
+                               Grid.Column="1"
+                               Text="{Binding StatementDraftLast4}"
+                               IsVisible="{Binding HasStatementDraftLast4}"
+                               FontFamily="OpenSansSemibold" />
+                    </Grid>
+                    <Label Text="{Binding StatementDraftDuplicate}"
+                           IsVisible="{Binding IsStatementDraftDuplicate}"
+                           TextColor="{StaticResource Error}" />
+                    <Label Text="{Binding StatementDraftWarnings}"
+                           IsVisible="{Binding HasStatementDraftWarnings}"
+                           TextColor="{StaticResource Error}" />
+
+                    <Label Text="Ekstre tutarı" Style="{StaticResource FieldLabel}" />
+                    <Entry Text="{Binding StatementDraftAmount}" Keyboard="Numeric" />
+                    <Label Text="Asgari ödeme" Style="{StaticResource FieldLabel}" />
+                    <Entry Text="{Binding StatementDraftMinimum}" Keyboard="Numeric" />
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                        <VerticalStackLayout Spacing="6">
+                            <Label Text="Kesim tarihi" Style="{StaticResource FieldLabel}" />
+                            <DatePicker Date="{Binding StatementDraftDate}" />
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Column="1" Spacing="6">
+                            <Label Text="Son ödeme" Style="{StaticResource FieldLabel}" />
+                            <DatePicker Date="{Binding StatementDraftDueDate}" />
+                        </VerticalStackLayout>
+                    </Grid>
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                        <VerticalStackLayout Spacing="6">
+                            <Label Text="Sonraki kesim" Style="{StaticResource FieldLabel}" />
+                            <Entry Text="{Binding StatementDraftNextStatementDate}"
+                                   Placeholder="gg.aa.yyyy" />
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Column="1" Spacing="6">
+                            <Label Text="Sonraki son ödeme" Style="{StaticResource FieldLabel}" />
+                            <Entry Text="{Binding StatementDraftNextDueDate}"
+                                   Placeholder="gg.aa.yyyy" />
+                        </VerticalStackLayout>
+                    </Grid>
+
+                    <Label Text="Bu ekstreyi nasıl ödeyeceksin?"
+                           Style="{StaticResource FieldLabel}" />
+                    <Label Text="{Binding StatementDraftPaymentPlanText}"
+                           FontFamily="OpenSansSemibold" />
+                    <Grid ColumnDefinitions="*,*,*" ColumnSpacing="6">
+                        <Button Text="Asgari"
+                                Command="{Binding DraftPayMinimumCommand}" />
+                        <Button Grid.Column="1"
+                                Text="Tamamı"
+                                Command="{Binding DraftPayFullCommand}"
+                                Style="{StaticResource SecondaryButton}" />
+                        <Button Grid.Column="2"
+                                Text="Başka"
+                                Command="{Binding DraftPayCustomCommand}"
+                                Style="{StaticResource SecondaryButton}" />
+                    </Grid>
+                    <Entry Text="{Binding StatementDraftCustomAmount}"
+                           IsVisible="{Binding IsStatementDraftCustom}"
+                           Placeholder="Özel ödeme tutarı"
+                           Keyboard="Numeric" />
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                        <Button Text="Ekstreyi Kaydet"
+                                Command="{Binding SaveStatementDraftCommand}" />
+                        <Button Grid.Column="1"
+                                Text="Vazgeç"
+                                Command="{Binding CancelStatementDraftCommand}"
+                                Style="{StaticResource SecondaryButton}" />
+                    </Grid>
+                </VerticalStackLayout>
+            </Border>
+
+            <Border IsVisible="{Binding HasActualStatement}">
+                <VerticalStackLayout Spacing="10">
+                    <Label Text="Bu Ekstreyi Nasıl Ödeyeceksin?"
+                           Style="{StaticResource SectionTitle}" />
+                    <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
+                        <Label Text="Plan" Style="{StaticResource MutedText}" />
+                        <Label Grid.Column="1"
+                               Text="{Binding CurrentStatementPlanText}"
+                               FontFamily="OpenSansSemibold" />
+                        <Label Grid.Row="1" Text="Ödenecek" Style="{StaticResource MutedText}" />
+                        <Label Grid.Row="1"
+                               Grid.Column="1"
+                               Text="{Binding CurrentStatementPaymentText}"
+                               FontFamily="OpenSansSemibold" />
+                    </Grid>
+                    <Grid ColumnDefinitions="*,*,*" ColumnSpacing="6">
+                        <Button Text="Asgari"
+                                Command="{Binding SetCurrentStatementMinimumCommand}" />
+                        <Button Grid.Column="1"
+                                Text="Tamamı"
+                                Command="{Binding SetCurrentStatementFullCommand}"
+                                Style="{StaticResource SecondaryButton}" />
+                        <Button Grid.Column="2"
+                                Text="Başka"
+                                Command="{Binding ShowCurrentStatementCustomCommand}"
+                                Style="{StaticResource SecondaryButton}" />
+                    </Grid>
+                    <Grid ColumnDefinitions="*,Auto"
+                          ColumnSpacing="8"
+                          IsVisible="{Binding IsCurrentStatementCustom}">
+                        <Entry Text="{Binding CurrentStatementCustomAmount}"
+                               Placeholder="Özel tutar"
+                               Keyboard="Numeric" />
+                        <Button Grid.Column="1"
+                                Text="Kaydet"
+                                Command="{Binding SaveCurrentStatementCustomCommand}" />
+                    </Grid>
                 </VerticalStackLayout>
             </Border>
 
             <Border BackgroundColor="{StaticResource SoftPink}">
                 <VerticalStackLayout Spacing="10">
-                    <Label Text="Henüz Karar Vermediğin Ekstrelerde"
+                    <Label Text="Sonraki Ekstre"
                            Style="{StaticResource SectionTitle}" />
-                    <Label Text="{Binding FallbackText}"
-                           FontFamily="OpenSansSemibold" />
-                    <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
-                        <Button Text="Asgari"
-                                Command="{Binding FallbackMinimumCommand}" />
-                        <Button Grid.Column="1"
-                                Text="Tamamı"
-                                Command="{Binding FallbackFullCommand}"
-                                Style="{StaticResource SecondaryButton}" />
+                    <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
+                        <Label Text="Tahmini" Style="{StaticResource MutedText}" />
+                        <Label Grid.Column="1"
+                               Text="{Binding NextStatementEstimateText}"
+                               FontFamily="OpenSansSemibold" />
+                        <Label Grid.Row="1" Text="Kesim" Style="{StaticResource MutedText}" />
+                        <Label Grid.Row="1"
+                               Grid.Column="1"
+                               Text="{Binding NextStatementDateText}"
+                               FontFamily="OpenSansSemibold" />
                     </Grid>
+                    <Label Text="{Binding NextStatementBreakdownText}"
+                           Style="{StaticResource MutedText}" />
                 </VerticalStackLayout>
             </Border>
 
             <Border>
                 <VerticalStackLayout Spacing="10">
-                    <Label Text="Gelecek Harcamalar"
+                    <Label Text="Gelecek Kart Hareketleri"
                            Style="{StaticResource SectionTitle}" />
                     <Label Text="Açıklama" Style="{StaticResource FieldLabel}" />
                     <Entry Text="{Binding ChargeDescription}"
@@ -107,6 +243,45 @@
                     </VerticalStackLayout>
                     <Button Text="Harcamaları Kaydet"
                             Command="{Binding SaveChargesCommand}" />
+                </VerticalStackLayout>
+            </Border>
+
+            <Border>
+                <VerticalStackLayout Spacing="10">
+                    <Label Text="Varsayılan Plan"
+                           Style="{StaticResource SectionTitle}" />
+                    <Label Text="Gelecekteki ekstreleri genelde nasıl ödeyelim?"
+                           Style="{StaticResource MutedText}" />
+                    <Label Text="{Binding PaymentPreferenceText}"
+                           FontFamily="OpenSansSemibold" />
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                        <Button Text="Asgari"
+                                Command="{Binding PayMinimumCommand}" />
+                        <Button Grid.Column="1"
+                                Text="Tamamı"
+                                Command="{Binding PayFullCommand}"
+                                Style="{StaticResource SecondaryButton}" />
+                    </Grid>
+                    <Button Text="Her Ekstrede Sor"
+                            Command="{Binding AskEachStatementCommand}"
+                            BackgroundColor="{StaticResource SoftPink}" />
+                </VerticalStackLayout>
+            </Border>
+
+            <Border BackgroundColor="{StaticResource SoftSky}">
+                <VerticalStackLayout Spacing="10">
+                    <Label Text="Kararsız Gelecek Ekstrelerde"
+                           Style="{StaticResource SectionTitle}" />
+                    <Label Text="{Binding FallbackText}"
+                           FontFamily="OpenSansSemibold" />
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                        <Button Text="Asgari"
+                                Command="{Binding FallbackMinimumCommand}" />
+                        <Button Grid.Column="1"
+                                Text="Tamamı"
+                                Command="{Binding FallbackFullCommand}"
+                                Style="{StaticResource SecondaryButton}" />
+                    </Grid>
                 </VerticalStackLayout>
             </Border>
 

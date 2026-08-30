@@ -324,6 +324,186 @@ public sealed class CreditCardStatementTests
             TestFactory.AxessCard().KnownTotalDebt);
     }
 
+    [Fact]
+    public void ActualAxessMinimumPayment_UsesBankMinimumAndCarriesPrincipal()
+    {
+        var statement = Assert.Single(_calculator.Project(
+            ActualCard(
+                100_804.94m,
+                40_321.97m,
+                CurrentStatementPaymentMode.Minimum),
+            1));
+
+        Assert.True(statement.IsActualStatement);
+        Assert.Equal(new DateOnly(2026, 8, 28),
+            statement.StatementCloseDate);
+        Assert.Equal(new DateOnly(2026, 9, 7),
+            statement.PaymentDueDate);
+        Assert.Equal(100_804.94m, statement.StatementBalance);
+        Assert.Equal(40_321.97m, statement.MinimumPayment);
+        Assert.Equal(40_321.97m, statement.Payment);
+        Assert.Equal(60_482.97m, statement.CarriedAfterPayment);
+    }
+
+    [Fact]
+    public void ActualGarantiMinimumPayment_UsesExactActualDateAndMinimum()
+    {
+        var statement = Assert.Single(_calculator.Project(
+            ActualCard(
+                15_000m,
+                6_000m,
+                CurrentStatementPaymentMode.Minimum) with
+            {
+                CurrentStatement = new CreditCardStatement
+                {
+                    StatementDate = new DateOnly(2026, 8, 24),
+                    DueDate = new DateOnly(2026, 9, 3),
+                    StatementAmount = 15_000m,
+                    MinimumPaymentAmount = 6_000m,
+                    NextStatementDate = new DateOnly(2026, 9, 25),
+                    NextDueDate = new DateOnly(2026, 10, 5)
+                }
+            },
+            1));
+
+        Assert.Equal(new DateOnly(2026, 8, 24),
+            statement.StatementCloseDate);
+        Assert.Equal(new DateOnly(2026, 9, 3),
+            statement.PaymentDueDate);
+        Assert.Equal(6_000m, statement.Payment);
+        Assert.Equal(9_000m, statement.CarriedAfterPayment);
+    }
+
+    [Fact]
+    public void ActualFullPayment_LeavesNoCarryInterest()
+    {
+        var statement = Assert.Single(_calculator.Project(
+            ActualCard(
+                15_000m,
+                6_000m,
+                CurrentStatementPaymentMode.Full),
+            1));
+
+        Assert.Equal(15_000m, statement.Payment);
+        Assert.Equal(0m, statement.CarriedAfterPayment);
+        Assert.Equal(0m, statement.CarryInterest);
+        Assert.Equal(0m, statement.NextCarriedBalance);
+    }
+
+    [Fact]
+    public void ActualCustomPayment_CarriesRemainderWithoutMinimumFloor()
+    {
+        var statement = Assert.Single(_calculator.Project(
+            ActualCard(
+                15_000m,
+                6_000m,
+                CurrentStatementPaymentMode.Custom,
+                10_000m),
+            1));
+
+        Assert.Equal(10_000m, statement.Payment);
+        Assert.Equal(5_000m, statement.CarriedAfterPayment);
+    }
+
+    [Fact]
+    public void ActualMinimum_OverridesConfiguredMinimumRatio()
+    {
+        var statement = Assert.Single(_calculator.Project(
+            ActualCard(
+                15_000m,
+                6_000m,
+                CurrentStatementPaymentMode.Minimum) with
+            {
+                MinimumPaymentRate = 0.10m
+            },
+            1));
+
+        Assert.Equal(6_000m, statement.MinimumPayment);
+        Assert.Equal(6_000m, statement.Payment);
+    }
+
+    [Fact]
+    public void ActualStatement_DoesNotDoubleCountLegacySeedOrHistoricalCharges()
+    {
+        var statement = Assert.Single(_calculator.Project(
+            ActualCard(
+                15_000m,
+                6_000m,
+                CurrentStatementPaymentMode.Minimum) with
+            {
+                CarriedBalance = 50_000m,
+                UnbilledSpending = 20_000m,
+                Charges =
+                [
+                    Charge(new DateOnly(2026, 8, 20), 7_000m)
+                ]
+            },
+            1));
+
+        Assert.Equal(15_000m, statement.StatementBalance);
+        Assert.Equal(0m, statement.NewCharges);
+        Assert.Equal(9_000m, statement.CarriedAfterPayment);
+    }
+
+    [Fact]
+    public void ActualStatement_UsesExactNextDatesForImmediateNextCycle()
+    {
+        var statements = _calculator.Project(
+            ActualCard(
+                15_000m,
+                6_000m,
+                CurrentStatementPaymentMode.Minimum) with
+            {
+                Charges =
+                [
+                    Charge(new DateOnly(2026, 9, 25), 1_250m)
+                ]
+            },
+            2,
+            carryInterestRate: 0m);
+
+        Assert.Equal(new DateOnly(2026, 9, 28),
+            statements[1].StatementCloseDate);
+        Assert.Equal(new DateOnly(2026, 10, 8),
+            statements[1].PaymentDueDate);
+        Assert.Equal(1_250m, statements[1].NewCharges);
+        Assert.Equal(10_250m, statements[1].StatementBalance);
+    }
+
+    [Fact]
+    public void NewActualStatement_ReanchorsInsteadOfAddingPredictionDelta()
+    {
+        var predicted = _calculator.Project(
+            ActualCard(
+                79_000m,
+                31_600m,
+                CurrentStatementPaymentMode.Minimum),
+            2)[1];
+
+        var reanchored = _calculator.Project(
+            ActualCard(
+                81_200m,
+                32_480m,
+                CurrentStatementPaymentMode.Minimum) with
+            {
+                CurrentStatement = new CreditCardStatement
+                {
+                    StatementDate = new DateOnly(2026, 9, 28),
+                    DueDate = new DateOnly(2026, 10, 8),
+                    StatementAmount = 81_200m,
+                    MinimumPaymentAmount = 32_480m,
+                    NextStatementDate = new DateOnly(2026, 10, 28),
+                    NextDueDate = new DateOnly(2026, 11, 8)
+                }
+            },
+            1);
+
+        Assert.NotEqual(predicted.StatementBalance,
+            reanchored[0].StatementBalance);
+        Assert.Equal(81_200m, reanchored[0].StatementBalance);
+        Assert.Equal(48_720m, reanchored[0].CarriedAfterPayment);
+    }
+
     private static void AssertStatement(
         CreditCardStatementProjection statement,
         DateOnly closeDate,
@@ -359,4 +539,39 @@ public sealed class CreditCardStatementTests
         PostingDate = postingDate,
         Amount = amount
     };
+
+    private static CreditCard ActualCard(
+        decimal statementAmount,
+        decimal minimumPayment,
+        CurrentStatementPaymentMode mode,
+        decimal? customAmount = null)
+    {
+        var id = Guid.NewGuid();
+        return new CreditCard
+        {
+            Id = id,
+            Name = "Actual",
+            BalanceAsOfDate = new DateOnly(2026, 8, 28),
+            StatementClosingDay = 25,
+            PaymentDueDay = 5,
+            MinimumPaymentRate = 0.40m,
+            PaymentStrategy = CreditCardPaymentStrategy.AskEachStatement,
+            ProjectionFallbackStrategy = ProjectionFallbackStrategy.Minimum,
+            CurrentStatement = new CreditCardStatement
+            {
+                CreditCardId = id,
+                StatementDate = new DateOnly(2026, 8, 28),
+                DueDate = new DateOnly(2026, 9, 7),
+                StatementAmount = statementAmount,
+                MinimumPaymentAmount = minimumPayment,
+                NextStatementDate = new DateOnly(2026, 9, 28),
+                NextDueDate = new DateOnly(2026, 10, 8)
+            },
+            CurrentStatementPaymentPlan = new CurrentStatementPaymentPlan
+            {
+                Mode = mode,
+                CustomAmount = customAmount
+            }
+        };
+    }
 }

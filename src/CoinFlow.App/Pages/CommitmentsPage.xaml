@@ -95,7 +95,65 @@
                         <Entry Text="{Binding Bank}" />
                         <Label Text="Kart limiti" Style="{StaticResource FieldLabel}" />
                         <Entry Text="{Binding CardLimit}" Keyboard="Numeric" />
+                        <Label Text="Kesilmiş bir ekstren var mı?"
+                               Style="{StaticResource FieldLabel}" />
                         <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                            <Button Text="Evet"
+                                    Command="{Binding UseActualStatementForCardCommand}" />
+                            <Button Grid.Column="1"
+                                    Text="Hayır"
+                                    Command="{Binding UseLegacyCardSetupCommand}"
+                                    Style="{StaticResource SecondaryButton}" />
+                        </Grid>
+                        <VerticalStackLayout IsVisible="{Binding CardHasActualStatement}"
+                                             Spacing="8">
+                            <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                                <Button Text="Ekstreden İçeri Aktar"
+                                        Command="{Binding ImportCardStatementPdfCommand}" />
+                                <Label Grid.Column="1"
+                                       Text="PDF yerel okunur; dosya saklanmaz."
+                                       Style="{StaticResource MutedText}"
+                                       VerticalTextAlignment="Center" />
+                            </Grid>
+                            <Label Text="{Binding CardStatementImportWarnings}"
+                                   IsVisible="{Binding HasCardStatementImportWarnings}"
+                                   TextColor="{StaticResource Error}" />
+                            <Label Text="Ekstre tutarı" Style="{StaticResource FieldLabel}" />
+                            <Entry Text="{Binding CardStatementAmount}" Keyboard="Numeric" />
+                            <Label Text="Asgari ödeme" Style="{StaticResource FieldLabel}" />
+                            <Entry Text="{Binding CardStatementMinimum}" Keyboard="Numeric" />
+                            <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                                <VerticalStackLayout Spacing="6">
+                                    <Label Text="Kesim tarihi" Style="{StaticResource FieldLabel}" />
+                                    <DatePicker Date="{Binding CardStatementDate}" />
+                                </VerticalStackLayout>
+                                <VerticalStackLayout Grid.Column="1" Spacing="6">
+                                    <Label Text="Son ödeme" Style="{StaticResource FieldLabel}" />
+                                    <DatePicker Date="{Binding CardStatementDueDate}" />
+                                </VerticalStackLayout>
+                            </Grid>
+                            <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                                <VerticalStackLayout Spacing="6">
+                                    <Label Text="Sonraki kesim" Style="{StaticResource FieldLabel}" />
+                                    <Entry Text="{Binding CardNextStatementDate}" Placeholder="gg.aa.yyyy" />
+                                </VerticalStackLayout>
+                                <VerticalStackLayout Grid.Column="1" Spacing="6">
+                                    <Label Text="Sonraki son ödeme" Style="{StaticResource FieldLabel}" />
+                                    <Entry Text="{Binding CardNextDueDate}" Placeholder="gg.aa.yyyy" />
+                                </VerticalStackLayout>
+                            </Grid>
+                            <Label Text="Bu ekstreyi nasıl ödeyeceksin?"
+                                   Style="{StaticResource FieldLabel}" />
+                            <Picker ItemsSource="{Binding CurrentStatementPaymentModes}"
+                                    SelectedItem="{Binding SelectedCurrentStatementPaymentMode}" />
+                            <Entry Text="{Binding CurrentStatementCustomPayment}"
+                                   IsVisible="{Binding IsCurrentStatementCustomPayment}"
+                                   Placeholder="Özel ödeme tutarı"
+                                   Keyboard="Numeric" />
+                        </VerticalStackLayout>
+                        <Grid ColumnDefinitions="*,*"
+                              ColumnSpacing="8"
+                              IsVisible="{Binding IsLegacyCardSetup}">
                             <VerticalStackLayout Spacing="6">
                                 <Label Text="Devreden bakiye" Style="{StaticResource FieldLabel}" />
                                 <Entry Text="{Binding CarriedBalance}" Keyboard="Numeric" />
@@ -105,8 +163,11 @@
                                 <Entry Text="{Binding UnbilledSpending}" Keyboard="Numeric" />
                             </VerticalStackLayout>
                         </Grid>
-                        <Label Text="Bakiye tarihi" Style="{StaticResource FieldLabel}" />
-                        <DatePicker Date="{Binding CardBalanceDate}" />
+                        <VerticalStackLayout IsVisible="{Binding IsLegacyCardSetup}"
+                                             Spacing="6">
+                            <Label Text="Bakiye tarihi" Style="{StaticResource FieldLabel}" />
+                            <DatePicker Date="{Binding CardBalanceDate}" />
+                        </VerticalStackLayout>
                         <Grid ColumnDefinitions="*,*,*" ColumnSpacing="7">
                             <VerticalStackLayout>
                                 <Label Text="Kesim günü" Style="{StaticResource FieldLabel}" />

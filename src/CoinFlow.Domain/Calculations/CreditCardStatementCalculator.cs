@@ -7,7 +7,8 @@ public enum CreditCardPaymentResolution
     Undetermined = 0,
     DueDateOverride = 1,
     GeneralStrategy = 2,
-    ProjectionFallback = 3
+    ProjectionFallback = 3,
+    CurrentStatementPlan = 4
 }
 
 public sealed record CreditCardStatementProjection(
@@ -23,7 +24,9 @@ public sealed record CreditCardStatementProjection(
     decimal? NextCarriedBalance,
     decimal AppliedInterestRate,
     CreditCardPaymentResolution PaymentResolution,
-    CreditCardPaymentType? AppliedPaymentType)
+    CreditCardPaymentType? AppliedPaymentType,
+    bool IsActualStatement = false,
+    CreditCardStatementSource? StatementSource = null)
 {
     public bool IsPaymentDetermined => Payment is not null;
     public bool UsesProjectionFallback =>
@@ -45,23 +48,31 @@ public sealed class CreditCardStatementCalculator
 
         Validate(card);
         ValidateInterestRate(carryInterestRate);
-        var firstClose = ResolveStatementCloseOnOrAfter(
-            card.BalanceAsOfDate,
-            card.StatementClosingDay);
+        var actualStatement = card.CurrentStatement;
+        var firstClose = actualStatement?.StatementDate ??
+                         ResolveStatementCloseOnOrAfter(
+                             card.BalanceAsOfDate,
+                             card.StatementClosingDay);
         var closeDate = firstClose;
         var assignedCharges = card.Charges
+            .Where(x => actualStatement is null ||
+                        x.PostingDate > actualStatement.StatementDate)
             .GroupBy(x => ResolveChargeStatementClose(
+                card,
                 x.PostingDate,
-                firstClose,
-                card.StatementClosingDay))
+                firstClose))
             .ToDictionary(x => x.Key, x => x.Sum(charge => charge.Amount));
-        decimal? carried = card.CarriedBalance;
+        decimal? carried = actualStatement?.StatementAmount ??
+                           card.CarriedBalance;
         var result = new List<CreditCardStatementProjection>(statementCount);
 
         for (var index = 0; index < statementCount; index++)
         {
-            var newCharges = assignedCharges.GetValueOrDefault(closeDate);
-            if (index == 0)
+            var isActualStatement = actualStatement is not null && index == 0;
+            var newCharges = isActualStatement
+                ? 0m
+                : assignedCharges.GetValueOrDefault(closeDate);
+            if (actualStatement is null && index == 0)
             {
                 newCharges += card.UnbilledSpending;
             }
@@ -69,15 +80,22 @@ public sealed class CreditCardStatementCalculator
             decimal? statementBalance = carried is null
                 ? null
                 : carried.Value + newCharges;
-            decimal? minimumPayment = statementBalance is null
-                ? null
-                : RoundMoney(statementBalance.Value * card.MinimumPaymentRate);
-            var dueDate = ResolvePaymentDueDate(closeDate, card.PaymentDueDay);
+            decimal? minimumPayment = isActualStatement
+                ? actualStatement!.MinimumPaymentAmount
+                : statementBalance is null
+                    ? null
+                    : RoundMoney(
+                        statementBalance.Value * card.MinimumPaymentRate);
+            var dueDate = ResolvePaymentDueDate(
+                card,
+                closeDate,
+                isActualStatement);
             var decision = ResolvePayment(
                 card,
                 dueDate,
                 statementBalance,
                 minimumPayment,
+                isActualStatement,
                 useProjectionFallback);
             decimal? carriedAfterPayment = statementBalance is null || decision.Payment is null
                 ? null
@@ -102,13 +120,15 @@ public sealed class CreditCardStatementCalculator
                 nextCarriedBalance,
                 carryInterestRate,
                 decision.Resolution,
-                decision.PaymentType));
+                decision.PaymentType,
+                isActualStatement,
+                isActualStatement ? actualStatement!.Source : null));
 
             carried = nextCarriedBalance;
-            closeDate = CalendarRules.AddMonthsKeepingDay(
+            closeDate = ResolveNextStatementCloseDate(
+                card,
                 closeDate,
-                1,
-                card.StatementClosingDay);
+                isActualStatement);
         }
 
         return result;
@@ -134,6 +154,27 @@ public sealed class CreditCardStatementCalculator
         return closeDate < firstProjectionClose ? firstProjectionClose : closeDate;
     }
 
+    private static DateOnly ResolveChargeStatementClose(
+        CreditCard card,
+        DateOnly postingDate,
+        DateOnly firstProjectionClose)
+    {
+        if (card.CurrentStatement is
+            {
+                NextStatementDate: { } nextStatementDate
+            } currentStatement &&
+            postingDate > currentStatement.StatementDate &&
+            postingDate <= nextStatementDate)
+        {
+            return nextStatementDate;
+        }
+
+        return ResolveChargeStatementClose(
+            postingDate,
+            firstProjectionClose,
+            card.StatementClosingDay);
+    }
+
     public static DateOnly ResolvePaymentDueDate(
         DateOnly statementCloseDate,
         int paymentDueDay)
@@ -148,13 +189,71 @@ public sealed class CreditCardStatementCalculator
             : CalendarRules.AddMonthsKeepingDay(sameMonth, 1, paymentDueDay);
     }
 
+    private static DateOnly ResolvePaymentDueDate(
+        CreditCard card,
+        DateOnly statementCloseDate,
+        bool isCurrentActualStatement)
+    {
+        if (card.CurrentStatement is not { } statement)
+        {
+            return ResolvePaymentDueDate(
+                statementCloseDate,
+                card.PaymentDueDay);
+        }
+
+        if (isCurrentActualStatement)
+        {
+            return statement.DueDate;
+        }
+
+        if (statement.NextStatementDate == statementCloseDate &&
+            statement.NextDueDate is { } nextDueDate)
+        {
+            return nextDueDate;
+        }
+
+        return ResolvePaymentDueDate(
+            statementCloseDate,
+            card.PaymentDueDay);
+    }
+
+    private static DateOnly ResolveNextStatementCloseDate(
+        CreditCard card,
+        DateOnly closeDate,
+        bool wasCurrentActualStatement)
+    {
+        if (wasCurrentActualStatement &&
+            card.CurrentStatement?.NextStatementDate is { } nextStatementDate)
+        {
+            return nextStatementDate;
+        }
+
+        return CalendarRules.AddMonthsKeepingDay(
+            closeDate,
+            1,
+            card.StatementClosingDay);
+    }
+
     private static PaymentDecision ResolvePayment(
         CreditCard card,
         DateOnly dueDate,
         decimal? statementBalance,
         decimal? minimumPayment,
+        bool isActualStatement,
         bool useProjectionFallback)
     {
+        if (isActualStatement &&
+            card.CurrentStatementPaymentPlan is { } currentPlan)
+        {
+            return new PaymentDecision(
+                CalculateCurrentStatementPayment(
+                    currentPlan,
+                    statementBalance,
+                    minimumPayment),
+                CreditCardPaymentResolution.CurrentStatementPlan,
+                ToPaymentType(currentPlan.Mode));
+        }
+
         var paymentOverride = card.PaymentPlans.SingleOrDefault(x => x.DueDate == dueDate);
         if (paymentOverride is not null)
         {
@@ -202,6 +301,37 @@ public sealed class CreditCardStatementCalculator
             null);
     }
 
+    private static decimal? CalculateCurrentStatementPayment(
+        CurrentStatementPaymentPlan plan,
+        decimal? statementBalance,
+        decimal? minimumPayment)
+    {
+        if (statementBalance is null || minimumPayment is null)
+        {
+            return null;
+        }
+
+        var requested = plan.Mode switch
+        {
+            CurrentStatementPaymentMode.Minimum => minimumPayment.Value,
+            CurrentStatementPaymentMode.Full => statementBalance.Value,
+            CurrentStatementPaymentMode.Custom =>
+                plan.CustomAmount ??
+                throw new InvalidOperationException(
+                    "Bu ekstre için özel ödeme tutarı gereklidir."),
+            _ => throw new ArgumentOutOfRangeException(nameof(plan))
+        };
+
+        var rounded = RoundMoney(requested);
+        if (rounded < 0m || rounded > statementBalance.Value)
+        {
+            throw new InvalidOperationException(
+                "Bu ekstre için ödeme tutarı 0 ile ekstre tutarı arasında olmalıdır.");
+        }
+
+        return rounded;
+    }
+
     private static decimal? CalculatePayment(
         CreditCardPaymentType paymentType,
         decimal? fixedAmount,
@@ -237,6 +367,15 @@ public sealed class CreditCardStatementCalculator
         CreditCardPaymentStrategy.FullStatement => CreditCardPaymentType.FullStatement,
         CreditCardPaymentStrategy.FixedAmount => CreditCardPaymentType.FixedAmount,
         _ => throw new ArgumentOutOfRangeException(nameof(strategy))
+    };
+
+    private static CreditCardPaymentType ToPaymentType(
+        CurrentStatementPaymentMode mode) => mode switch
+    {
+        CurrentStatementPaymentMode.Minimum => CreditCardPaymentType.Minimum,
+        CurrentStatementPaymentMode.Full => CreditCardPaymentType.FullStatement,
+        CurrentStatementPaymentMode.Custom => CreditCardPaymentType.FixedAmount,
+        _ => throw new ArgumentOutOfRangeException(nameof(mode))
     };
 
     private static CreditCardPaymentType? ToPaymentType(
@@ -312,6 +451,60 @@ public sealed class CreditCardStatementCalculator
         {
             throw new InvalidOperationException(
                 "Aynı son ödeme tarihi için yalnızca bir özel kart planı olabilir.");
+        }
+
+        if (card.CurrentStatement is { } statement)
+        {
+            if (statement.StatementDate == default ||
+                statement.DueDate == default)
+            {
+                throw new InvalidOperationException(
+                    "Kesilmiş ekstre için kesim ve son ödeme tarihi gereklidir.");
+            }
+
+            if (statement.StatementAmount < 0m ||
+                statement.MinimumPaymentAmount < 0m ||
+                statement.MinimumPaymentAmount > statement.StatementAmount)
+            {
+                throw new InvalidOperationException(
+                    "Kesilmiş ekstre tutarı ve asgari ödeme geçersiz.");
+            }
+
+            if (statement.NextStatementDate is { } nextStatementDate &&
+                nextStatementDate <= statement.StatementDate)
+            {
+                throw new InvalidOperationException(
+                    "Bir sonraki kesim tarihi mevcut ekstre tarihinden sonra olmalıdır.");
+            }
+
+            if (statement.NextDueDate is { } nextDueDate &&
+                nextDueDate <= statement.DueDate)
+            {
+                throw new InvalidOperationException(
+                    "Bir sonraki son ödeme tarihi mevcut son ödeme tarihinden sonra olmalıdır.");
+            }
+        }
+
+        if (card.CurrentStatement is null &&
+            card.CurrentStatementPaymentPlan is not null)
+        {
+            throw new InvalidOperationException(
+                "Kesilmiş ekstre planı için önce ekstre bilgisi gereklidir.");
+        }
+
+        if (card is
+            {
+                CurrentStatement: { } currentStatement,
+                CurrentStatementPaymentPlan:
+                {
+                    Mode: CurrentStatementPaymentMode.Custom
+                } currentPlan
+            } &&
+            (currentPlan.CustomAmount is null or < 0m ||
+             currentPlan.CustomAmount > currentStatement.StatementAmount))
+        {
+            throw new InvalidOperationException(
+                "Bu ekstre için özel ödeme tutarı 0 ile ekstre tutarı arasında olmalıdır.");
         }
     }
 

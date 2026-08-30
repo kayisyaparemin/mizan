@@ -124,14 +124,34 @@ public static class CanonicalDevelopmentOnboardingFixture
                 Name = "Axess",
                 Bank = "Akbank",
                 Limit = 607_350m,
-                CarriedBalance = 35_201.77m,
-                UnbilledSpending = 61_283.91m,
-                BalanceAsOfDate = new DateOnly(2026, 8, 20),
+                CarriedBalance = 0m,
+                UnbilledSpending = 0m,
+                BalanceAsOfDate = new DateOnly(2026, 8, 28),
                 StatementClosingDay = 25,
                 PaymentDueDay = 5,
                 MinimumPaymentRate = 0.40m,
                 PaymentStrategy = CreditCardPaymentStrategy.AskEachStatement,
                 ProjectionFallbackStrategy = ProjectionFallbackStrategy.Minimum,
+                CurrentStatement = new CreditCardStatement
+                {
+                    Id = Guid.Parse("40000000-0000-0000-0000-000000000101"),
+                    CreditCardId = Guid.Parse("40000000-0000-0000-0000-000000000001"),
+                    StatementDate = new DateOnly(2026, 8, 28),
+                    DueDate = new DateOnly(2026, 9, 7),
+                    StatementAmount = 100_804.94m,
+                    MinimumPaymentAmount = 40_321.97m,
+                    NextStatementDate = new DateOnly(2026, 9, 28),
+                    NextDueDate = new DateOnly(2026, 10, 8),
+                    Source = CreditCardStatementSource.Manual,
+                    CreatedAt = new DateTimeOffset(
+                        2026, 8, 28, 0, 0, 0, TimeSpan.Zero),
+                    UpdatedAt = new DateTimeOffset(
+                        2026, 8, 28, 0, 0, 0, TimeSpan.Zero)
+                },
+                CurrentStatementPaymentPlan = new CurrentStatementPaymentPlan
+                {
+                    Mode = CurrentStatementPaymentMode.Minimum
+                },
                 Charges =
                 [
                     new CardCharge

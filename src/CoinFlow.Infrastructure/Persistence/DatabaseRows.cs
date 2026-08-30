@@ -103,6 +103,26 @@ internal sealed class CreditCardPaymentPlanRow
     public decimal? Amount { get; set; }
 }
 
+[Table("credit_card_statements")]
+internal sealed class CreditCardStatementRow
+{
+    [PrimaryKey] public string Id { get; set; } = string.Empty;
+    [Indexed] public string CreditCardId { get; set; } = string.Empty;
+    [Indexed] public string StatementDate { get; set; } = string.Empty;
+    public string DueDate { get; set; } = string.Empty;
+    public decimal StatementAmount { get; set; }
+    public decimal MinimumPaymentAmount { get; set; }
+    public string? NextStatementDate { get; set; }
+    public string? NextDueDate { get; set; }
+    public int Source { get; set; }
+    public string? SourceDocumentFingerprint { get; set; }
+    public string? ImportedAt { get; set; }
+    public string CreatedAt { get; set; } = string.Empty;
+    public string UpdatedAt { get; set; } = string.Empty;
+    public int CurrentPaymentMode { get; set; }
+    public decimal? CurrentPaymentCustomAmount { get; set; }
+}
+
 [Table("planned_large_expenses")]
 internal sealed class PlannedLargeExpenseRow
 {

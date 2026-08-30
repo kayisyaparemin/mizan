@@ -39,7 +39,7 @@ public sealed class FinancialSnapshotReviewTests
                     line.PlannedDate <= FirstReviewDate));
             Assert.Contains(frozen.PaymentLines, x =>
                 x.SourceType == PlanPaymentSourceType.CreditCard &&
-                x.PlannedDate == new DateOnly(2026, 9, 5));
+                x.PlannedDate == new DateOnly(2026, 9, 7));
             Assert.Contains(frozen.PaymentLines, x =>
                 x.SourceType == PlanPaymentSourceType.Loan &&
                 x.PlannedDate == new DateOnly(2026, 9, 7));
@@ -525,17 +525,19 @@ public sealed class FinancialSnapshotReviewTests
             await initial.GetFinancialPlanAsync();
             var initialPlan = Assert.Single(
                 (await store.GetFinancialHistoryAsync()).Plans);
-            Assert.Equal(38_594.27m, initialPlan.PlannedCardPayments);
+            Assert.Equal(40_321.97m, initialPlan.PlannedCardPayments);
 
             var cardChange = TestFactory.Service(
                 store,
                 new DateOnly(2026, 9, 2));
             var cardPlan = await cardChange.GetFinancialPlanAsync();
-            await cardChange.SaveCreditCardAsync(
-                cardPlan.CreditCards.Single() with
+            var card = cardPlan.CreditCards.Single();
+            await cardChange.SaveCreditCardStatementAsync(
+                card.Id,
+                card.CurrentStatement!,
+                new CurrentStatementPaymentPlan
                 {
-                    PaymentStrategy =
-                        CreditCardPaymentStrategy.FullStatement
+                    Mode = CurrentStatementPaymentMode.Full
                 });
 
             var strategyChange = TestFactory.Service(
@@ -551,7 +553,7 @@ public sealed class FinancialSnapshotReviewTests
 
             var current = Assert.Single(
                 await strategyChange.GetFuturePeriodsAsync(periodCount: 1));
-            Assert.Equal(96_485.68m, current.CreditCardPayments);
+            Assert.Equal(100_804.94m, current.CreditCardPayments);
 
             var review = TestFactory.Service(store, FirstReviewDate);
             var context = await review.GetPeriodReviewContextAsync();
@@ -559,15 +561,15 @@ public sealed class FinancialSnapshotReviewTests
                 context.Revision);
 
             Assert.Equal(2, context.RevisionCount);
-            Assert.Equal(38_594.27m,
+            Assert.Equal(40_321.97m,
                 context.OriginalPlan.PlannedCardPayments);
-            Assert.Equal(96_485.68m, revision.PlannedCardPayments);
+            Assert.Equal(100_804.94m, revision.PlannedCardPayments);
             Assert.Equal(0m, revision.PlannedCardInterest);
-            Assert.Equal(110_986.91m,
+            Assert.Equal(115_306.17m,
                 revision.PlannedMandatoryPayments);
             Assert.Equal(20_322.58m, revision.PlannedLivingBudget);
-            Assert.Equal(815.47m, revision.PlannedDeficitInterest);
-            Assert.Equal(-17_124.96m, revision.PlannedEndingSavings);
+            Assert.Equal(1_031.44m, revision.PlannedDeficitInterest);
+            Assert.Equal(-21_660.19m, revision.PlannedEndingSavings);
 
             await review.FinalizePeriodReviewAsync(
                 DefaultDraft(context, revision.PlannedLivingBudget));
@@ -575,11 +577,11 @@ public sealed class FinancialSnapshotReviewTests
             var cardLine = history.Comparison.Lines.Single(x =>
                 x.Category == "Kredi kartları");
 
-            Assert.Equal(96_485.68m, cardLine.Planned);
-            Assert.Equal(96_485.68m,
+            Assert.Equal(100_804.94m, cardLine.Planned);
+            Assert.Equal(100_804.94m,
                 Assert.IsType<PeriodPlanRevision>(history.Revision)
                     .PlannedCardPayments);
-            Assert.Equal(38_594.27m,
+            Assert.Equal(40_321.97m,
                 history.OriginalPlan.PlannedCardPayments);
 
             var afterCheckpoint = TestFactory.Service(
@@ -593,7 +595,7 @@ public sealed class FinancialSnapshotReviewTests
                 });
             var persisted = Assert.Single(
                 await afterCheckpoint.GetHistoryPeriodsAsync());
-            Assert.Equal(96_485.68m,
+            Assert.Equal(100_804.94m,
                 Assert.IsType<PeriodPlanRevision>(persisted.Revision)
                     .PlannedCardPayments);
         });
@@ -664,15 +666,15 @@ public sealed class FinancialSnapshotReviewTests
                     context.Revision);
                 Assert.Equal(115_000m, revision.PlannedIncome);
                 Assert.Equal(14_501.23m, revision.PlannedLoanPayments);
-                Assert.Equal(96_485.68m, revision.PlannedCardPayments);
+                Assert.Equal(100_804.94m, revision.PlannedCardPayments);
 
                 var result = await review.FinalizePeriodReviewAsync(
                     PromptActualDraft(context));
 
                 Assert.Equal(FirstReviewDate, result.NewSnapshot.SnapshotDate);
-                Assert.Equal(4_013.09m,
+                Assert.Equal(-306.17m,
                     result.NewSnapshot.ProjectionStartingSavings);
-                Assert.Equal(4_013.09m,
+                Assert.Equal(-306.17m,
                     result.Actual.ConfirmedEndingSavings);
 
                 var future = await review.GetFuturePeriodsAsync(
@@ -686,7 +688,7 @@ public sealed class FinancialSnapshotReviewTests
                 Assert.NotNull(dashboard);
                 Assert.Equal(SecondReviewDate,
                     dashboard!.CurrentPeriod.PeriodStart);
-                Assert.Equal(4_013.09m,
+                Assert.Equal(-306.17m,
                     dashboard.CurrentPeriod.OpeningProjectedSavings);
 
                 var simulation = await review.SimulateAsync(
@@ -697,7 +699,7 @@ public sealed class FinancialSnapshotReviewTests
                         SecondReviewDate));
                 Assert.Equal(SecondReviewDate,
                     simulation.Baseline[0].PeriodStart);
-                Assert.Equal(4_013.09m,
+                Assert.Equal(-306.17m,
                     simulation.Baseline[0].OpeningProjectedSavings);
                 Assert.Equal(SecondReviewDate,
                     simulation.Scenario[0].PeriodStart);
@@ -739,7 +741,7 @@ public sealed class FinancialSnapshotReviewTests
                     periodCount: 12);
                 AssertFutureStartsAfterFinalization(
                     restartedFuture,
-                    4_013.09m);
+                    -306.17m);
             }
         }
         finally
@@ -1074,10 +1076,13 @@ public sealed class FinancialSnapshotReviewTests
     {
         var service = TestFactory.Service(store, today);
         var plan = await service.GetFinancialPlanAsync();
-        await service.SaveCreditCardAsync(
-            plan.CreditCards.Single() with
+        var card = plan.CreditCards.Single();
+        await service.SaveCreditCardStatementAsync(
+            card.Id,
+            card.CurrentStatement!,
+            new CurrentStatementPaymentPlan
             {
-                PaymentStrategy = CreditCardPaymentStrategy.FullStatement
+                Mode = CurrentStatementPaymentMode.Full
             });
     }
 

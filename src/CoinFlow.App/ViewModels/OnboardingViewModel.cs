@@ -8,6 +8,7 @@ using CoinFlow.Application.Models;
 using CoinFlow.Application.Services;
 using CoinFlow.Domain.Calculations;
 using CoinFlow.Domain.Models;
+using Microsoft.Maui.Storage;
 
 namespace CoinFlow.App.ViewModels;
 
@@ -17,6 +18,7 @@ public partial class OnboardingViewModel : ViewModelBase
     private readonly CoinFlowService _service;
     private readonly IClock _clock;
     private readonly IUserFeedbackService _feedback;
+    private readonly ICreditCardStatementImporter _statementImporter;
     private readonly List<SalaryScheduleEntry> _salaries = [];
     private readonly List<Loan> _loans = [];
     private readonly List<CreditCard> _cards = [];
@@ -27,20 +29,26 @@ public partial class OnboardingViewModel : ViewModelBase
     public OnboardingViewModel(
         CoinFlowService service,
         IClock clock,
-        IUserFeedbackService feedback)
+        IUserFeedbackService feedback,
+        ICreditCardStatementImporter statementImporter)
     {
         _service = service;
         _clock = clock;
         _feedback = feedback;
+        _statementImporter = statementImporter;
         _draftAnchorDate = clock.Today;
         IncomeEffectiveDate = clock.Today.ToDateTime(TimeOnly.MinValue);
         LoanNextPaymentDate = clock.Today.AddMonths(1)
             .ToDateTime(TimeOnly.MinValue);
         PaymentDate = clock.Today.AddMonths(1).ToDateTime(TimeOnly.MinValue);
         CardBalanceDate = clock.Today.ToDateTime(TimeOnly.MinValue);
+        CardStatementDate = clock.Today.ToDateTime(TimeOnly.MinValue);
+        CardStatementDueDate = clock.Today.AddDays(10)
+            .ToDateTime(TimeOnly.MinValue);
         SelectedAssignmentMode = AssignmentModes[0];
         SelectedCardPaymentStrategy = CardPaymentStrategies[0];
         SelectedCardFallbackStrategy = CardFallbackStrategies[0];
+        SelectedCurrentStatementPaymentMode = CurrentStatementPaymentModes[0];
         SelectedPaymentType = PaymentTypes[0];
         RefreshStepState();
         RefreshDraftLines();
@@ -68,6 +76,14 @@ public partial class OnboardingViewModel : ViewModelBase
     [
         new("Asgari", ProjectionFallbackStrategy.Minimum),
         new("Tamamı", ProjectionFallbackStrategy.FullStatement)
+    ];
+
+    public ObservableCollection<SelectionOption<CurrentStatementPaymentMode>>
+        CurrentStatementPaymentModes { get; } =
+    [
+        new("Asgari", CurrentStatementPaymentMode.Minimum),
+        new("Tamamı", CurrentStatementPaymentMode.Full),
+        new("Başka tutar", CurrentStatementPaymentMode.Custom)
     ];
 
     public ObservableCollection<SelectionOption<string>> PaymentTypes { get; } =
@@ -111,9 +127,25 @@ public partial class OnboardingViewModel : ViewModelBase
     [ObservableProperty] private string cardName = string.Empty;
     [ObservableProperty] private string cardBank = string.Empty;
     [ObservableProperty] private string cardLimit = string.Empty;
+    [ObservableProperty] private bool cardHasActualStatement;
+    [ObservableProperty] private bool isLegacyCardSetup = true;
     [ObservableProperty] private string cardCarriedBalance = "0";
     [ObservableProperty] private string cardUnbilledSpending = "0";
     [ObservableProperty] private DateTime cardBalanceDate;
+    [ObservableProperty] private string cardStatementAmount = string.Empty;
+    [ObservableProperty] private string cardStatementMinimum = string.Empty;
+    [ObservableProperty] private DateTime cardStatementDate = DateTime.Today;
+    [ObservableProperty] private DateTime cardStatementDueDate = DateTime.Today;
+    [ObservableProperty] private string cardNextStatementDate = string.Empty;
+    [ObservableProperty] private string cardNextDueDate = string.Empty;
+    [ObservableProperty] private string cardStatementImportWarnings = string.Empty;
+    [ObservableProperty] private bool hasCardStatementImportWarnings;
+    [ObservableProperty] private SelectionOption<CurrentStatementPaymentMode>? selectedCurrentStatementPaymentMode;
+    [ObservableProperty] private string currentStatementCustomPayment = string.Empty;
+    [ObservableProperty] private bool isCurrentStatementCustomPayment;
+    private string? _cardStatementFingerprint;
+    private CreditCardStatementSource _cardStatementSource =
+        CreditCardStatementSource.Manual;
     [ObservableProperty] private string cardClosingDay = "25";
     [ObservableProperty] private string cardDueDay = "5";
     [ObservableProperty] private string cardMinimumRate = "40";
@@ -172,6 +204,14 @@ public partial class OnboardingViewModel : ViewModelBase
             PaymentCount = "12";
         }
     }
+
+    partial void OnCardHasActualStatementChanged(bool value) =>
+        IsLegacyCardSetup = !value;
+
+    partial void OnSelectedCurrentStatementPaymentModeChanged(
+        SelectionOption<CurrentStatementPaymentMode>? value) =>
+        IsCurrentStatementCustomPayment =
+            value?.Value == CurrentStatementPaymentMode.Custom;
 
     [RelayCommand]
     private void Begin()
@@ -240,6 +280,69 @@ public partial class OnboardingViewModel : ViewModelBase
     }
 
     [RelayCommand]
+    private void UseActualStatementForCard()
+    {
+        CardHasActualStatement = true;
+        CardStatementDate = _clock.Today.ToDateTime(TimeOnly.MinValue);
+        CardStatementDueDate = _clock.Today.AddDays(10)
+            .ToDateTime(TimeOnly.MinValue);
+    }
+
+    [RelayCommand]
+    private void UseLegacyCardSetup()
+    {
+        CardHasActualStatement = false;
+        HasCardStatementImportWarnings = false;
+        CardStatementImportWarnings = string.Empty;
+    }
+
+    [RelayCommand]
+    private async Task ImportCardStatementPdfAsync()
+    {
+        if (IsBusy)
+        {
+            return;
+        }
+
+        try
+        {
+            var file = await FilePicker.Default.PickAsync(new PickOptions
+            {
+                PickerTitle = "Ekstre PDF seç",
+                FileTypes = FilePickerFileType.Pdf
+            });
+            if (file is null)
+            {
+                return;
+            }
+
+            IsBusy = true;
+            SetStatus(string.Empty);
+            await using var stream = await file.OpenReadAsync();
+            var result = await _statementImporter.ImportPdfAsync(stream);
+            ApplyStatementImport(result);
+            if (!result.HasRequiredFields)
+            {
+                await _feedback.ShowErrorAsync(
+                    "Bilgileri elle girebilirsin.",
+                    "Ekstre Otomatik Okunamadı");
+            }
+        }
+        catch (Exception exception)
+        {
+            var message = UserFacingMessages.FromException(exception);
+            SetStatus(message);
+            await _feedback.ShowErrorAsync(
+                "Bilgileri elle girebilirsin.",
+                "Ekstre Kaydedilemedi");
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    [RelayCommand]
     private void AddCard()
     {
         try
@@ -251,18 +354,28 @@ public partial class OnboardingViewModel : ViewModelBase
                     "Kart günleri geçerli olmalıdır.");
             }
 
+            var cardId = Guid.NewGuid();
+            var actualStatement = CardHasActualStatement
+                ? BuildCurrentStatement(cardId)
+                : null;
             _cards.Add(new CreditCard
             {
+                Id = cardId,
                 Name = RequireText(CardName, "Kart adı"),
                 Bank = CardBank.Trim(),
                 Limit = ParsePositiveMoney(CardLimit, "Kart limiti"),
-                CarriedBalance = ParseNonNegativeMoney(
-                    CardCarriedBalance,
-                    "Devreden bakiye"),
-                UnbilledSpending = ParseNonNegativeMoney(
-                    CardUnbilledSpending,
-                    "Ekstreleşmemiş harcama"),
-                BalanceAsOfDate = DateOnly.FromDateTime(CardBalanceDate),
+                CarriedBalance = actualStatement is null
+                    ? ParseNonNegativeMoney(
+                        CardCarriedBalance,
+                        "Devreden bakiye")
+                    : 0m,
+                UnbilledSpending = actualStatement is null
+                    ? ParseNonNegativeMoney(
+                        CardUnbilledSpending,
+                        "Ekstreleşmemiş harcama")
+                    : 0m,
+                BalanceAsOfDate = actualStatement?.StatementDate ??
+                                  DateOnly.FromDateTime(CardBalanceDate),
                 StatementClosingDay = closingDay,
                 PaymentDueDay = dueDay,
                 MinimumPaymentRate =
@@ -271,13 +384,26 @@ public partial class OnboardingViewModel : ViewModelBase
                                   CreditCardPaymentStrategy.AskEachStatement,
                 ProjectionFallbackStrategy =
                     SelectedCardFallbackStrategy?.Value ??
-                    ProjectionFallbackStrategy.Minimum
+                    ProjectionFallbackStrategy.Minimum,
+                CurrentStatement = actualStatement,
+                CurrentStatementPaymentPlan = actualStatement is null
+                    ? null
+                    : BuildCurrentStatementPaymentPlan(
+                        actualStatement.StatementAmount)
             });
             CardName = string.Empty;
             CardBank = string.Empty;
             CardLimit = string.Empty;
             CardCarriedBalance = "0";
             CardUnbilledSpending = "0";
+            CardHasActualStatement = false;
+            CardStatementAmount = string.Empty;
+            CardStatementMinimum = string.Empty;
+            CardNextStatementDate = string.Empty;
+            CardNextDueDate = string.Empty;
+            CurrentStatementCustomPayment = string.Empty;
+            _cardStatementFingerprint = null;
+            _cardStatementSource = CreditCardStatementSource.Manual;
             RefreshDraftLines();
             SetStatus(string.Empty);
         }
@@ -488,6 +614,16 @@ public partial class OnboardingViewModel : ViewModelBase
         CurrentAmount = "0";
         SelectedAssignmentMode = AssignmentModes[0];
         SelectedPaymentType = PaymentTypes[0];
+        CardHasActualStatement = false;
+        CardStatementAmount = string.Empty;
+        CardStatementMinimum = string.Empty;
+        CardNextStatementDate = string.Empty;
+        CardNextDueDate = string.Empty;
+        CardStatementImportWarnings = string.Empty;
+        HasCardStatementImportWarnings = false;
+        CurrentStatementCustomPayment = string.Empty;
+        _cardStatementFingerprint = null;
+        _cardStatementSource = CreditCardStatementSource.Manual;
         RefreshDraftLines();
         SetStatus(string.Empty);
     }
@@ -551,14 +687,19 @@ public partial class OnboardingViewModel : ViewModelBase
         DraftCards.Clear();
         foreach (var card in _cards.OrderBy(x => x.Bank).ThenBy(x => x.Name))
         {
+            var subtitle = card.CurrentStatement is { } statement
+                ? $"Ekstre: {statement.StatementDate:dd.MM.yyyy} • Son ödeme: {statement.DueDate:dd.MM.yyyy}"
+                : $"Kesim {card.StatementClosingDay}. gün • Son ödeme {card.PaymentDueDay}. gün";
             DraftCards.Add(new FinancialRecordLine(
                 card.Id,
                 ManagementSection.Payment,
                 FinancialRecordKind.CreditCard,
                 $"{card.Bank} {card.Name}".Trim(),
-                $"Kesim {card.StatementClosingDay}. gün • Son ödeme {card.PaymentDueDay}. gün",
+                subtitle,
                 Money(card.KnownTotalDebt),
-                "Kredi kartı"));
+                card.CurrentStatement is null
+                    ? "Kredi kartı"
+                    : $"Plan: {CurrentStatementPlanLabel(card.CurrentStatementPaymentPlan)}"));
         }
 
         DraftLoans.Clear();
@@ -628,6 +769,122 @@ public partial class OnboardingViewModel : ViewModelBase
         ReviewPeriodText = $"Dönem günü {PeriodDay}";
     }
 
+    private CreditCardStatement BuildCurrentStatement(Guid cardId)
+    {
+        var amount = ParsePositiveMoney(
+            CardStatementAmount,
+            "Ekstre tutarı");
+        var minimum = ParseNonNegativeMoney(
+            CardStatementMinimum,
+            "Asgari ödeme");
+        if (minimum > amount)
+        {
+            throw new InvalidOperationException(
+                "Asgari ödeme ekstre tutarından büyük olamaz.");
+        }
+
+        return new CreditCardStatement
+        {
+            CreditCardId = cardId,
+            StatementDate = DateOnly.FromDateTime(CardStatementDate),
+            DueDate = DateOnly.FromDateTime(CardStatementDueDate),
+            StatementAmount = amount,
+            MinimumPaymentAmount = minimum,
+            NextStatementDate = ParseOptionalDate(
+                CardNextStatementDate,
+                "Bir sonraki kesim tarihi"),
+            NextDueDate = ParseOptionalDate(
+                CardNextDueDate,
+                "Bir sonraki son ödeme tarihi"),
+            Source = _cardStatementSource,
+            SourceDocumentFingerprint = _cardStatementFingerprint,
+            ImportedAt = _cardStatementSource ==
+                         CreditCardStatementSource.PdfImport
+                ? DateTimeOffset.UtcNow
+                : null,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+    }
+
+    private CurrentStatementPaymentPlan BuildCurrentStatementPaymentPlan(
+        decimal statementAmount)
+    {
+        var mode = SelectedCurrentStatementPaymentMode?.Value ??
+                   CurrentStatementPaymentMode.Minimum;
+        var custom = mode == CurrentStatementPaymentMode.Custom
+            ? ParseMoney(
+                CurrentStatementCustomPayment,
+                "Bu ekstre için özel ödeme")
+            : (decimal?)null;
+        if (custom is decimal customAmount &&
+            (customAmount < 0m || customAmount > statementAmount))
+        {
+            throw new InvalidOperationException(
+                "Bu ekstre için ödeme tutarı 0 ile ekstre tutarı arasında olmalıdır.");
+        }
+
+        return new CurrentStatementPaymentPlan
+        {
+            Mode = mode,
+            CustomAmount = custom
+        };
+    }
+
+    private void ApplyStatementImport(
+        CreditCardStatementImportResult result)
+    {
+        CardHasActualStatement = true;
+        _cardStatementSource = CreditCardStatementSource.PdfImport;
+        _cardStatementFingerprint = result.SourceDocumentFingerprint;
+        if (!string.IsNullOrWhiteSpace(result.DetectedBank) &&
+            string.IsNullOrWhiteSpace(CardBank))
+        {
+            CardBank = result.DetectedBank;
+        }
+
+        if (string.IsNullOrWhiteSpace(CardName))
+        {
+            CardName = result.DetectedBank.Contains(
+                "Bonus",
+                StringComparison.OrdinalIgnoreCase)
+                ? "Bonus"
+                : "Axess";
+        }
+
+        CardStatementDate = (result.StatementDate ?? _clock.Today)
+            .ToDateTime(TimeOnly.MinValue);
+        CardStatementDueDate = (result.DueDate ?? _clock.Today.AddDays(10))
+            .ToDateTime(TimeOnly.MinValue);
+        CardStatementAmount =
+            result.StatementAmount?.ToString("N2", TurkishCulture) ??
+            CardStatementAmount;
+        CardStatementMinimum =
+            result.MinimumPaymentAmount?.ToString("N2", TurkishCulture) ??
+            CardStatementMinimum;
+        CardNextStatementDate =
+            result.NextStatementDate?.ToString("dd.MM.yyyy") ??
+            CardNextStatementDate;
+        CardNextDueDate =
+            result.NextDueDate?.ToString("dd.MM.yyyy") ??
+            CardNextDueDate;
+        CardStatementImportWarnings =
+            string.Join(Environment.NewLine, result.Warnings);
+        HasCardStatementImportWarnings = result.Warnings.Count > 0;
+        SelectedCurrentStatementPaymentMode ??=
+            CurrentStatementPaymentModes[0];
+    }
+
+    private static string CurrentStatementPlanLabel(
+        CurrentStatementPaymentPlan? plan) => plan?.Mode switch
+    {
+        CurrentStatementPaymentMode.Full => "Tamamı",
+        CurrentStatementPaymentMode.Custom =>
+            $"Başka tutar {Money(plan.CustomAmount.GetValueOrDefault())}",
+        CurrentStatementPaymentMode.Minimum => "Asgari",
+        _ => "Henüz seçilmedi"
+    };
+
     private static string RequireText(string value, string field) =>
         string.IsNullOrWhiteSpace(value)
             ? throw new InvalidOperationException($"{field} gereklidir.")
@@ -655,6 +912,34 @@ public partial class OnboardingViewModel : ViewModelBase
         string.IsNullOrWhiteSpace(value)
             ? null
             : ParseNonNegativeMoney(value, "Tutar");
+
+    private static DateOnly? ParseOptionalDate(
+        string? value,
+        string field)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        if (DateOnly.TryParseExact(
+                value.Trim(),
+                "dd.MM.yyyy",
+                TurkishCulture,
+                System.Globalization.DateTimeStyles.None,
+                out var date) ||
+            DateOnly.TryParse(
+                value,
+                TurkishCulture,
+                System.Globalization.DateTimeStyles.None,
+                out date))
+        {
+            return date;
+        }
+
+        throw new InvalidOperationException(
+            $"{field} gg.aa.yyyy formatında olmalıdır.");
+    }
 
     private static string TryMoneyText(string value)
     {

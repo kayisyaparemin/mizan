@@ -63,8 +63,19 @@ public sealed class PersistenceAndSeedTests
 
             var axess = Assert.Single(plan.CreditCards);
             Assert.Equal(607_350m, axess.Limit);
-            Assert.Equal(35_201.77m, axess.CarriedBalance);
-            Assert.Equal(61_283.91m, axess.UnbilledSpending);
+            Assert.Equal(0m, axess.CarriedBalance);
+            Assert.Equal(0m, axess.UnbilledSpending);
+            Assert.NotNull(axess.CurrentStatement);
+            var statement = axess.CurrentStatement!;
+            Assert.Equal(new DateOnly(2026, 8, 28),
+                statement.StatementDate);
+            Assert.Equal(new DateOnly(2026, 9, 7),
+                statement.DueDate);
+            Assert.Equal(100_804.94m, statement.StatementAmount);
+            Assert.Equal(40_321.97m, statement.MinimumPaymentAmount);
+            Assert.Equal(
+                CurrentStatementPaymentMode.Minimum,
+                axess.CurrentStatementPaymentPlan!.Mode);
             Assert.Equal(
                 CreditCardPaymentStrategy.AskEachStatement,
                 axess.PaymentStrategy);
@@ -853,10 +864,25 @@ public sealed class PersistenceAndSeedTests
             Money(card.MinimumPaymentRate),
             card.PaymentStrategy,
             card.ProjectionFallbackStrategy,
+            StatementSignature(card.CurrentStatement),
+            card.CurrentStatementPaymentPlan?.Mode,
+            Money(card.CurrentStatementPaymentPlan?.CustomAmount ?? 0m),
             string.Join(";",
                 card.Charges
                     .OrderBy(x => x.PostingDate)
                     .Select(x => $"{x.PostingDate:yyyy-MM-dd}:{Money(x.Amount)}:{x.Description}")));
+
+    private static string StatementSignature(
+        CreditCardStatement? statement) => statement is null
+        ? "none"
+        : string.Join(":",
+            statement.StatementDate.ToString("yyyy-MM-dd"),
+            statement.DueDate.ToString("yyyy-MM-dd"),
+            Money(statement.StatementAmount),
+            Money(statement.MinimumPaymentAmount),
+            statement.NextStatementDate?.ToString("yyyy-MM-dd") ?? "",
+            statement.NextDueDate?.ToString("yyyy-MM-dd") ?? "",
+            statement.Source);
 
     private static string ProjectionSignature(SalaryPeriodProjection row) =>
         string.Join("|",

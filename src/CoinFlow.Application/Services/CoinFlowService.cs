@@ -737,17 +737,43 @@ public sealed class CoinFlowService(
         CreditCard card,
         CancellationToken cancellationToken = default)
     {
-        ValidateCreditCardPaymentSettings(card);
-        var normalized = card with
-        {
-            BalanceAsOfDate = card.BalanceAsOfDate == default
-                ? clock.Today
-                : card.BalanceAsOfDate
-        };
+        var normalized = NormalizeCreditCard(card);
+        ValidateCreditCardPaymentSettings(normalized);
         await store.UpsertCreditCardAsync(normalized, cancellationToken);
         await CapturePlanningChangeAsync(
             "Kart planı değişti",
             cancellationToken);
+    }
+
+    public async Task SaveCreditCardStatementAsync(
+        Guid creditCardId,
+        CreditCardStatement statement,
+        CurrentStatementPaymentPlan paymentPlan,
+        CancellationToken cancellationToken = default)
+    {
+        var card = (await store.GetCreditCardsAsync(cancellationToken))
+            .SingleOrDefault(x => x.Id == creditCardId)
+            ?? throw new InvalidOperationException("Kredi kartı bulunamadı.");
+        var now = clock.UtcNow;
+        var normalizedStatement = statement with
+        {
+            CreditCardId = creditCardId,
+            CreatedAt = statement.CreatedAt == default
+                ? now
+                : statement.CreatedAt,
+            UpdatedAt = now,
+            ImportedAt = statement.Source == CreditCardStatementSource.PdfImport
+                ? statement.ImportedAt ?? now
+                : statement.ImportedAt
+        };
+        var normalizedPlan = paymentPlan.Mode == CurrentStatementPaymentMode.Custom
+            ? paymentPlan
+            : paymentPlan with { CustomAmount = null };
+        await SaveCreditCardAsync(card with
+        {
+            CurrentStatement = normalizedStatement,
+            CurrentStatementPaymentPlan = normalizedPlan
+        }, cancellationToken);
     }
 
     public async Task DeleteCreditCardAsync(
@@ -1335,6 +1361,24 @@ public sealed class CoinFlowService(
         BalanceAsOfDate = card.BalanceAsOfDate == default
             ? clock.Today
             : card.BalanceAsOfDate,
+        CurrentStatement = card.CurrentStatement is null
+            ? null
+            : card.CurrentStatement with
+            {
+                CreditCardId = card.Id,
+                UpdatedAt = card.CurrentStatement.UpdatedAt == default
+                    ? clock.UtcNow
+                    : card.CurrentStatement.UpdatedAt
+            },
+        CurrentStatementPaymentPlan =
+            card.CurrentStatementPaymentPlan is null ||
+            card.CurrentStatementPaymentPlan.Mode ==
+            CurrentStatementPaymentMode.Custom
+                ? card.CurrentStatementPaymentPlan
+                : card.CurrentStatementPaymentPlan with
+                {
+                    CustomAmount = null
+                },
         Charges = card.Charges
             .OrderBy(x => x.PostingDate)
             .Select(x => x with { CreditCardId = card.Id })
@@ -1370,6 +1414,61 @@ public sealed class CoinFlowService(
         {
             throw new InvalidOperationException(
                 "Özel kart ödeme tutarı sıfırdan büyük olmalıdır.");
+        }
+
+        if (card.CurrentStatement is { } statement)
+        {
+            if (statement.CreditCardId != card.Id)
+            {
+                throw new InvalidOperationException(
+                    "Ekstre kartla eşleşmiyor.");
+            }
+
+            if (statement.StatementDate == default ||
+                statement.DueDate == default ||
+                statement.StatementAmount < 0m ||
+                statement.MinimumPaymentAmount < 0m ||
+                statement.MinimumPaymentAmount > statement.StatementAmount)
+            {
+                throw new InvalidOperationException(
+                    "Kesilmiş ekstre bilgileri geçersiz.");
+            }
+
+            if (statement.NextStatementDate is { } nextStatementDate &&
+                nextStatementDate <= statement.StatementDate)
+            {
+                throw new InvalidOperationException(
+                    "Bir sonraki kesim tarihi mevcut ekstre tarihinden sonra olmalıdır.");
+            }
+
+            if (statement.NextDueDate is { } nextDueDate &&
+                nextDueDate <= statement.DueDate)
+            {
+                throw new InvalidOperationException(
+                    "Bir sonraki son ödeme tarihi mevcut son ödeme tarihinden sonra olmalıdır.");
+            }
+        }
+
+        if (card.CurrentStatement is null &&
+            card.CurrentStatementPaymentPlan is not null)
+        {
+            throw new InvalidOperationException(
+                "Kesilmiş ekstre planı için önce ekstre bilgisi gereklidir.");
+        }
+
+        if (card is
+            {
+                CurrentStatement: { } currentStatement,
+                CurrentStatementPaymentPlan:
+                {
+                    Mode: CurrentStatementPaymentMode.Custom
+                } currentPlan
+            } &&
+            (currentPlan.CustomAmount is null or < 0m ||
+             currentPlan.CustomAmount > currentStatement.StatementAmount))
+        {
+            throw new InvalidOperationException(
+                "Bu ekstre için özel ödeme tutarı 0 ile ekstre tutarı arasında olmalıdır.");
         }
     }
 }

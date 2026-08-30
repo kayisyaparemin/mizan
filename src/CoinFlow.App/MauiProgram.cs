@@ -3,6 +3,7 @@ using CoinFlow.App.Services;
 using CoinFlow.App.ViewModels;
 using CoinFlow.Application.Abstractions;
 using CoinFlow.Application.Services;
+using CoinFlow.Infrastructure.Imports;
 using CoinFlow.Domain.Calculations;
 using CoinFlow.Infrastructure.Persistence;
 using Microsoft.Extensions.Logging;
@@ -57,6 +58,10 @@ public static class MauiProgram
         builder.Services.AddSingleton<PlanActualComparisonCalculator>();
         builder.Services.AddSingleton<PeriodReviewService>();
         builder.Services.AddSingleton<HistoryQueryService>();
+        builder.Services.AddSingleton<IPdfTextExtractor, PdfPigPdfTextExtractor>();
+        builder.Services.AddSingleton<ICreditCardStatementParser, AkbankAxessStatementParser>();
+        builder.Services.AddSingleton<ICreditCardStatementParser, GarantiBonusStatementParser>();
+        builder.Services.AddSingleton<ICreditCardStatementImporter, CreditCardStatementImporter>();
         builder.Services.AddSingleton<SalaryPeriodDetailPresenter>();
         builder.Services.AddSingleton<SimulatorInsightService>();
         builder.Services.AddSingleton<SimulationCalculator>();

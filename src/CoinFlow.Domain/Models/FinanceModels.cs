@@ -23,6 +23,19 @@ public enum CreditCardPaymentType
     FullStatement = 2
 }
 
+public enum CreditCardStatementSource
+{
+    Manual = 0,
+    PdfImport = 1
+}
+
+public enum CurrentStatementPaymentMode
+{
+    Minimum = 0,
+    Full = 1,
+    Custom = 2
+}
+
 public enum PaymentPlanKind
 {
     Temporary = 0,
@@ -119,10 +132,42 @@ public sealed record CreditCard
     public decimal? FixedPaymentAmount { get; init; }
     public ProjectionFallbackStrategy ProjectionFallbackStrategy { get; init; } = ProjectionFallbackStrategy.None;
     public decimal? ProjectionFallbackFixedAmount { get; init; }
+    public CreditCardStatement? CurrentStatement { get; init; }
+    public CurrentStatementPaymentPlan? CurrentStatementPaymentPlan { get; init; }
     public IReadOnlyList<CardCharge> Charges { get; init; } = [];
     public IReadOnlyList<CreditCardPaymentPlan> PaymentPlans { get; init; } = [];
 
-    public decimal KnownTotalDebt => CarriedBalance + UnbilledSpending + Charges.Sum(x => x.Amount);
+    public decimal KnownTotalDebt => CurrentStatement is null
+        ? CarriedBalance + UnbilledSpending + Charges.Sum(x => x.Amount)
+        : CurrentStatement.StatementAmount +
+          Charges
+              .Where(x => x.PostingDate > CurrentStatement.StatementDate)
+              .Sum(x => x.Amount);
+}
+
+public sealed record CreditCardStatement
+{
+    public Guid Id { get; init; } = Guid.NewGuid();
+    public Guid CreditCardId { get; init; }
+    public DateOnly StatementDate { get; init; }
+    public DateOnly DueDate { get; init; }
+    public decimal StatementAmount { get; init; }
+    public decimal MinimumPaymentAmount { get; init; }
+    public DateOnly? NextStatementDate { get; init; }
+    public DateOnly? NextDueDate { get; init; }
+    public CreditCardStatementSource Source { get; init; } =
+        CreditCardStatementSource.Manual;
+    public string? SourceDocumentFingerprint { get; init; }
+    public DateTimeOffset? ImportedAt { get; init; }
+    public DateTimeOffset CreatedAt { get; init; } = DateTimeOffset.UtcNow;
+    public DateTimeOffset UpdatedAt { get; init; } = DateTimeOffset.UtcNow;
+}
+
+public sealed record CurrentStatementPaymentPlan
+{
+    public CurrentStatementPaymentMode Mode { get; init; } =
+        CurrentStatementPaymentMode.Minimum;
+    public decimal? CustomAmount { get; init; }
 }
 
 public sealed record CardCharge

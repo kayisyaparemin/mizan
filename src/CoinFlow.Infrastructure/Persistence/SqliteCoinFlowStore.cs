@@ -10,8 +10,8 @@ namespace CoinFlow.Infrastructure.Persistence;
 public sealed class SqliteCoinFlowStore : ICoinFlowStore, IAsyncDisposable
 {
     private const string DateFormat = "yyyy-MM-dd";
-    private const int CurrentSchemaVersion = 9;
-    private const int CurrentCardStatementModelVersion = 6;
+    private const int CurrentSchemaVersion = 10;
+    private const int CurrentCardStatementModelVersion = 7;
     private const decimal DefaultPlanningInterestRate = 0.05m;
     private static readonly Guid LegacyInitialAssignmentStrategyId =
         Guid.Parse("50000000-0000-0000-0000-000000000001");
@@ -68,6 +68,7 @@ public sealed class SqliteCoinFlowStore : ICoinFlowStore, IAsyncDisposable
             await _database.CreateTableAsync<CreditCardRow>();
             await _database.CreateTableAsync<CardInstallmentRow>();
             await _database.CreateTableAsync<CreditCardPaymentPlanRow>();
+            await _database.CreateTableAsync<CreditCardStatementRow>();
             await _database.CreateTableAsync<PlannedLargeExpenseRow>();
             await _database.CreateTableAsync<SettingsRow>();
             await _database.CreateTableAsync<PaymentAssignmentStrategyRow>();
@@ -151,6 +152,7 @@ public sealed class SqliteCoinFlowStore : ICoinFlowStore, IAsyncDisposable
             connection.DeleteAll<PaymentPlanRow>();
             connection.DeleteAll<CardInstallmentRow>();
             connection.DeleteAll<CreditCardPaymentPlanRow>();
+            connection.DeleteAll<CreditCardStatementRow>();
             connection.DeleteAll<CreditCardRow>();
             connection.DeleteAll<PlannedLargeExpenseRow>();
             connection.DeleteAll<OtherIncomeRow>();
@@ -437,10 +439,14 @@ public sealed class SqliteCoinFlowStore : ICoinFlowStore, IAsyncDisposable
         var payments = await _database
             .Table<CreditCardPaymentPlanRow>()
             .ToListAsync();
+        var statements = await _database
+            .Table<CreditCardStatementRow>()
+            .ToListAsync();
         return cards.Select(row => FromRow(
             row,
             charges.Where(x => x.CreditCardId == row.Id),
-            payments.Where(x => x.CreditCardId == row.Id))).ToArray();
+            payments.Where(x => x.CreditCardId == row.Id),
+            statements.Where(x => x.CreditCardId == row.Id))).ToArray();
     }
 
     public async Task UpsertCreditCardAsync(
@@ -469,6 +475,16 @@ public sealed class SqliteCoinFlowStore : ICoinFlowStore, IAsyncDisposable
                 connection.Insert(
                     ToRow(payment with { CreditCardId = card.Id }));
             }
+
+            connection.Execute(
+                "DELETE FROM credit_card_statements WHERE CreditCardId = ?",
+                Key(card.Id));
+            if (card.CurrentStatement is { } statement)
+            {
+                connection.Insert(ToRow(
+                    statement with { CreditCardId = card.Id },
+                    card.CurrentStatementPaymentPlan));
+            }
         });
     }
 
@@ -482,6 +498,9 @@ public sealed class SqliteCoinFlowStore : ICoinFlowStore, IAsyncDisposable
             Key(id));
         await _database.ExecuteAsync(
             "DELETE FROM credit_card_payment_plans WHERE CreditCardId = ?",
+            Key(id));
+        await _database.ExecuteAsync(
+            "DELETE FROM credit_card_statements WHERE CreditCardId = ?",
             Key(id));
         await _database.ExecuteAsync(
             "DELETE FROM credit_cards WHERE Id = ?",
@@ -555,24 +574,7 @@ public sealed class SqliteCoinFlowStore : ICoinFlowStore, IAsyncDisposable
 
             foreach (var card in batch.CreditCards)
             {
-                connection.InsertOrReplace(ToRow(card));
-                connection.Execute(
-                    "DELETE FROM card_installments WHERE CreditCardId = ?",
-                    Key(card.Id));
-                foreach (var charge in card.Charges)
-                {
-                    connection.Insert(
-                        ToRow(charge with { CreditCardId = card.Id }));
-                }
-
-                connection.Execute(
-                    "DELETE FROM credit_card_payment_plans WHERE CreditCardId = ?",
-                    Key(card.Id));
-                foreach (var payment in card.PaymentPlans)
-                {
-                    connection.Insert(
-                        ToRow(payment with { CreditCardId = card.Id }));
-                }
+                InsertCreditCard(connection, card);
             }
 
             foreach (var income in batch.OtherIncomes)
@@ -1016,7 +1018,15 @@ public sealed class SqliteCoinFlowStore : ICoinFlowStore, IAsyncDisposable
     private static CreditCard FromRow(
         CreditCardRow row,
         IEnumerable<CardInstallmentRow> charges,
-        IEnumerable<CreditCardPaymentPlanRow> paymentPlans) => new()
+        IEnumerable<CreditCardPaymentPlanRow> paymentPlans,
+        IEnumerable<CreditCardStatementRow> statements)
+    {
+        var currentStatement = statements
+            .OrderByDescending(x => x.StatementDate)
+            .ThenByDescending(x => x.UpdatedAt)
+            .FirstOrDefault();
+
+        return new CreditCard
         {
             Id = ParseKey(row.Id),
             Name = row.Name,
@@ -1031,18 +1041,25 @@ public sealed class SqliteCoinFlowStore : ICoinFlowStore, IAsyncDisposable
             PaymentStrategy = (CreditCardPaymentStrategy)row.PaymentStrategy,
             FixedPaymentAmount = row.FixedPaymentAmount,
             ProjectionFallbackStrategy =
-            (ProjectionFallbackStrategy)row.ProjectionFallbackStrategy,
+                (ProjectionFallbackStrategy)row.ProjectionFallbackStrategy,
             ProjectionFallbackFixedAmount =
-            row.ProjectionFallbackFixedAmount,
+                row.ProjectionFallbackFixedAmount,
+            CurrentStatement = currentStatement is null
+                ? null
+                : FromRow(currentStatement),
+            CurrentStatementPaymentPlan = currentStatement is null
+                ? null
+                : FromPaymentPlan(currentStatement),
             Charges = charges
-            .Select(FromRow)
-            .OrderBy(x => x.PostingDate)
-            .ToArray(),
+                .Select(FromRow)
+                .OrderBy(x => x.PostingDate)
+                .ToArray(),
             PaymentPlans = paymentPlans
-            .Select(FromRow)
-            .OrderBy(x => x.DueDate)
-            .ToArray()
+                .Select(FromRow)
+                .OrderBy(x => x.DueDate)
+                .ToArray()
         };
+    }
 
     internal static CardInstallmentRow ToRow(CardCharge value) => new()
     {
@@ -1085,6 +1102,78 @@ public sealed class SqliteCoinFlowStore : ICoinFlowStore, IAsyncDisposable
                      ? row.PlannedPaymentAmount
                      : null)
         };
+
+    internal static CreditCardStatementRow ToRow(
+        CreditCardStatement value,
+        CurrentStatementPaymentPlan? paymentPlan) => new()
+        {
+            Id = Key(value.Id),
+            CreditCardId = Key(value.CreditCardId),
+            StatementDate = FormatDate(value.StatementDate),
+            DueDate = FormatDate(value.DueDate),
+            StatementAmount = value.StatementAmount,
+            MinimumPaymentAmount = value.MinimumPaymentAmount,
+            NextStatementDate = FormatNullableDate(value.NextStatementDate),
+            NextDueDate = FormatNullableDate(value.NextDueDate),
+            Source = (int)value.Source,
+            SourceDocumentFingerprint = value.SourceDocumentFingerprint,
+            ImportedAt = value.ImportedAt is null
+                ? null
+                : FormatInstant(value.ImportedAt.Value),
+            CreatedAt = FormatInstant(value.CreatedAt),
+            UpdatedAt = FormatInstant(value.UpdatedAt),
+            CurrentPaymentMode = (int)(paymentPlan?.Mode ??
+                                       CurrentStatementPaymentMode.Minimum),
+            CurrentPaymentCustomAmount = paymentPlan?.Mode ==
+                                         CurrentStatementPaymentMode.Custom
+                ? paymentPlan.CustomAmount
+                : null
+        };
+
+    private static CreditCardStatement FromRow(
+        CreditCardStatementRow row) => new()
+        {
+            Id = ParseKey(row.Id),
+            CreditCardId = ParseKey(row.CreditCardId),
+            StatementDate = ParseDate(row.StatementDate),
+            DueDate = ParseDate(row.DueDate),
+            StatementAmount = row.StatementAmount,
+            MinimumPaymentAmount = row.MinimumPaymentAmount,
+            NextStatementDate = ParseNullableDate(row.NextStatementDate),
+            NextDueDate = ParseNullableDate(row.NextDueDate),
+            Source = Enum.IsDefined(
+                typeof(CreditCardStatementSource),
+                row.Source)
+                ? (CreditCardStatementSource)row.Source
+                : CreditCardStatementSource.Manual,
+            SourceDocumentFingerprint = row.SourceDocumentFingerprint,
+            ImportedAt = string.IsNullOrWhiteSpace(row.ImportedAt)
+                ? null
+                : ParseInstant(row.ImportedAt),
+            CreatedAt = string.IsNullOrWhiteSpace(row.CreatedAt)
+                ? DateTimeOffset.UnixEpoch
+                : ParseInstant(row.CreatedAt),
+            UpdatedAt = string.IsNullOrWhiteSpace(row.UpdatedAt)
+                ? DateTimeOffset.UnixEpoch
+                : ParseInstant(row.UpdatedAt)
+        };
+
+    private static CurrentStatementPaymentPlan FromPaymentPlan(
+        CreditCardStatementRow row)
+    {
+        var mode = Enum.IsDefined(
+            typeof(CurrentStatementPaymentMode),
+            row.CurrentPaymentMode)
+            ? (CurrentStatementPaymentMode)row.CurrentPaymentMode
+            : CurrentStatementPaymentMode.Minimum;
+        return new CurrentStatementPaymentPlan
+        {
+            Mode = mode,
+            CustomAmount = mode == CurrentStatementPaymentMode.Custom
+                ? row.CurrentPaymentCustomAmount
+                : null
+        };
+    }
 
     private static PlannedLargeExpenseRow ToRow(
         PlannedLargeExpense value) => new()
@@ -1529,6 +1618,16 @@ public sealed class SqliteCoinFlowStore : ICoinFlowStore, IAsyncDisposable
             {
                 CreditCardId = card.Id
             }));
+        }
+
+        connection.Execute(
+            "DELETE FROM credit_card_statements WHERE CreditCardId = ?",
+            Key(card.Id));
+        if (card.CurrentStatement is { } statement)
+        {
+            connection.Insert(ToRow(
+                statement with { CreditCardId = card.Id },
+                card.CurrentStatementPaymentPlan));
         }
     }
 

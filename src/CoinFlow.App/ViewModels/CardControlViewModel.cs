@@ -3,58 +3,307 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CoinFlow.App.Models;
 using CoinFlow.App.Services;
+using CoinFlow.Application.Abstractions;
+using CoinFlow.Application.Models;
 using CoinFlow.Application.Services;
+using CoinFlow.Domain.Calculations;
 using CoinFlow.Domain.Models;
+using Microsoft.Maui.Storage;
 
 namespace CoinFlow.App.ViewModels;
 
 public partial class CardControlViewModel(
     CoinFlowService service,
+    CreditCardStatementCalculator cardCalculator,
+    ICreditCardStatementImporter statementImporter,
     IUserFeedbackService feedback) : ViewModelBase
 {
     public const string CardIdQueryKey = "cardId";
     private readonly Dictionary<Guid, string> _chargeDescriptions = [];
     private CreditCard? _card;
+    private FinancialPlan? _plan;
+    private string? _statementDraftFingerprint;
+    private CreditCardStatementSource _statementDraftSource =
+        CreditCardStatementSource.Manual;
+    private CurrentStatementPaymentMode _statementDraftPaymentMode =
+        CurrentStatementPaymentMode.Minimum;
 
     public ObservableCollection<DatedAmountLine> FutureCharges { get; } = [];
 
     [ObservableProperty] private string title = "Kart";
     [ObservableProperty] private string subtitle = string.Empty;
-    [ObservableProperty] private string knownDebt = "—";
-    [ObservableProperty] private string limitText = "—";
-    [ObservableProperty] private string statementText = "—";
-    [ObservableProperty] private string paymentPreferenceText = "—";
-    [ObservableProperty] private string fallbackText = "—";
+    [ObservableProperty] private string knownDebt = "-";
+    [ObservableProperty] private string limitText = "-";
+    [ObservableProperty] private string statementText = "-";
+    [ObservableProperty] private string statementDateText = "-";
+    [ObservableProperty] private string statementDueText = "-";
+    [ObservableProperty] private string statementMinimumText = "-";
+    [ObservableProperty] private string currentStatementPlanText = "-";
+    [ObservableProperty] private string currentStatementPaymentText = "-";
+    [ObservableProperty] private string nextStatementEstimateText = "-";
+    [ObservableProperty] private string nextStatementDateText = "-";
+    [ObservableProperty] private string nextStatementBreakdownText = string.Empty;
+    [ObservableProperty] private string paymentPreferenceText = "-";
+    [ObservableProperty] private string fallbackText = "-";
+    [ObservableProperty] private bool hasActualStatement;
+    [ObservableProperty] private bool hasNoActualStatement = true;
     [ObservableProperty] private bool hasFutureCharges;
+    [ObservableProperty] private bool isCurrentStatementCustom;
+    [ObservableProperty] private string currentStatementCustomAmount = string.Empty;
+
+    [ObservableProperty] private bool hasStatementDraft;
+    [ObservableProperty] private string statementDraftTitle = "Ekstreyi Kontrol Et";
+    [ObservableProperty] private string statementDraftBank = "-";
+    [ObservableProperty] private string statementDraftLast4 = string.Empty;
+    [ObservableProperty] private bool hasStatementDraftLast4;
+    [ObservableProperty] private string statementDraftWarnings = string.Empty;
+    [ObservableProperty] private bool hasStatementDraftWarnings;
+    [ObservableProperty] private string statementDraftDuplicate = string.Empty;
+    [ObservableProperty] private bool isStatementDraftDuplicate;
+    [ObservableProperty] private DateTime statementDraftDate = DateTime.Today;
+    [ObservableProperty] private DateTime statementDraftDueDate = DateTime.Today;
+    [ObservableProperty] private string statementDraftAmount = string.Empty;
+    [ObservableProperty] private string statementDraftMinimum = string.Empty;
+    [ObservableProperty] private string statementDraftNextStatementDate = string.Empty;
+    [ObservableProperty] private string statementDraftNextDueDate = string.Empty;
+    [ObservableProperty] private string statementDraftPaymentPlanText = "Asgari";
+    [ObservableProperty] private bool isStatementDraftCustom;
+    [ObservableProperty] private string statementDraftCustomAmount = string.Empty;
+
     [ObservableProperty] private DateTime chargeDate = DateTime.Today.AddMonths(1);
     [ObservableProperty] private string chargeAmount = string.Empty;
     [ObservableProperty] private string chargeDescription = string.Empty;
 
     public async Task LoadAsync(Guid cardId)
     {
-        var plan = await service.GetFinancialPlanAsync();
-        _card = plan.CreditCards.Single(x => x.Id == cardId);
+        _plan = await service.GetFinancialPlanAsync();
+        _card = _plan.CreditCards.Single(x => x.Id == cardId);
         RefreshCardState();
         SetStatus(string.Empty);
+    }
+
+    [RelayCommand]
+    private async Task ImportStatementAsync()
+    {
+        if (IsBusy)
+        {
+            return;
+        }
+
+        try
+        {
+            var file = await FilePicker.Default.PickAsync(new PickOptions
+            {
+                PickerTitle = "Ekstre PDF seç",
+                FileTypes = FilePickerFileType.Pdf
+            });
+            if (file is null)
+            {
+                return;
+            }
+
+            IsBusy = true;
+            SetStatus(string.Empty);
+            await using var stream = await file.OpenReadAsync();
+            var result = await statementImporter.ImportPdfAsync(stream);
+            StartStatementDraft(result);
+            if (!result.HasRequiredFields)
+            {
+                await feedback.ShowErrorAsync(
+                    "Bilgileri elle girebilirsin.",
+                    "Ekstre Otomatik Okunamadı");
+            }
+        }
+        catch (Exception exception)
+        {
+            var message = UserFacingMessages.FromException(exception);
+            SetStatus(message);
+            await feedback.ShowErrorAsync(
+                "Bilgileri elle girebilirsin.",
+                "Ekstre Kaydedilemedi");
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    [RelayCommand]
+    private void StartManualStatement()
+    {
+        var card = RequiredCard();
+        var statement = card.CurrentStatement;
+        _statementDraftSource = CreditCardStatementSource.Manual;
+        _statementDraftFingerprint = null;
+        _statementDraftPaymentMode =
+            card.CurrentStatementPaymentPlan?.Mode ??
+            CurrentStatementPaymentMode.Minimum;
+        StatementDraftTitle = statement is null
+            ? "Ekstreyi Elle Gir"
+            : "Bu Ekstreyi Düzenle";
+        StatementDraftBank = $"{card.Bank} {card.Name}".Trim();
+        StatementDraftLast4 = string.Empty;
+        HasStatementDraftLast4 = false;
+        StatementDraftWarnings = string.Empty;
+        HasStatementDraftWarnings = false;
+        StatementDraftDuplicate = string.Empty;
+        IsStatementDraftDuplicate = false;
+        StatementDraftDate = (statement?.StatementDate ?? DateOnly.FromDateTime(DateTime.Today))
+            .ToDateTime(TimeOnly.MinValue);
+        StatementDraftDueDate = (statement?.DueDate ?? DateOnly.FromDateTime(DateTime.Today))
+            .ToDateTime(TimeOnly.MinValue);
+        StatementDraftAmount = statement?.StatementAmount.ToString("N2", TurkishCulture) ?? string.Empty;
+        StatementDraftMinimum = statement?.MinimumPaymentAmount.ToString("N2", TurkishCulture) ?? string.Empty;
+        StatementDraftNextStatementDate = statement?.NextStatementDate?.ToString("dd.MM.yyyy") ?? string.Empty;
+        StatementDraftNextDueDate = statement?.NextDueDate?.ToString("dd.MM.yyyy") ?? string.Empty;
+        StatementDraftCustomAmount =
+            card.CurrentStatementPaymentPlan?.CustomAmount?.ToString("N2", TurkishCulture) ??
+            string.Empty;
+        RefreshStatementDraftPaymentMode();
+        HasStatementDraft = true;
+    }
+
+    [RelayCommand]
+    private void CancelStatementDraft()
+    {
+        HasStatementDraft = false;
+        StatementDraftWarnings = string.Empty;
+        HasStatementDraftWarnings = false;
+        IsStatementDraftDuplicate = false;
+        StatementDraftDuplicate = string.Empty;
+    }
+
+    [RelayCommand]
+    private void DraftPayMinimum()
+    {
+        _statementDraftPaymentMode = CurrentStatementPaymentMode.Minimum;
+        RefreshStatementDraftPaymentMode();
+    }
+
+    [RelayCommand]
+    private void DraftPayFull()
+    {
+        _statementDraftPaymentMode = CurrentStatementPaymentMode.Full;
+        RefreshStatementDraftPaymentMode();
+    }
+
+    [RelayCommand]
+    private void DraftPayCustom()
+    {
+        _statementDraftPaymentMode = CurrentStatementPaymentMode.Custom;
+        RefreshStatementDraftPaymentMode();
+    }
+
+    [RelayCommand]
+    private async Task SaveStatementDraftAsync()
+    {
+        if (IsBusy)
+        {
+            return;
+        }
+
+        try
+        {
+            IsBusy = true;
+            var card = RequiredCard();
+            var amount = ParsePositiveMoney(
+                StatementDraftAmount,
+                "Ekstre tutarı");
+            var minimum = ParseMoney(
+                StatementDraftMinimum,
+                "Asgari ödeme");
+            if (minimum < 0m || minimum > amount)
+            {
+                throw new InvalidOperationException(
+                    "Asgari ödeme 0 ile ekstre tutarı arasında olmalıdır.");
+            }
+
+            var statement = new CreditCardStatement
+            {
+                Id = card.CurrentStatement?.Id ?? Guid.NewGuid(),
+                CreditCardId = card.Id,
+                StatementDate = DateOnly.FromDateTime(StatementDraftDate),
+                DueDate = DateOnly.FromDateTime(StatementDraftDueDate),
+                StatementAmount = amount,
+                MinimumPaymentAmount = minimum,
+                NextStatementDate = ParseOptionalDate(
+                    StatementDraftNextStatementDate,
+                    "Bir sonraki kesim tarihi"),
+                NextDueDate = ParseOptionalDate(
+                    StatementDraftNextDueDate,
+                    "Bir sonraki son ödeme tarihi"),
+                Source = _statementDraftSource,
+                SourceDocumentFingerprint = _statementDraftFingerprint,
+                ImportedAt = _statementDraftSource ==
+                             CreditCardStatementSource.PdfImport
+                    ? DateTimeOffset.UtcNow
+                    : null,
+                CreatedAt = card.CurrentStatement?.CreatedAt ??
+                            DateTimeOffset.UtcNow,
+                UpdatedAt = DateTimeOffset.UtcNow
+            };
+            await service.SaveCreditCardStatementAsync(
+                card.Id,
+                statement,
+                BuildDraftPaymentPlan(amount));
+            HasStatementDraft = false;
+            await LoadAsync(card.Id);
+            await feedback.ShowSuccessAsync(
+                "Kart projeksiyonun yeni kesilmiş ekstreye göre güncellendi.",
+                "Ekstre Kaydedildi");
+        }
+        catch (Exception exception)
+        {
+            var message = UserFacingMessages.FromException(exception);
+            SetStatus(message);
+            await feedback.ShowErrorAsync(message, "Ekstre Kaydedilemedi");
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    [RelayCommand]
+    private Task SetCurrentStatementMinimumAsync() =>
+        SaveCurrentStatementPlanAsync(CurrentStatementPaymentMode.Minimum);
+
+    [RelayCommand]
+    private Task SetCurrentStatementFullAsync() =>
+        SaveCurrentStatementPlanAsync(CurrentStatementPaymentMode.Full);
+
+    [RelayCommand]
+    private void ShowCurrentStatementCustom() =>
+        IsCurrentStatementCustom = true;
+
+    [RelayCommand]
+    private async Task SaveCurrentStatementCustomAsync()
+    {
+        var amount = ParseMoney(
+            CurrentStatementCustomAmount,
+            "Bu ekstre için özel ödeme");
+        await SaveCurrentStatementPlanAsync(
+            CurrentStatementPaymentMode.Custom,
+            amount);
     }
 
     [RelayCommand]
     private Task PayMinimumAsync() =>
         SavePreferenceAsync(
             CreditCardPaymentStrategy.Minimum,
-            "Her ekstrede asgari ödeme seçildi.");
+            "Gelecek ekstrelerde asgari ödeme seçildi.");
 
     [RelayCommand]
     private Task PayFullAsync() =>
         SavePreferenceAsync(
             CreditCardPaymentStrategy.FullStatement,
-            "Her ekstrede tamamı seçildi.");
+            "Gelecek ekstrelerde tamamı seçildi.");
 
     [RelayCommand]
     private Task AskEachStatementAsync() =>
         SavePreferenceAsync(
             CreditCardPaymentStrategy.AskEachStatement,
-            "Her ekstrede sor seçildi.");
+            "Gelecek ekstrelerde sor seçildi.");
 
     [RelayCommand]
     private Task FallbackMinimumAsync() =>
@@ -150,6 +399,39 @@ public partial class CardControlViewModel(
             });
     }
 
+    private async Task SaveCurrentStatementPlanAsync(
+        CurrentStatementPaymentMode mode,
+        decimal? customAmount = null)
+    {
+        try
+        {
+            var card = RequiredCard();
+            var statement = card.CurrentStatement ??
+                            throw new InvalidOperationException(
+                                "Önce kesilmiş ekstre bilgisini gir.");
+            await service.SaveCreditCardStatementAsync(
+                card.Id,
+                statement,
+                new CurrentStatementPaymentPlan
+                {
+                    Mode = mode,
+                    CustomAmount = mode == CurrentStatementPaymentMode.Custom
+                        ? customAmount
+                        : null
+                });
+            IsCurrentStatementCustom = false;
+            await LoadAsync(card.Id);
+            await feedback.ShowSuccessAsync(
+                "Bu ekstre için ödeme planı kaydedildi.");
+        }
+        catch (Exception exception)
+        {
+            var message = UserFacingMessages.FromException(exception);
+            SetStatus(message);
+            await feedback.ShowErrorAsync(message);
+        }
+    }
+
     private async Task SavePreferenceAsync(
         CreditCardPaymentStrategy strategy,
         string message)
@@ -196,31 +478,183 @@ public partial class CardControlViewModel(
         }
     }
 
+    private void StartStatementDraft(
+        CreditCardStatementImportResult result)
+    {
+        var card = RequiredCard();
+        _statementDraftSource = CreditCardStatementSource.PdfImport;
+        _statementDraftFingerprint = result.SourceDocumentFingerprint;
+        _statementDraftPaymentMode =
+            card.CurrentStatementPaymentPlan?.Mode ??
+            CurrentStatementPaymentMode.Minimum;
+        StatementDraftTitle = "Ekstreyi Kontrol Et";
+        StatementDraftBank = string.IsNullOrWhiteSpace(result.DetectedBank)
+            ? $"{card.Bank} {card.Name}".Trim()
+            : result.DetectedBank;
+        StatementDraftLast4 = result.CardLast4 is null
+            ? string.Empty
+            : $"**** {result.CardLast4}";
+        HasStatementDraftLast4 = !string.IsNullOrWhiteSpace(
+            StatementDraftLast4);
+        StatementDraftDate = (result.StatementDate ?? DateOnly.FromDateTime(DateTime.Today))
+            .ToDateTime(TimeOnly.MinValue);
+        StatementDraftDueDate = (result.DueDate ?? DateOnly.FromDateTime(DateTime.Today))
+            .ToDateTime(TimeOnly.MinValue);
+        StatementDraftAmount = result.StatementAmount?.ToString("N2", TurkishCulture) ?? string.Empty;
+        StatementDraftMinimum = result.MinimumPaymentAmount?.ToString("N2", TurkishCulture) ?? string.Empty;
+        StatementDraftNextStatementDate = result.NextStatementDate?.ToString("dd.MM.yyyy") ?? string.Empty;
+        StatementDraftNextDueDate = result.NextDueDate?.ToString("dd.MM.yyyy") ?? string.Empty;
+        StatementDraftWarnings = string.Join(Environment.NewLine, result.Warnings);
+        HasStatementDraftWarnings = result.Warnings.Count > 0;
+        IsStatementDraftDuplicate = card.CurrentStatement is not null &&
+                                    (card.CurrentStatement.StatementDate ==
+                                     result.StatementDate ||
+                                     (!string.IsNullOrWhiteSpace(
+                                          result.SourceDocumentFingerprint) &&
+                                      card.CurrentStatement.SourceDocumentFingerprint ==
+                                      result.SourceDocumentFingerprint));
+        StatementDraftDuplicate = IsStatementDraftDuplicate
+            ? "Bu ekstre daha önce içeri aktarılmış. Kaydedersen mevcut ekstre güncellenecek."
+            : string.Empty;
+        StatementDraftCustomAmount =
+            card.CurrentStatementPaymentPlan?.CustomAmount?.ToString("N2", TurkishCulture) ??
+            string.Empty;
+        RefreshStatementDraftPaymentMode();
+        HasStatementDraft = true;
+    }
+
+    private CurrentStatementPaymentPlan BuildDraftPaymentPlan(
+        decimal statementAmount)
+    {
+        var customAmount = _statementDraftPaymentMode ==
+                           CurrentStatementPaymentMode.Custom
+            ? ParseMoney(
+                StatementDraftCustomAmount,
+                "Bu ekstre için özel ödeme")
+            : (decimal?)null;
+        if (customAmount is decimal parsedCustomAmount &&
+            (parsedCustomAmount < 0m ||
+             parsedCustomAmount > statementAmount))
+        {
+            throw new InvalidOperationException(
+                "Bu ekstre için ödeme tutarı 0 ile ekstre tutarı arasında olmalıdır.");
+        }
+
+        return new CurrentStatementPaymentPlan
+        {
+            Mode = _statementDraftPaymentMode,
+            CustomAmount = customAmount
+        };
+    }
+
+    private void RefreshStatementDraftPaymentMode()
+    {
+        StatementDraftPaymentPlanText = _statementDraftPaymentMode switch
+        {
+            CurrentStatementPaymentMode.Full => "Tamamı",
+            CurrentStatementPaymentMode.Custom => "Başka Tutar",
+            _ => "Asgari"
+        };
+        IsStatementDraftCustom =
+            _statementDraftPaymentMode == CurrentStatementPaymentMode.Custom;
+    }
+
     private CreditCard RequiredCard() =>
         _card ?? throw new InvalidOperationException("Kredi kartı bulunamadı.");
+
+    private FinancialPlan RequiredPlan() =>
+        _plan ?? throw new InvalidOperationException("Finans planı bulunamadı.");
 
     private void RefreshCardState()
     {
         var card = RequiredCard();
+        var plan = RequiredPlan();
+        var projections = cardCalculator.Project(
+            card,
+            2,
+            useProjectionFallback: true,
+            plan.Settings.CreditCardCarryInterestRate);
+        var currentProjection = projections[0];
+        var nextProjection = projections.Count > 1 ? projections[1] : null;
+
         Title = card.Name.Length == 0 ? "Kart" : card.Name;
-        Subtitle = $"{card.Bank} • Kesim {card.StatementClosingDay}. gün • Son ödeme {card.PaymentDueDay}. gün";
-        KnownDebt = Money(card.KnownTotalDebt);
-        LimitText = Money(card.Limit);
-        StatementText =
-            $"Devreden {Money(card.CarriedBalance)} • Ekstreleşmemiş {Money(card.UnbilledSpending)}";
+        Subtitle =
+            $"{card.Bank} • Kesim {card.StatementClosingDay}. gün • Son ödeme {card.PaymentDueDay}. gün";
+        KnownDebt = Money(card.KnownTotalDebt, 2);
+        LimitText = Money(card.Limit, 2);
+        HasActualStatement = card.CurrentStatement is not null;
+        HasNoActualStatement = !HasActualStatement;
+
+        if (card.CurrentStatement is { } statement)
+        {
+            StatementText = Money(statement.StatementAmount, 2);
+            StatementDateText = statement.StatementDate.ToString(
+                "dd MMMM",
+                TurkishCulture);
+            StatementDueText = statement.DueDate.ToString(
+                "dd MMMM",
+                TurkishCulture);
+            StatementMinimumText = Money(
+                statement.MinimumPaymentAmount,
+                2);
+            CurrentStatementPlanText = CurrentPlanLabel(
+                card.CurrentStatementPaymentPlan);
+            CurrentStatementPaymentText = currentProjection.Payment is decimal payment
+                ? Money(payment, 2)
+                : "Henüz belirlenmedi";
+            CurrentStatementCustomAmount =
+                card.CurrentStatementPaymentPlan?.CustomAmount
+                    ?.ToString("N2", TurkishCulture) ?? string.Empty;
+            NextStatementEstimateText = nextProjection?.StatementBalance is decimal nextAmount
+                ? Money(nextAmount, 2)
+                : "-";
+            NextStatementDateText =
+                (statement.NextStatementDate ?? nextProjection?.StatementCloseDate)
+                ?.ToString("dd MMMM", TurkishCulture) ?? "-";
+            NextStatementBreakdownText =
+                $"Devreden {Money(currentProjection.CarriedAfterPayment ?? 0m, 2)} • " +
+                $"finansman {Money(currentProjection.CarryInterest, 2)} • " +
+                $"bilinen yeni harcama {Money(nextProjection?.NewCharges ?? 0m, 2)}";
+        }
+        else
+        {
+            StatementText =
+                $"Devreden {Money(card.CarriedBalance, 2)} • Ekstreleşmemiş {Money(card.UnbilledSpending, 2)}";
+            StatementDateText = card.BalanceAsOfDate.ToString(
+                "dd MMMM",
+                TurkishCulture);
+            StatementDueText = currentProjection.PaymentDueDate.ToString(
+                "dd MMMM",
+                TurkishCulture);
+            StatementMinimumText = currentProjection.MinimumPayment is decimal minimum
+                ? Money(minimum, 2)
+                : "-";
+            CurrentStatementPlanText = "Legacy başlangıç";
+            CurrentStatementPaymentText = currentProjection.Payment is decimal payment
+                ? Money(payment, 2)
+                : "Henüz belirlenmedi";
+            NextStatementEstimateText = nextProjection?.StatementBalance is decimal nextAmount
+                ? Money(nextAmount, 2)
+                : "-";
+            NextStatementDateText = nextProjection?.StatementCloseDate
+                .ToString("dd MMMM", TurkishCulture) ?? "-";
+            NextStatementBreakdownText =
+                "Kesilmiş ekstre eklenince bankanın gerçek tutarı esas alınır.";
+        }
+
         PaymentPreferenceText = card.PaymentStrategy switch
         {
-            CreditCardPaymentStrategy.Minimum => "Her ekstrede asgari",
-            CreditCardPaymentStrategy.FullStatement => "Her ekstrede tamamı",
+            CreditCardPaymentStrategy.Minimum => "Gelecekte asgari",
+            CreditCardPaymentStrategy.FullStatement => "Gelecekte tamamı",
             CreditCardPaymentStrategy.FixedAmount =>
-                $"Sabit {Money(card.FixedPaymentAmount.GetValueOrDefault())}",
+                $"Sabit {Money(card.FixedPaymentAmount.GetValueOrDefault(), 2)}",
             _ => "Her ekstrede sor"
         };
         FallbackText = card.ProjectionFallbackStrategy switch
         {
             ProjectionFallbackStrategy.FullStatement => "Tamamı",
             ProjectionFallbackStrategy.FixedAmount =>
-                $"Sabit {Money(card.ProjectionFallbackFixedAmount.GetValueOrDefault())}",
+                $"Sabit {Money(card.ProjectionFallbackFixedAmount.GetValueOrDefault(), 2)}",
             ProjectionFallbackStrategy.None => "Hesaba katma",
             _ => "Asgari"
         };
@@ -239,4 +673,39 @@ public partial class CardControlViewModel(
 
         HasFutureCharges = FutureCharges.Count > 0;
     }
+
+    private static string CurrentPlanLabel(
+        CurrentStatementPaymentPlan? plan) => plan?.Mode switch
+    {
+        CurrentStatementPaymentMode.Full => "Tamamı",
+        CurrentStatementPaymentMode.Custom =>
+            $"Başka tutar: {Money(plan.CustomAmount.GetValueOrDefault(), 2)}",
+        CurrentStatementPaymentMode.Minimum => "Asgari",
+        _ => "Henüz seçilmedi"
+    };
+
+    private static DateOnly? ParseOptionalDate(
+        string? value,
+        string field)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        if (DateOnly.TryParseExact(
+                value.Trim(),
+                "dd.MM.yyyy",
+                TurkishCulture,
+                System.Globalization.DateTimeStyles.None,
+                out var date) ||
+            DateOnly.TryParse(value, TurkishCulture, out date))
+        {
+            return date;
+        }
+
+        throw new InvalidOperationException(
+            $"{field} gg.aa.yyyy formatında olmalıdır.");
+    }
+
 }
