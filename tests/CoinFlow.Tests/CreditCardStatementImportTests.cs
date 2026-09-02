@@ -1,4 +1,5 @@
 using System.Text;
+using System.Diagnostics;
 using CoinFlow.Application.Abstractions;
 using CoinFlow.Application.Models;
 using CoinFlow.Infrastructure.Imports;
@@ -105,6 +106,57 @@ public sealed class CreditCardStatementImportTests
         Assert.Contains("otomatik okunamadı", result.Warnings[0]);
     }
 
+    [Fact]
+    public async Task Importer_ReturnsImmediatelyWhileSynchronousExtractionRuns()
+    {
+        var importer = new CreditCardStatementImporter(
+            new SlowSynchronousExtractor(),
+            [new GarantiBonusStatementParser()]);
+        await using var pdf = new MemoryStream([1, 2, 3]);
+        var timer = Stopwatch.StartNew();
+
+        var import = importer.ImportPdfAsync(pdf);
+
+        timer.Stop();
+        Assert.True(
+            timer.Elapsed < TimeSpan.FromMilliseconds(200),
+            $"Import call blocked for {timer.Elapsed.TotalMilliseconds:N0} ms.");
+        Assert.False(import.IsCompleted);
+        Assert.True((await import).HasRequiredFields);
+    }
+
+    [Fact]
+    public async Task Importer_BoundedPipelineExtractsAndParsesOnlyOnce()
+    {
+        var extractor = new CountingExtractor();
+        var parser = new CountingParser();
+        var importer = new CreditCardStatementImporter(
+            extractor,
+            [parser]);
+        await using var pdf = new MemoryStream([1, 2, 3]);
+
+        var result = await importer.ImportPdfAsync(pdf);
+
+        Assert.True(result.HasRequiredFields);
+        Assert.Equal(1, extractor.CallCount);
+        Assert.Equal(1, parser.CanParseCount);
+        Assert.Equal(1, parser.ParseCount);
+    }
+
+    [Fact]
+    public async Task Importer_ParserFailureReturnsManualFallback()
+    {
+        var importer = new CreditCardStatementImporter(
+            new CountingExtractor(),
+            [new ThrowingParser()]);
+        await using var pdf = new MemoryStream([1, 2, 3]);
+
+        var result = await importer.ImportPdfAsync(pdf);
+
+        Assert.False(result.HasRequiredFields);
+        Assert.Contains("otomatik okunamadı", result.Warnings[0]);
+    }
+
     private sealed class FixedTextExtractor(string text) : IPdfTextExtractor
     {
         public Task<string> ExtractTextAsync(
@@ -112,4 +164,71 @@ public sealed class CreditCardStatementImportTests
             CancellationToken cancellationToken = default) =>
             Task.FromResult(text);
     }
+
+    private sealed class SlowSynchronousExtractor : IPdfTextExtractor
+    {
+        public Task<string> ExtractTextAsync(
+            Stream pdf,
+            CancellationToken cancellationToken = default)
+        {
+            Thread.Sleep(350);
+            return Task.FromResult(ValidText());
+        }
+    }
+
+    private sealed class CountingExtractor : IPdfTextExtractor
+    {
+        public int CallCount { get; private set; }
+
+        public Task<string> ExtractTextAsync(
+            Stream pdf,
+            CancellationToken cancellationToken = default)
+        {
+            CallCount++;
+            return Task.FromResult(ValidText());
+        }
+    }
+
+    private class CountingParser : ICreditCardStatementParser
+    {
+        public string BankName => "Test";
+        public int CanParseCount { get; private set; }
+        public int ParseCount { get; private set; }
+
+        public virtual bool CanParse(string text)
+        {
+            CanParseCount++;
+            return true;
+        }
+
+        public virtual CreditCardStatementImportResult Parse(
+            string text,
+            string sourceDocumentFingerprint)
+        {
+            ParseCount++;
+            return new CreditCardStatementImportResult
+            {
+                StatementDate = new DateOnly(2026, 8, 28),
+                DueDate = new DateOnly(2026, 9, 7),
+                StatementAmount = 100m,
+                MinimumPaymentAmount = 40m
+            };
+        }
+    }
+
+    private sealed class ThrowingParser : CountingParser
+    {
+        public override CreditCardStatementImportResult Parse(
+            string text,
+            string sourceDocumentFingerprint) =>
+            throw new FormatException("statement contents");
+    }
+
+    private static string ValidText() => """
+        GARANTI BBVA BONUS EKSTRE OZETI
+        EKSTRE TARIHI 24.08.2026
+        SON ODEME TARIHI 03.09.2026
+        EKSTRE TUTARI 15.000,00 TL
+        ASGARI ODEME TUTARI 6.000,00 TL
+        """;
 }

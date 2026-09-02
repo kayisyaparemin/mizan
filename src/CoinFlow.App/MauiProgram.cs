@@ -61,7 +61,16 @@ public static class MauiProgram
         builder.Services.AddSingleton<IPdfTextExtractor, PdfPigPdfTextExtractor>();
         builder.Services.AddSingleton<ICreditCardStatementParser, AkbankAxessStatementParser>();
         builder.Services.AddSingleton<ICreditCardStatementParser, GarantiBonusStatementParser>();
+        builder.Services.AddSingleton<ICreditCardStatementPdfPicker, CreditCardStatementPdfPicker>();
+#if COINFLOW_DEV_BUILD
+        builder.Services.AddSingleton<ICreditCardStatementImportDiagnostics,
+            DevelopmentCreditCardStatementImportDiagnostics>();
+#else
+        builder.Services.AddSingleton<ICreditCardStatementImportDiagnostics,
+            NullCreditCardStatementImportDiagnostics>();
+#endif
         builder.Services.AddSingleton<ICreditCardStatementImporter, CreditCardStatementImporter>();
+        builder.Services.AddSingleton<CreditCardStatementImportWorkflow>();
         builder.Services.AddSingleton<SalaryPeriodDetailPresenter>();
         builder.Services.AddSingleton<SimulatorInsightService>();
         builder.Services.AddSingleton<SimulationCalculator>();

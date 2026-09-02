@@ -109,12 +109,20 @@
                                              Spacing="8">
                             <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
                                 <Button Text="Ekstreden İçeri Aktar"
-                                        Command="{Binding ImportCardStatementPdfCommand}" />
+                                        Command="{Binding ImportCardStatementPdfCommand}"
+                                        IsEnabled="{Binding IsNotBusy}" />
                                 <Label Grid.Column="1"
                                        Text="PDF yerel okunur; dosya saklanmaz."
                                        Style="{StaticResource MutedText}"
                                        VerticalTextAlignment="Center" />
                             </Grid>
+                            <HorizontalStackLayout Spacing="8"
+                                                   IsVisible="{Binding IsBusy}">
+                                <ActivityIndicator IsRunning="{Binding IsBusy}" />
+                                <Label Text="{Binding BusyMessage}"
+                                       VerticalTextAlignment="Center"
+                                       Style="{StaticResource MutedText}" />
+                            </HorizontalStackLayout>
                             <Label Text="{Binding CardStatementImportWarnings}"
                                    IsVisible="{Binding HasCardStatementImportWarnings}"
                                    TextColor="{StaticResource Error}" />
@@ -134,15 +142,17 @@
                             </Grid>
                             <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
                                 <VerticalStackLayout Spacing="6">
-                                    <Label Text="Sonraki kesim" Style="{StaticResource FieldLabel}" />
-                                    <Entry Text="{Binding CardNextStatementDate}" Placeholder="gg.aa.yyyy" />
+                                    <Label Text="Sonraki tahmini kesim" Style="{StaticResource FieldLabel}" />
+                                    <Label Text="{Binding CardNextStatementDate}"
+                                           FontFamily="OpenSansSemibold" />
                                 </VerticalStackLayout>
                                 <VerticalStackLayout Grid.Column="1" Spacing="6">
-                                    <Label Text="Sonraki son ödeme" Style="{StaticResource FieldLabel}" />
-                                    <Entry Text="{Binding CardNextDueDate}" Placeholder="gg.aa.yyyy" />
+                                    <Label Text="Sonraki tahmini son ödeme" Style="{StaticResource FieldLabel}" />
+                                    <Label Text="{Binding CardNextDueDate}"
+                                           FontFamily="OpenSansSemibold" />
                                 </VerticalStackLayout>
                             </Grid>
-                            <Label Text="Bu ekstreyi nasıl ödeyeceksin?"
+                            <Label Text="Bu ekstreyi nasıl ödemeyi planlıyorsun?"
                                    Style="{StaticResource FieldLabel}" />
                             <Picker ItemsSource="{Binding CurrentStatementPaymentModes}"
                                     SelectedItem="{Binding SelectedCurrentStatementPaymentMode}" />
@@ -237,7 +247,9 @@
                         <Editor Text="{Binding Note}" AutoSize="TextChanges" />
                     </VerticalStackLayout>
 
-                    <Button Text="{Binding SaveButtonText}" Command="{Binding SaveCommand}" />
+                    <Button Text="{Binding SaveButtonText}"
+                            Command="{Binding SaveCommand}"
+                            IsEnabled="{Binding IsNotBusy}" />
                     <Button Text="Vazgeç"
                             Command="{Binding CancelEditingCardCommand}"
                             Style="{StaticResource SecondaryButton}" />
@@ -366,6 +378,12 @@
             <Label Text="{Binding StatusMessage}"
                    IsVisible="{Binding HasStatus}"
                    TextColor="{StaticResource Error}" />
+            <ActivityIndicator IsRunning="{Binding IsBusy}"
+                               IsVisible="{Binding IsBusy}" />
+            <Label Text="{Binding BusyMessage}"
+                   IsVisible="{Binding IsBusy}"
+                   HorizontalTextAlignment="Center"
+                   Style="{StaticResource MutedText}" />
         </VerticalStackLayout>
     </ScrollView>
 </ContentPage>

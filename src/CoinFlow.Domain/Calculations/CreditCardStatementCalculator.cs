@@ -189,6 +189,26 @@ public sealed class CreditCardStatementCalculator
             : CalendarRules.AddMonthsKeepingDay(sameMonth, 1, paymentDueDay);
     }
 
+    public static DateOnly ResolveNextStatementDate(
+        DateOnly actualStatementDate,
+        int statementClosingDay,
+        DateOnly? importedExactDate = null)
+    {
+        CalendarRules.ValidateDay(statementClosingDay);
+        return importedExactDate ?? CalendarRules.AddMonthsKeepingDay(
+            actualStatementDate,
+            1,
+            statementClosingDay);
+    }
+
+    public static DateOnly ResolveNextDueDate(
+        DateOnly nextStatementDate,
+        int paymentDueDay,
+        DateOnly? importedExactDate = null) =>
+        importedExactDate ?? ResolvePaymentDueDate(
+            nextStatementDate,
+            paymentDueDay);
+
     private static DateOnly ResolvePaymentDueDate(
         CreditCard card,
         DateOnly statementCloseDate,
@@ -228,9 +248,8 @@ public sealed class CreditCardStatementCalculator
             return nextStatementDate;
         }
 
-        return CalendarRules.AddMonthsKeepingDay(
+        return ResolveNextStatementDate(
             closeDate,
-            1,
             card.StatementClosingDay);
     }
 

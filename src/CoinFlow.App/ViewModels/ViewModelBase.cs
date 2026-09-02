@@ -11,6 +11,11 @@ public abstract partial class ViewModelBase : ObservableObject
     private bool isBusy;
 
     [ObservableProperty]
+    private string busyMessage = string.Empty;
+
+    public bool IsNotBusy => !IsBusy;
+
+    [ObservableProperty]
     private string statusMessage = string.Empty;
 
     [ObservableProperty]
@@ -47,4 +52,7 @@ public abstract partial class ViewModelBase : ObservableObject
         StatusMessage = message;
         HasStatus = !string.IsNullOrWhiteSpace(message);
     }
+
+    partial void OnIsBusyChanged(bool value) =>
+        OnPropertyChanged(nameof(IsNotBusy));
 }

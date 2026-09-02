@@ -9,14 +9,13 @@ using CoinFlow.Application.Services;
 using CoinFlow.Domain.Calculations;
 using CoinFlow.Domain.Models;
 using Microsoft.Maui.Devices;
-using Microsoft.Maui.Storage;
 
 namespace CoinFlow.App.ViewModels;
 
 public partial class CommitmentsViewModel(
     CoinFlowService service,
     CreditCardStatementCalculator cardCalculator,
-    ICreditCardStatementImporter statementImporter,
+    CreditCardStatementImportWorkflow statementImportWorkflow,
     IUserFeedbackService feedback) : ViewModelBase
 {
     public event Action<InitialPaymentStrategySetup>?
@@ -75,6 +74,8 @@ public partial class CommitmentsViewModel(
     private string? _cardStatementFingerprint;
     private CreditCardStatementSource _cardStatementSource =
         CreditCardStatementSource.Manual;
+    private DateOnly? _cardExactNextStatementDate;
+    private DateOnly? _cardExactNextDueDate;
 
     [ObservableProperty] private bool isIncomeSection = true;
     [ObservableProperty] private bool isPaymentSection;
@@ -386,6 +387,15 @@ public partial class CommitmentsViewModel(
         IsCurrentStatementCustomPayment =
             value?.Value == CurrentStatementPaymentMode.Custom;
 
+    partial void OnCardStatementDateChanged(DateTime value) =>
+        RefreshCardNextDates();
+
+    partial void OnClosingDayChanged(string value) =>
+        RefreshCardNextDates();
+
+    partial void OnDueDayChanged(string value) =>
+        RefreshCardNextDates();
+
     [RelayCommand]
     private void AddPlanPayment()
     {
@@ -437,14 +447,19 @@ public partial class CommitmentsViewModel(
     private void UseActualStatementForCard()
     {
         CardHasActualStatement = true;
+        _cardExactNextStatementDate = null;
+        _cardExactNextDueDate = null;
         CardStatementDate = DateTime.Today;
         CardStatementDueDate = DateTime.Today;
+        RefreshCardNextDates();
     }
 
     [RelayCommand]
     private void UseLegacyCardSetup()
     {
         CardHasActualStatement = false;
+        _cardExactNextStatementDate = null;
+        _cardExactNextDueDate = null;
         HasCardStatementImportWarnings = false;
         CardStatementImportWarnings = string.Empty;
     }
@@ -457,40 +472,42 @@ public partial class CommitmentsViewModel(
             return;
         }
 
+        IsBusy = true;
+        BusyMessage = "Ekstre okunuyor...";
+        SetStatus(string.Empty);
         try
         {
-            var file = await FilePicker.Default.PickAsync(new PickOptions
-            {
-                PickerTitle = "Ekstre PDF seç",
-                FileTypes = FilePickerFileType.Pdf
-            });
-            if (file is null)
+            var attempt = await statementImportWorkflow.RunAsync();
+            if (attempt.Outcome is
+                CreditCardStatementImportOutcome.Cancelled or
+                CreditCardStatementImportOutcome.AlreadyRunning)
             {
                 return;
             }
 
-            IsBusy = true;
-            SetStatus(string.Empty);
-            await using var stream = await file.OpenReadAsync();
-            var result = await statementImporter.ImportPdfAsync(stream);
+            if (!attempt.IsCompleted || attempt.Result is null)
+            {
+                CardHasActualStatement = true;
+                await ShowManualFallbackAsync();
+                return;
+            }
+
+            var result = attempt.Result;
             ApplyStatementImport(result);
             if (!result.HasRequiredFields)
             {
-                await feedback.ShowErrorAsync(
-                    "Bilgileri elle girebilirsin.",
-                    "Ekstre Otomatik Okunamadı");
+                await ShowManualFallbackAsync();
             }
         }
-        catch (Exception exception)
+        catch (Exception)
         {
-            var message = UserFacingMessages.FromException(exception);
-            SetStatus(message);
-            await feedback.ShowErrorAsync(
-                "Bilgileri elle girebilirsin.",
-                "Ekstre Kaydedilemedi");
+            CardHasActualStatement = true;
+            SetStatus(string.Empty);
+            await ShowManualFallbackAsync();
         }
         finally
         {
+            BusyMessage = string.Empty;
             IsBusy = false;
         }
     }
@@ -551,6 +568,9 @@ public partial class CommitmentsViewModel(
             card.CurrentStatement?.SourceDocumentFingerprint;
         _cardStatementSource =
             card.CurrentStatement?.Source ?? CreditCardStatementSource.Manual;
+        _cardExactNextStatementDate =
+            card.CurrentStatement?.NextStatementDate;
+        _cardExactNextDueDate = card.CurrentStatement?.NextDueDate;
         IsIncomeSection = false;
         IsPaymentSection = true;
         RefreshRecordTypes();
@@ -577,12 +597,7 @@ public partial class CommitmentsViewModel(
                 statement.StatementDate.ToDateTime(TimeOnly.MinValue);
             CardStatementDueDate =
                 statement.DueDate.ToDateTime(TimeOnly.MinValue);
-            CardNextStatementDate =
-                statement.NextStatementDate?.ToString("dd.MM.yyyy") ??
-                string.Empty;
-            CardNextDueDate =
-                statement.NextDueDate?.ToString("dd.MM.yyyy") ??
-                string.Empty;
+            RefreshCardNextDates();
             SelectedCurrentStatementPaymentMode =
                 CurrentStatementPaymentModes.Single(x =>
                     x.Value == (card.CurrentStatementPaymentPlan?.Mode ??
@@ -595,6 +610,8 @@ public partial class CommitmentsViewModel(
         {
             CardStatementAmount = string.Empty;
             CardStatementMinimum = string.Empty;
+            _cardExactNextStatementDate = null;
+            _cardExactNextDueDate = null;
             CardNextStatementDate = string.Empty;
             CardNextDueDate = string.Empty;
             SelectedCurrentStatementPaymentMode =
@@ -797,6 +814,8 @@ public partial class CommitmentsViewModel(
         _editingCardStatement = null;
         _cardStatementFingerprint = null;
         _cardStatementSource = CreditCardStatementSource.Manual;
+        _cardExactNextStatementDate = null;
+        _cardExactNextDueDate = null;
         IsEditingCard = false;
         HasActiveForm = false;
         SaveButtonText = "Kaydet";
@@ -960,12 +979,8 @@ public partial class CommitmentsViewModel(
             DueDate = DateOnly.FromDateTime(CardStatementDueDate),
             StatementAmount = amount,
             MinimumPaymentAmount = minimum,
-            NextStatementDate = ParseOptionalDate(
-                CardNextStatementDate,
-                "Bir sonraki kesim tarihi"),
-            NextDueDate = ParseOptionalDate(
-                CardNextDueDate,
-                "Bir sonraki son ödeme tarihi"),
+            NextStatementDate = ResolveCardNextStatementDate(),
+            NextDueDate = ResolveCardNextDueDate(),
             Source = _cardStatementSource,
             SourceDocumentFingerprint = _cardStatementFingerprint,
             ImportedAt = _cardStatementSource == CreditCardStatementSource.PdfImport
@@ -1056,6 +1071,8 @@ public partial class CommitmentsViewModel(
         CardStatementDueDate = DateTime.Today;
         CardNextStatementDate = string.Empty;
         CardNextDueDate = string.Empty;
+        _cardExactNextStatementDate = null;
+        _cardExactNextDueDate = null;
         CardStatementImportWarnings = string.Empty;
         HasCardStatementImportWarnings = false;
         CurrentStatementCustomPayment = string.Empty;
@@ -1115,6 +1132,8 @@ public partial class CommitmentsViewModel(
         CardHasActualStatement = true;
         _cardStatementSource = CreditCardStatementSource.PdfImport;
         _cardStatementFingerprint = result.SourceDocumentFingerprint;
+        _cardExactNextStatementDate = result.NextStatementDate;
+        _cardExactNextDueDate = result.NextDueDate;
         if (!string.IsNullOrWhiteSpace(result.DetectedBank) &&
             string.IsNullOrWhiteSpace(Bank))
         {
@@ -1142,18 +1161,73 @@ public partial class CommitmentsViewModel(
         CardStatementMinimum =
             result.MinimumPaymentAmount?.ToString("N2", TurkishCulture) ??
             CardStatementMinimum;
-        CardNextStatementDate =
-            result.NextStatementDate?.ToString("dd.MM.yyyy") ??
-            CardNextStatementDate;
-        CardNextDueDate =
-            result.NextDueDate?.ToString("dd.MM.yyyy") ??
-            CardNextDueDate;
+        RefreshCardNextDates();
         SelectedCurrentStatementPaymentMode ??=
             CurrentStatementPaymentModes[0];
         CardStatementImportWarnings =
             string.Join(Environment.NewLine, result.Warnings);
         HasCardStatementImportWarnings = result.Warnings.Count > 0;
     }
+
+    private void RefreshCardNextDates()
+    {
+        if (!int.TryParse(ClosingDay, out var closingDay) ||
+            closingDay is < 1 or > 31 ||
+            !int.TryParse(DueDay, out var dueDay) ||
+            dueDay is < 1 or > 31)
+        {
+            CardNextStatementDate = "-";
+            CardNextDueDate = "-";
+            return;
+        }
+
+        var nextStatementDate =
+            CreditCardStatementCalculator.ResolveNextStatementDate(
+                DateOnly.FromDateTime(CardStatementDate),
+                closingDay,
+                _cardExactNextStatementDate);
+        var nextDueDate = CreditCardStatementCalculator.ResolveNextDueDate(
+            nextStatementDate,
+            dueDay,
+            _cardExactNextDueDate);
+        CardNextStatementDate = nextStatementDate
+            .ToString("dd.MM.yyyy", TurkishCulture);
+        CardNextDueDate = nextDueDate
+            .ToString("dd.MM.yyyy", TurkishCulture);
+    }
+
+    private DateOnly ResolveCardNextStatementDate()
+    {
+        if (!int.TryParse(ClosingDay, out var closingDay))
+        {
+            throw new InvalidOperationException(
+                "Kart kesim günü geçerli olmalıdır.");
+        }
+
+        return CreditCardStatementCalculator.ResolveNextStatementDate(
+            DateOnly.FromDateTime(CardStatementDate),
+            closingDay,
+            _cardExactNextStatementDate);
+    }
+
+    private DateOnly ResolveCardNextDueDate()
+    {
+        if (!int.TryParse(DueDay, out var dueDay))
+        {
+            throw new InvalidOperationException(
+                "Kart son ödeme günü geçerli olmalıdır.");
+        }
+
+        return CreditCardStatementCalculator.ResolveNextDueDate(
+            ResolveCardNextStatementDate(),
+            dueDay,
+            _cardExactNextDueDate);
+    }
+
+    private Task ShowManualFallbackAsync() => feedback.ShowErrorAsync(
+        "Bilgileri elle girebilirsin.",
+        "Ekstre Otomatik Okunamadı",
+        "Elle Gir");
 
     private string RequireName() =>
         string.IsNullOrWhiteSpace(Name)
@@ -1200,31 +1274,4 @@ public partial class CommitmentsViewModel(
         _ => "Henüz seçilmedi"
     };
 
-    private static DateOnly? ParseOptionalDate(
-        string? value,
-        string field)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return null;
-        }
-
-        if (DateOnly.TryParseExact(
-                value.Trim(),
-                "dd.MM.yyyy",
-                TurkishCulture,
-                System.Globalization.DateTimeStyles.None,
-                out var date) ||
-            DateOnly.TryParse(
-                value,
-                TurkishCulture,
-                System.Globalization.DateTimeStyles.None,
-                out date))
-        {
-            return date;
-        }
-
-        throw new InvalidOperationException(
-            $"{field} gg.aa.yyyy formatında olmalıdır.");
-    }
 }

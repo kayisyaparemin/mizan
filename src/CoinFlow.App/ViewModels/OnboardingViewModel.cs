@@ -8,7 +8,6 @@ using CoinFlow.Application.Models;
 using CoinFlow.Application.Services;
 using CoinFlow.Domain.Calculations;
 using CoinFlow.Domain.Models;
-using Microsoft.Maui.Storage;
 
 namespace CoinFlow.App.ViewModels;
 
@@ -18,24 +17,26 @@ public partial class OnboardingViewModel : ViewModelBase
     private readonly CoinFlowService _service;
     private readonly IClock _clock;
     private readonly IUserFeedbackService _feedback;
-    private readonly ICreditCardStatementImporter _statementImporter;
+    private readonly CreditCardStatementImportWorkflow _statementImportWorkflow;
     private readonly List<SalaryScheduleEntry> _salaries = [];
     private readonly List<Loan> _loans = [];
     private readonly List<CreditCard> _cards = [];
     private readonly List<TemporaryPaymentPlan> _paymentPlans = [];
     private readonly List<PlannedLargeExpense> _payments = [];
     private DateOnly _draftAnchorDate;
+    private DateOnly? _cardExactNextStatementDate;
+    private DateOnly? _cardExactNextDueDate;
 
     public OnboardingViewModel(
         CoinFlowService service,
         IClock clock,
         IUserFeedbackService feedback,
-        ICreditCardStatementImporter statementImporter)
+        CreditCardStatementImportWorkflow statementImportWorkflow)
     {
         _service = service;
         _clock = clock;
         _feedback = feedback;
-        _statementImporter = statementImporter;
+        _statementImportWorkflow = statementImportWorkflow;
         _draftAnchorDate = clock.Today;
         IncomeEffectiveDate = clock.Today.ToDateTime(TimeOnly.MinValue);
         LoanNextPaymentDate = clock.Today.AddMonths(1)
@@ -213,6 +214,15 @@ public partial class OnboardingViewModel : ViewModelBase
         IsCurrentStatementCustomPayment =
             value?.Value == CurrentStatementPaymentMode.Custom;
 
+    partial void OnCardStatementDateChanged(DateTime value) =>
+        RefreshCardNextDates();
+
+    partial void OnCardClosingDayChanged(string value) =>
+        RefreshCardNextDates();
+
+    partial void OnCardDueDayChanged(string value) =>
+        RefreshCardNextDates();
+
     [RelayCommand]
     private void Begin()
     {
@@ -283,15 +293,20 @@ public partial class OnboardingViewModel : ViewModelBase
     private void UseActualStatementForCard()
     {
         CardHasActualStatement = true;
+        _cardExactNextStatementDate = null;
+        _cardExactNextDueDate = null;
         CardStatementDate = _clock.Today.ToDateTime(TimeOnly.MinValue);
         CardStatementDueDate = _clock.Today.AddDays(10)
             .ToDateTime(TimeOnly.MinValue);
+        RefreshCardNextDates();
     }
 
     [RelayCommand]
     private void UseLegacyCardSetup()
     {
         CardHasActualStatement = false;
+        _cardExactNextStatementDate = null;
+        _cardExactNextDueDate = null;
         HasCardStatementImportWarnings = false;
         CardStatementImportWarnings = string.Empty;
     }
@@ -304,40 +319,42 @@ public partial class OnboardingViewModel : ViewModelBase
             return;
         }
 
+        IsBusy = true;
+        BusyMessage = "Ekstre okunuyor...";
+        SetStatus(string.Empty);
         try
         {
-            var file = await FilePicker.Default.PickAsync(new PickOptions
-            {
-                PickerTitle = "Ekstre PDF seç",
-                FileTypes = FilePickerFileType.Pdf
-            });
-            if (file is null)
+            var attempt = await _statementImportWorkflow.RunAsync();
+            if (attempt.Outcome is
+                CreditCardStatementImportOutcome.Cancelled or
+                CreditCardStatementImportOutcome.AlreadyRunning)
             {
                 return;
             }
 
-            IsBusy = true;
-            SetStatus(string.Empty);
-            await using var stream = await file.OpenReadAsync();
-            var result = await _statementImporter.ImportPdfAsync(stream);
+            if (!attempt.IsCompleted || attempt.Result is null)
+            {
+                CardHasActualStatement = true;
+                await ShowManualFallbackAsync();
+                return;
+            }
+
+            var result = attempt.Result;
             ApplyStatementImport(result);
             if (!result.HasRequiredFields)
             {
-                await _feedback.ShowErrorAsync(
-                    "Bilgileri elle girebilirsin.",
-                    "Ekstre Otomatik Okunamadı");
+                await ShowManualFallbackAsync();
             }
         }
-        catch (Exception exception)
+        catch (Exception)
         {
-            var message = UserFacingMessages.FromException(exception);
-            SetStatus(message);
-            await _feedback.ShowErrorAsync(
-                "Bilgileri elle girebilirsin.",
-                "Ekstre Kaydedilemedi");
+            CardHasActualStatement = true;
+            SetStatus(string.Empty);
+            await ShowManualFallbackAsync();
         }
         finally
         {
+            BusyMessage = string.Empty;
             IsBusy = false;
         }
     }
@@ -404,6 +421,8 @@ public partial class OnboardingViewModel : ViewModelBase
             CurrentStatementCustomPayment = string.Empty;
             _cardStatementFingerprint = null;
             _cardStatementSource = CreditCardStatementSource.Manual;
+            _cardExactNextStatementDate = null;
+            _cardExactNextDueDate = null;
             RefreshDraftLines();
             SetStatus(string.Empty);
         }
@@ -624,6 +643,8 @@ public partial class OnboardingViewModel : ViewModelBase
         CurrentStatementCustomPayment = string.Empty;
         _cardStatementFingerprint = null;
         _cardStatementSource = CreditCardStatementSource.Manual;
+        _cardExactNextStatementDate = null;
+        _cardExactNextDueDate = null;
         RefreshDraftLines();
         SetStatus(string.Empty);
     }
@@ -790,12 +811,8 @@ public partial class OnboardingViewModel : ViewModelBase
             DueDate = DateOnly.FromDateTime(CardStatementDueDate),
             StatementAmount = amount,
             MinimumPaymentAmount = minimum,
-            NextStatementDate = ParseOptionalDate(
-                CardNextStatementDate,
-                "Bir sonraki kesim tarihi"),
-            NextDueDate = ParseOptionalDate(
-                CardNextDueDate,
-                "Bir sonraki son ödeme tarihi"),
+            NextStatementDate = ResolveCardNextStatementDate(),
+            NextDueDate = ResolveCardNextDueDate(),
             Source = _cardStatementSource,
             SourceDocumentFingerprint = _cardStatementFingerprint,
             ImportedAt = _cardStatementSource ==
@@ -837,6 +854,8 @@ public partial class OnboardingViewModel : ViewModelBase
         CardHasActualStatement = true;
         _cardStatementSource = CreditCardStatementSource.PdfImport;
         _cardStatementFingerprint = result.SourceDocumentFingerprint;
+        _cardExactNextStatementDate = result.NextStatementDate;
+        _cardExactNextDueDate = result.NextDueDate;
         if (!string.IsNullOrWhiteSpace(result.DetectedBank) &&
             string.IsNullOrWhiteSpace(CardBank))
         {
@@ -862,18 +881,73 @@ public partial class OnboardingViewModel : ViewModelBase
         CardStatementMinimum =
             result.MinimumPaymentAmount?.ToString("N2", TurkishCulture) ??
             CardStatementMinimum;
-        CardNextStatementDate =
-            result.NextStatementDate?.ToString("dd.MM.yyyy") ??
-            CardNextStatementDate;
-        CardNextDueDate =
-            result.NextDueDate?.ToString("dd.MM.yyyy") ??
-            CardNextDueDate;
+        RefreshCardNextDates();
         CardStatementImportWarnings =
             string.Join(Environment.NewLine, result.Warnings);
         HasCardStatementImportWarnings = result.Warnings.Count > 0;
         SelectedCurrentStatementPaymentMode ??=
             CurrentStatementPaymentModes[0];
     }
+
+    private void RefreshCardNextDates()
+    {
+        if (!int.TryParse(CardClosingDay, out var closingDay) ||
+            closingDay is < 1 or > 31 ||
+            !int.TryParse(CardDueDay, out var dueDay) ||
+            dueDay is < 1 or > 31)
+        {
+            CardNextStatementDate = "-";
+            CardNextDueDate = "-";
+            return;
+        }
+
+        var nextStatementDate =
+            CreditCardStatementCalculator.ResolveNextStatementDate(
+                DateOnly.FromDateTime(CardStatementDate),
+                closingDay,
+                _cardExactNextStatementDate);
+        var nextDueDate = CreditCardStatementCalculator.ResolveNextDueDate(
+            nextStatementDate,
+            dueDay,
+            _cardExactNextDueDate);
+        CardNextStatementDate = nextStatementDate
+            .ToString("dd.MM.yyyy", TurkishCulture);
+        CardNextDueDate = nextDueDate
+            .ToString("dd.MM.yyyy", TurkishCulture);
+    }
+
+    private DateOnly ResolveCardNextStatementDate()
+    {
+        if (!int.TryParse(CardClosingDay, out var closingDay))
+        {
+            throw new InvalidOperationException(
+                "Kart kesim günü geçerli olmalıdır.");
+        }
+
+        return CreditCardStatementCalculator.ResolveNextStatementDate(
+            DateOnly.FromDateTime(CardStatementDate),
+            closingDay,
+            _cardExactNextStatementDate);
+    }
+
+    private DateOnly ResolveCardNextDueDate()
+    {
+        if (!int.TryParse(CardDueDay, out var dueDay))
+        {
+            throw new InvalidOperationException(
+                "Kart son ödeme günü geçerli olmalıdır.");
+        }
+
+        return CreditCardStatementCalculator.ResolveNextDueDate(
+            ResolveCardNextStatementDate(),
+            dueDay,
+            _cardExactNextDueDate);
+    }
+
+    private Task ShowManualFallbackAsync() => _feedback.ShowErrorAsync(
+        "Bilgileri elle girebilirsin.",
+        "Ekstre Otomatik Okunamadı",
+        "Elle Gir");
 
     private static string CurrentStatementPlanLabel(
         CurrentStatementPaymentPlan? plan) => plan?.Mode switch
@@ -912,34 +986,6 @@ public partial class OnboardingViewModel : ViewModelBase
         string.IsNullOrWhiteSpace(value)
             ? null
             : ParseNonNegativeMoney(value, "Tutar");
-
-    private static DateOnly? ParseOptionalDate(
-        string? value,
-        string field)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return null;
-        }
-
-        if (DateOnly.TryParseExact(
-                value.Trim(),
-                "dd.MM.yyyy",
-                TurkishCulture,
-                System.Globalization.DateTimeStyles.None,
-                out var date) ||
-            DateOnly.TryParse(
-                value,
-                TurkishCulture,
-                System.Globalization.DateTimeStyles.None,
-                out date))
-        {
-            return date;
-        }
-
-        throw new InvalidOperationException(
-            $"{field} gg.aa.yyyy formatında olmalıdır.");
-    }
 
     private static string TryMoneyText(string value)
     {

@@ -471,6 +471,75 @@ public sealed class CreditCardStatementTests
     }
 
     [Fact]
+    public void GarantiActualAugust24_DerivesNominalSeptember25()
+    {
+        var next = CreditCardStatementCalculator.ResolveNextStatementDate(
+            new DateOnly(2026, 8, 24),
+            statementClosingDay: 25);
+
+        Assert.Equal(new DateOnly(2026, 9, 25), next);
+    }
+
+    [Fact]
+    public void AxessActualAugust28_DerivesSeptember28()
+    {
+        var next = CreditCardStatementCalculator.ResolveNextStatementDate(
+            new DateOnly(2026, 8, 28),
+            statementClosingDay: 28);
+
+        Assert.Equal(new DateOnly(2026, 9, 28), next);
+    }
+
+    [Fact]
+    public void ImportedExactNextDates_AreAuthoritative()
+    {
+        var importedStatement = new DateOnly(2026, 9, 27);
+        var importedDue = new DateOnly(2026, 10, 9);
+        var next = CreditCardStatementCalculator.ResolveNextStatementDate(
+            new DateOnly(2026, 8, 24),
+            statementClosingDay: 25,
+            importedExactDate: importedStatement);
+        var due = CreditCardStatementCalculator.ResolveNextDueDate(
+            next,
+            paymentDueDay: 5,
+            importedExactDate: importedDue);
+
+        Assert.Equal(importedStatement, next);
+        Assert.Equal(importedDue, due);
+    }
+
+    [Fact]
+    public void NextDates_AreNotRequiredForValidActualStatement()
+    {
+        var card = ActualCard(
+            15_000m,
+            6_000m,
+            CurrentStatementPaymentMode.Minimum) with
+        {
+            StatementClosingDay = 25,
+            PaymentDueDay = 5,
+            CurrentStatement = new CreditCardStatement
+            {
+                StatementDate = new DateOnly(2026, 8, 24),
+                DueDate = new DateOnly(2026, 9, 3),
+                StatementAmount = 15_000m,
+                MinimumPaymentAmount = 6_000m,
+                NextStatementDate = null,
+                NextDueDate = null
+            }
+        };
+
+        var statements = _calculator.Project(card, 2);
+
+        Assert.Equal(new DateOnly(2026, 8, 24),
+            statements[0].StatementCloseDate);
+        Assert.Equal(new DateOnly(2026, 9, 25),
+            statements[1].StatementCloseDate);
+        Assert.Equal(new DateOnly(2026, 10, 5),
+            statements[1].PaymentDueDate);
+    }
+
+    [Fact]
     public void NewActualStatement_ReanchorsInsteadOfAddingPredictionDelta()
     {
         var predicted = _calculator.Project(

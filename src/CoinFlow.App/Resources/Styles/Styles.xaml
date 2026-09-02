@@ -67,6 +67,7 @@
         <Setter Property="BackgroundColor" Value="{StaticResource SoftYellow}" />
         <Setter Property="TextColor" Value="{StaticResource Ink}" />
         <Setter Property="MinimumHeightRequest" Value="48" />
+        <Setter Property="Format" Value="dd.MM.yyyy" />
     </Style>
     <Style TargetType="Button">
         <Setter Property="BackgroundColor" Value="{StaticResource SoftLavender}" />

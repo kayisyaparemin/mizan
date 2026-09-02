@@ -24,3 +24,23 @@ public interface ICreditCardStatementImporter
         Stream pdf,
         CancellationToken cancellationToken = default);
 }
+
+public interface ICreditCardStatementPdfPicker
+{
+    Task<Stream?> PickPdfAsync(
+        CancellationToken cancellationToken = default);
+}
+
+public interface ICreditCardStatementImportDiagnostics
+{
+    void ImportStarted();
+    void FileSelected();
+    void ExtractionCompleted(TimeSpan duration, bool hasUsableText);
+    void OcrFallbackUsed(bool used);
+    void ParserSelected(string? parserName);
+    void ParseCompleted(
+        TimeSpan duration,
+        bool hasRequiredFields,
+        int warningCount);
+    void ImportFailed(string exceptionType);
+}

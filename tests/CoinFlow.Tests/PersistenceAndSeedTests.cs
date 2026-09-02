@@ -210,6 +210,66 @@ public sealed class PersistenceAndSeedTests
     }
 
     [Fact]
+    public async Task SavedStatement_PersistsAcrossReopen()
+    {
+        var path = TempPath();
+        try
+        {
+            Guid cardId;
+            await using (var store = new SqliteCoinFlowStore(
+                             path,
+                             true,
+                             Today))
+            {
+                var service = TestFactory.Service(store);
+                await service.LoadCanonicalDevelopmentDataAsync();
+                var card = Assert.Single(
+                    (await service.GetFinancialPlanAsync()).CreditCards);
+                cardId = card.Id;
+                await service.SaveCreditCardStatementAsync(
+                    card.Id,
+                    new CreditCardStatement
+                    {
+                        CreditCardId = card.Id,
+                        StatementDate = new DateOnly(2026, 8, 24),
+                        DueDate = new DateOnly(2026, 9, 3),
+                        StatementAmount = 15_000m,
+                        MinimumPaymentAmount = 6_000m,
+                        NextStatementDate = new DateOnly(2026, 9, 25),
+                        NextDueDate = new DateOnly(2026, 10, 5),
+                        Source = CreditCardStatementSource.Manual
+                    },
+                    new CurrentStatementPaymentPlan
+                    {
+                        Mode = CurrentStatementPaymentMode.Minimum
+                    });
+            }
+
+            await using var reopened = new SqliteCoinFlowStore(
+                path,
+                true,
+                Today);
+            var persisted = Assert.Single(
+                (await TestFactory.Service(reopened)
+                    .GetFinancialPlanAsync()).CreditCards,
+                x => x.Id == cardId).CurrentStatement;
+
+            Assert.NotNull(persisted);
+            Assert.Equal(new DateOnly(2026, 8, 24),
+                persisted!.StatementDate);
+            Assert.Equal(15_000m, persisted.StatementAmount);
+            Assert.Equal(new DateOnly(2026, 9, 25),
+                persisted.NextStatementDate);
+            Assert.Equal(new DateOnly(2026, 10, 5),
+                persisted.NextDueDate);
+        }
+        finally
+        {
+            DeleteDatabase(path);
+        }
+    }
+
+    [Fact]
     public async Task DevelopmentSeed_UpsertsCanonicalDataIntoExistingDatabase()
     {
         await WithStore(true, async store =>

@@ -40,12 +40,20 @@
                     </Grid>
                     <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
                         <Button Text="Ekstreden İçeri Aktar"
-                                Command="{Binding ImportStatementCommand}" />
+                                Command="{Binding ImportStatementCommand}"
+                                IsEnabled="{Binding IsNotBusy}" />
                         <Button Grid.Column="1"
                                 Text="Elle Gir"
                                 Command="{Binding StartManualStatementCommand}"
                                 Style="{StaticResource SecondaryButton}" />
                     </Grid>
+                    <HorizontalStackLayout Spacing="8"
+                                           IsVisible="{Binding IsBusy}">
+                        <ActivityIndicator IsRunning="{Binding IsBusy}" />
+                        <Label Text="{Binding BusyMessage}"
+                               VerticalTextAlignment="Center"
+                               Style="{StaticResource MutedText}" />
+                    </HorizontalStackLayout>
                     <Label Text="Kesilmiş ekstre yoksa eski başlangıç bilgileriyle hesaplama sürer."
                            Style="{StaticResource MutedText}"
                            IsVisible="{Binding HasNoActualStatement}" />
@@ -95,18 +103,18 @@
                     </Grid>
                     <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
                         <VerticalStackLayout Spacing="6">
-                            <Label Text="Sonraki kesim" Style="{StaticResource FieldLabel}" />
-                            <Entry Text="{Binding StatementDraftNextStatementDate}"
-                                   Placeholder="gg.aa.yyyy" />
+                            <Label Text="Sonraki tahmini kesim" Style="{StaticResource FieldLabel}" />
+                            <Label Text="{Binding StatementDraftNextStatementDate}"
+                                   FontFamily="OpenSansSemibold" />
                         </VerticalStackLayout>
                         <VerticalStackLayout Grid.Column="1" Spacing="6">
-                            <Label Text="Sonraki son ödeme" Style="{StaticResource FieldLabel}" />
-                            <Entry Text="{Binding StatementDraftNextDueDate}"
-                                   Placeholder="gg.aa.yyyy" />
+                            <Label Text="Sonraki tahmini son ödeme" Style="{StaticResource FieldLabel}" />
+                            <Label Text="{Binding StatementDraftNextDueDate}"
+                                   FontFamily="OpenSansSemibold" />
                         </VerticalStackLayout>
                     </Grid>
 
-                    <Label Text="Bu ekstreyi nasıl ödeyeceksin?"
+                    <Label Text="Bu ekstreyi nasıl ödemeyi planlıyorsun?"
                            Style="{StaticResource FieldLabel}" />
                     <Label Text="{Binding StatementDraftPaymentPlanText}"
                            FontFamily="OpenSansSemibold" />
@@ -118,7 +126,7 @@
                                 Command="{Binding DraftPayFullCommand}"
                                 Style="{StaticResource SecondaryButton}" />
                         <Button Grid.Column="2"
-                                Text="Başka"
+                                Text="Başka Tutar"
                                 Command="{Binding DraftPayCustomCommand}"
                                 Style="{StaticResource SecondaryButton}" />
                     </Grid>
@@ -128,7 +136,8 @@
                            Keyboard="Numeric" />
                     <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
                         <Button Text="Ekstreyi Kaydet"
-                                Command="{Binding SaveStatementDraftCommand}" />
+                                Command="{Binding SaveStatementDraftCommand}"
+                                IsEnabled="{Binding IsNotBusy}" />
                         <Button Grid.Column="1"
                                 Text="Vazgeç"
                                 Command="{Binding CancelStatementDraftCommand}"
@@ -291,6 +300,10 @@
 
             <ActivityIndicator IsRunning="{Binding IsBusy}"
                                IsVisible="{Binding IsBusy}" />
+            <Label Text="{Binding BusyMessage}"
+                   IsVisible="{Binding IsBusy}"
+                   HorizontalTextAlignment="Center"
+                   Style="{StaticResource MutedText}" />
             <Label Text="{Binding StatusMessage}"
                    IsVisible="{Binding HasStatus}"
                    TextColor="{StaticResource Error}" />

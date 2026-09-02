@@ -63,3 +63,20 @@ public sealed record CreditCardStatementImportResult
             UpdatedAt = now
         };
 }
+
+public enum CreditCardStatementImportOutcome
+{
+    Completed,
+    Cancelled,
+    AlreadyRunning,
+    Failed
+}
+
+public sealed record CreditCardStatementImportAttempt(
+    CreditCardStatementImportOutcome Outcome,
+    CreditCardStatementImportResult? Result = null)
+{
+    public bool IsCompleted =>
+        Outcome == CreditCardStatementImportOutcome.Completed &&
+        Result is not null;
+}
