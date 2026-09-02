@@ -53,6 +53,10 @@
                         <Label Text="{Binding BusyMessage}"
                                VerticalTextAlignment="Center"
                                Style="{StaticResource MutedText}" />
+                        <Button Text="İptal"
+                                Command="{Binding CancelStatementImportCommand}"
+                                IsVisible="{Binding IsStatementImporting}"
+                                Style="{StaticResource SecondaryButton}" />
                     </HorizontalStackLayout>
                     <Label Text="Kesilmiş ekstre yoksa eski başlangıç bilgileriyle hesaplama sürer."
                            Style="{StaticResource MutedText}"

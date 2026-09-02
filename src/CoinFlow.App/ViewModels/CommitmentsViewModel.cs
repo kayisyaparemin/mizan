@@ -76,6 +76,7 @@ public partial class CommitmentsViewModel(
         CreditCardStatementSource.Manual;
     private DateOnly? _cardExactNextStatementDate;
     private DateOnly? _cardExactNextDueDate;
+    private CancellationTokenSource? _statementImportCancellation;
 
     [ObservableProperty] private bool isIncomeSection = true;
     [ObservableProperty] private bool isPaymentSection;
@@ -473,11 +474,15 @@ public partial class CommitmentsViewModel(
         }
 
         IsBusy = true;
+        IsStatementImporting = true;
         BusyMessage = "Ekstre okunuyor...";
         SetStatus(string.Empty);
+        using var importCancellation = new CancellationTokenSource();
+        _statementImportCancellation = importCancellation;
         try
         {
-            var attempt = await statementImportWorkflow.RunAsync();
+            var attempt = await statementImportWorkflow
+                .RunAsync(importCancellation.Token);
             if (attempt.Outcome is
                 CreditCardStatementImportOutcome.Cancelled or
                 CreditCardStatementImportOutcome.AlreadyRunning)
@@ -488,11 +493,14 @@ public partial class CommitmentsViewModel(
             if (!attempt.IsCompleted || attempt.Result is null)
             {
                 CardHasActualStatement = true;
-                await ShowManualFallbackAsync();
+                await ShowManualFallbackAsync(
+                    attempt.Outcome ==
+                    CreditCardStatementImportOutcome.TimedOut);
                 return;
             }
 
             var result = attempt.Result;
+            statementImportWorkflow.NotifyPreviewStarted();
             ApplyStatementImport(result);
             if (!result.HasRequiredFields)
             {
@@ -507,10 +515,16 @@ public partial class CommitmentsViewModel(
         }
         finally
         {
+            _statementImportCancellation = null;
+            IsStatementImporting = false;
             BusyMessage = string.Empty;
             IsBusy = false;
         }
     }
+
+    [RelayCommand]
+    private void CancelStatementImport() =>
+        _statementImportCancellation?.Cancel();
 
     [RelayCommand]
     private void AddCardPaymentPlan()
@@ -1224,8 +1238,11 @@ public partial class CommitmentsViewModel(
             _cardExactNextDueDate);
     }
 
-    private Task ShowManualFallbackAsync() => feedback.ShowErrorAsync(
-        "Bilgileri elle girebilirsin.",
+    private Task ShowManualFallbackAsync(bool timedOut = false) =>
+        feedback.ShowErrorAsync(
+        timedOut
+            ? "Ekstreyi otomatik okumak uzun sürdü. Bilgileri elle girebilirsin."
+            : "Bilgileri elle girebilirsin.",
         "Ekstre Otomatik Okunamadı",
         "Elle Gir");
 

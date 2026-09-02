@@ -13,6 +13,9 @@ public abstract partial class ViewModelBase : ObservableObject
     [ObservableProperty]
     private string busyMessage = string.Empty;
 
+    [ObservableProperty]
+    private bool isStatementImporting;
+
     public bool CanInteract => !IsBusy;
 
     [ObservableProperty]

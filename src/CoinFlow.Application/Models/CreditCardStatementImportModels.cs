@@ -68,8 +68,16 @@ public enum CreditCardStatementImportOutcome
 {
     Completed,
     Cancelled,
+    TimedOut,
     AlreadyRunning,
     Failed
+}
+
+public sealed record CreditCardStatementImportOptions(
+    TimeSpan AutomaticImportTimeout)
+{
+    public static CreditCardStatementImportOptions Default { get; } =
+        new(TimeSpan.FromSeconds(15));
 }
 
 public sealed record CreditCardStatementImportAttempt(

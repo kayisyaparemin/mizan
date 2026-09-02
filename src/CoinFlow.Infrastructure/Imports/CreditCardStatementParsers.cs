@@ -61,17 +61,25 @@ public sealed class GarantiBonusStatementParser : BankStatementParserBase
 
 public abstract class BankStatementParserBase : ICreditCardStatementParser
 {
+    private static readonly TimeSpan RegexTimeout =
+        TimeSpan.FromMilliseconds(250);
     private static readonly Regex DateRegex = new(
         @"\b(?<date>\d{1,2}[./-]\d{1,2}[./-]\d{4})\b",
-        RegexOptions.Compiled);
+        RegexOptions.Compiled | RegexOptions.CultureInvariant |
+        RegexOptions.NonBacktracking,
+        RegexTimeout);
 
     private static readonly Regex MoneyRegex = new(
         @"(?<amount>\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{2})|\d+(?:[.,]\d{2}))",
-        RegexOptions.Compiled);
+        RegexOptions.Compiled | RegexOptions.CultureInvariant |
+        RegexOptions.NonBacktracking,
+        RegexTimeout);
 
     private static readonly Regex Last4Regex = new(
         @"(?:\*{2,}|X{2,}|KART(?:\s+NO)?|CARD(?:\s+NO)?)\s*(?<last4>\d{4})\b",
-        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        RegexOptions.IgnoreCase | RegexOptions.Compiled |
+        RegexOptions.CultureInvariant | RegexOptions.NonBacktracking,
+        RegexTimeout);
 
     public abstract string BankName { get; }
     public abstract bool CanParse(string text);
@@ -146,9 +154,10 @@ public abstract class BankStatementParserBase : ICreditCardStatementParser
             .Replace('\u00A0', ' ')
             .ToUpperInvariant();
         var builder = new StringBuilder(upper.Length);
+        var previousHorizontalSpace = false;
         foreach (var character in upper)
         {
-            builder.Append(character switch
+            var normalized = character switch
             {
                 'Ç' => 'C',
                 'Ğ' => 'G',
@@ -159,10 +168,17 @@ public abstract class BankStatementParserBase : ICreditCardStatementParser
                 'Ş' => 'S',
                 'Ü' => 'U',
                 _ => character
-            });
+            };
+            var isHorizontalSpace = normalized is ' ' or '\t';
+            if (!isHorizontalSpace || !previousHorizontalSpace)
+            {
+                builder.Append(isHorizontalSpace ? ' ' : normalized);
+            }
+
+            previousHorizontalSpace = isHorizontalSpace;
         }
 
-        return Regex.Replace(builder.ToString(), @"[ \t]+", " ");
+        return builder.ToString();
     }
 
     protected static bool ContainsAll(

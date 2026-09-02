@@ -28,6 +28,7 @@ public partial class CardControlViewModel(
         CurrentStatementPaymentMode.Minimum;
     private DateOnly? _statementDraftExactNextStatementDate;
     private DateOnly? _statementDraftExactNextDueDate;
+    private CancellationTokenSource? _statementImportCancellation;
 
     public ObservableCollection<DatedAmountLine> FutureCharges { get; } = [];
 
@@ -92,11 +93,15 @@ public partial class CardControlViewModel(
         }
 
         IsBusy = true;
+        IsStatementImporting = true;
         BusyMessage = "Ekstre okunuyor...";
         SetStatus(string.Empty);
+        using var importCancellation = new CancellationTokenSource();
+        _statementImportCancellation = importCancellation;
         try
         {
-            var attempt = await statementImportWorkflow.RunAsync();
+            var attempt = await statementImportWorkflow
+                .RunAsync(importCancellation.Token);
             if (attempt.Outcome is
                 CreditCardStatementImportOutcome.Cancelled or
                 CreditCardStatementImportOutcome.AlreadyRunning)
@@ -107,11 +112,14 @@ public partial class CardControlViewModel(
             if (!attempt.IsCompleted || attempt.Result is null)
             {
                 StartManualStatement();
-                await ShowManualFallbackAsync();
+                await ShowManualFallbackAsync(
+                    attempt.Outcome ==
+                    CreditCardStatementImportOutcome.TimedOut);
                 return;
             }
 
             var result = attempt.Result;
+            statementImportWorkflow.NotifyPreviewStarted();
             StartStatementDraft(result);
             if (!result.HasRequiredFields)
             {
@@ -126,10 +134,16 @@ public partial class CardControlViewModel(
         }
         finally
         {
+            _statementImportCancellation = null;
+            IsStatementImporting = false;
             BusyMessage = string.Empty;
             IsBusy = false;
         }
     }
+
+    [RelayCommand]
+    private void CancelStatementImport() =>
+        _statementImportCancellation?.Cancel();
 
     [RelayCommand]
     private void StartManualStatement()
@@ -592,8 +606,11 @@ public partial class CardControlViewModel(
             card.PaymentDueDay,
             _statementDraftExactNextDueDate);
 
-    private Task ShowManualFallbackAsync() => feedback.ShowErrorAsync(
-        "Bilgileri elle girebilirsin.",
+    private Task ShowManualFallbackAsync(bool timedOut = false) =>
+        feedback.ShowErrorAsync(
+        timedOut
+            ? "Ekstreyi otomatik okumak uzun sürdü. Bilgileri elle girebilirsin."
+            : "Bilgileri elle girebilirsin.",
         "Ekstre Otomatik Okunamadı",
         "Elle Gir");
 

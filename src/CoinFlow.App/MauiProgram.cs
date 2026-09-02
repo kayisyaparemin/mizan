@@ -2,6 +2,7 @@ using CoinFlow.App.Pages;
 using CoinFlow.App.Services;
 using CoinFlow.App.ViewModels;
 using CoinFlow.Application.Abstractions;
+using CoinFlow.Application.Models;
 using CoinFlow.Application.Services;
 using CoinFlow.Infrastructure.Imports;
 using CoinFlow.Domain.Calculations;
@@ -70,6 +71,8 @@ public static class MauiProgram
             NullCreditCardStatementImportDiagnostics>();
 #endif
         builder.Services.AddSingleton<ICreditCardStatementImporter, CreditCardStatementImporter>();
+        builder.Services.AddSingleton(
+            CreditCardStatementImportOptions.Default);
         builder.Services.AddSingleton<CreditCardStatementImportWorkflow>();
         builder.Services.AddSingleton<SalaryPeriodDetailPresenter>();
         builder.Services.AddSingleton<SimulatorInsightService>();

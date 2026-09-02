@@ -157,6 +157,25 @@ public sealed class CreditCardStatementImportTests
         Assert.Contains("otomatik okunamadı", result.Warnings[0]);
     }
 
+    [Fact]
+    public async Task AxessBadEncoding_StopsAfterOneNativeExtraction()
+    {
+        var extractor = new BadEncodingExtractor();
+        var parser = new CountingParser();
+        var importer = new CreditCardStatementImporter(
+            extractor,
+            [parser]);
+        await using var pdf = new MemoryStream([1, 2, 3]);
+
+        var result = await importer.ImportPdfAsync(pdf);
+
+        Assert.False(result.HasRequiredFields);
+        Assert.False(result.TextExtractionSucceeded);
+        Assert.Equal(1, extractor.CallCount);
+        Assert.Equal(0, parser.CanParseCount);
+        Assert.Equal(0, parser.ParseCount);
+    }
+
     private sealed class FixedTextExtractor(string text) : IPdfTextExtractor
     {
         public Task<string> ExtractTextAsync(
@@ -186,6 +205,19 @@ public sealed class CreditCardStatementImportTests
         {
             CallCount++;
             return Task.FromResult(ValidText());
+        }
+    }
+
+    private sealed class BadEncodingExtractor : IPdfTextExtractor
+    {
+        public int CallCount { get; private set; }
+
+        public Task<string> ExtractTextAsync(
+            Stream pdf,
+            CancellationToken cancellationToken = default)
+        {
+            CallCount++;
+            return Task.FromResult(new string('\0', 500));
         }
     }
 

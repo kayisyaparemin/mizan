@@ -7,7 +7,7 @@ namespace CoinFlow.Infrastructure.Imports;
 
 public sealed class CreditCardStatementImporter : ICreditCardStatementImporter
 {
-    private const int MaximumPdfBytes = 32 * 1024 * 1024;
+    private const int MaximumParserCharacters = 256_000;
     private readonly IPdfTextExtractor _textExtractor;
     private readonly IReadOnlyList<ICreditCardStatementParser> _parsers;
     private readonly ICreditCardStatementImportDiagnostics _diagnostics;
@@ -43,19 +43,26 @@ public sealed class CreditCardStatementImporter : ICreditCardStatementImporter
         Stream pdf,
         CancellationToken cancellationToken)
     {
-        using var copy = new MemoryStream();
-        await CopyBoundedAsync(pdf, copy, cancellationToken)
-            .ConfigureAwait(false);
-        var bytes = copy.ToArray();
-        var fingerprint = Convert.ToHexString(SHA256.HashData(bytes));
-        copy.Position = 0;
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!pdf.CanSeek)
+        {
+            throw new InvalidDataException(
+                "Statement import requires a local seekable PDF.");
+        }
+
+        pdf.Position = 0;
+        var fingerprint = Convert.ToHexString(
+            await SHA256.HashDataAsync(pdf, cancellationToken)
+                .ConfigureAwait(false));
+        pdf.Position = 0;
 
         string text;
         var extractionTimer = Stopwatch.StartNew();
+        _diagnostics.ExtractionStarted();
         try
         {
             text = await _textExtractor
-                .ExtractTextAsync(copy, cancellationToken)
+                .ExtractTextAsync(pdf, cancellationToken)
                 .ConfigureAwait(false);
         }
         catch (OperationCanceledException)
@@ -75,10 +82,16 @@ public sealed class CreditCardStatementImporter : ICreditCardStatementImporter
         }
 
         extractionTimer.Stop();
+        if (text.Length > MaximumParserCharacters)
+        {
+            text = text[..MaximumParserCharacters];
+        }
+
         var hasUsableText = HasUsableText(text);
         _diagnostics.ExtractionCompleted(
             extractionTimer.Elapsed,
             hasUsableText);
+        _diagnostics.QualityAssessed(hasUsableText);
         _diagnostics.OcrFallbackUsed(used: false);
         if (!hasUsableText)
         {
@@ -101,6 +114,7 @@ public sealed class CreditCardStatementImporter : ICreditCardStatementImporter
         }
 
         var parseTimer = Stopwatch.StartNew();
+        _diagnostics.ParseStarted();
         try
         {
             var result = parser.Parse(text, fingerprint);
@@ -125,31 +139,6 @@ public sealed class CreditCardStatementImporter : ICreditCardStatementImporter
                 warningCount: 1);
             _diagnostics.ImportFailed(exception.GetType().Name);
             return Unreadable(fingerprint);
-        }
-    }
-
-    private static async Task CopyBoundedAsync(
-        Stream source,
-        Stream destination,
-        CancellationToken cancellationToken)
-    {
-        var buffer = new byte[81920];
-        var totalBytes = 0;
-        int bytesRead;
-        while ((bytesRead = await source
-                   .ReadAsync(buffer, cancellationToken)
-                   .ConfigureAwait(false)) > 0)
-        {
-            totalBytes += bytesRead;
-            if (totalBytes > MaximumPdfBytes)
-            {
-                throw new InvalidDataException(
-                    "Statement PDF exceeds the supported local import size.");
-            }
-
-            await destination
-                .WriteAsync(buffer.AsMemory(0, bytesRead), cancellationToken)
-                .ConfigureAwait(false);
         }
     }
 
@@ -184,15 +173,22 @@ public sealed class CreditCardStatementImporter : ICreditCardStatementImporter
 
         public void ImportStarted() { }
         public void FileSelected() { }
+        public void CopyStarted() { }
+        public void CopyCompleted(TimeSpan duration) { }
+        public void ExtractionStarted() { }
         public void ExtractionCompleted(
             TimeSpan duration,
             bool hasUsableText) { }
+        public void QualityAssessed(bool hasUsableText) { }
         public void OcrFallbackUsed(bool used) { }
+        public void ParseStarted() { }
         public void ParserSelected(string? parserName) { }
         public void ParseCompleted(
             TimeSpan duration,
             bool hasRequiredFields,
             int warningCount) { }
+        public void PreviewStarted() { }
+        public void ImportCompleted(string outcome, TimeSpan duration) { }
         public void ImportFailed(string exceptionType) { }
     }
 }

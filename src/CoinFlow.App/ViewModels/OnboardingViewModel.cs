@@ -26,6 +26,7 @@ public partial class OnboardingViewModel : ViewModelBase
     private DateOnly _draftAnchorDate;
     private DateOnly? _cardExactNextStatementDate;
     private DateOnly? _cardExactNextDueDate;
+    private CancellationTokenSource? _statementImportCancellation;
 
     public OnboardingViewModel(
         CoinFlowService service,
@@ -320,11 +321,15 @@ public partial class OnboardingViewModel : ViewModelBase
         }
 
         IsBusy = true;
+        IsStatementImporting = true;
         BusyMessage = "Ekstre okunuyor...";
         SetStatus(string.Empty);
+        using var importCancellation = new CancellationTokenSource();
+        _statementImportCancellation = importCancellation;
         try
         {
-            var attempt = await _statementImportWorkflow.RunAsync();
+            var attempt = await _statementImportWorkflow
+                .RunAsync(importCancellation.Token);
             if (attempt.Outcome is
                 CreditCardStatementImportOutcome.Cancelled or
                 CreditCardStatementImportOutcome.AlreadyRunning)
@@ -335,11 +340,14 @@ public partial class OnboardingViewModel : ViewModelBase
             if (!attempt.IsCompleted || attempt.Result is null)
             {
                 CardHasActualStatement = true;
-                await ShowManualFallbackAsync();
+                await ShowManualFallbackAsync(
+                    attempt.Outcome ==
+                    CreditCardStatementImportOutcome.TimedOut);
                 return;
             }
 
             var result = attempt.Result;
+            _statementImportWorkflow.NotifyPreviewStarted();
             ApplyStatementImport(result);
             if (!result.HasRequiredFields)
             {
@@ -354,10 +362,16 @@ public partial class OnboardingViewModel : ViewModelBase
         }
         finally
         {
+            _statementImportCancellation = null;
+            IsStatementImporting = false;
             BusyMessage = string.Empty;
             IsBusy = false;
         }
     }
+
+    [RelayCommand]
+    private void CancelStatementImport() =>
+        _statementImportCancellation?.Cancel();
 
     [RelayCommand]
     private void AddCard()
@@ -944,8 +958,11 @@ public partial class OnboardingViewModel : ViewModelBase
             _cardExactNextDueDate);
     }
 
-    private Task ShowManualFallbackAsync() => _feedback.ShowErrorAsync(
-        "Bilgileri elle girebilirsin.",
+    private Task ShowManualFallbackAsync(bool timedOut = false) =>
+        _feedback.ShowErrorAsync(
+        timedOut
+            ? "Ekstreyi otomatik okumak uzun sürdü. Bilgileri elle girebilirsin."
+            : "Bilgileri elle girebilirsin.",
         "Ekstre Otomatik Okunamadı",
         "Elle Gir");
 
