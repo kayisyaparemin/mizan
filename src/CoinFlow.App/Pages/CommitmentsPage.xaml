@@ -110,7 +110,7 @@
                             <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
                                 <Button Text="Ekstreden İçeri Aktar"
                                         Command="{Binding ImportCardStatementPdfCommand}"
-                                        IsEnabled="{Binding IsNotBusy}" />
+                                        IsEnabled="{Binding CanInteract}" />
                                 <Label Grid.Column="1"
                                        Text="PDF yerel okunur; dosya saklanmaz."
                                        Style="{StaticResource MutedText}"
@@ -249,7 +249,7 @@
 
                     <Button Text="{Binding SaveButtonText}"
                             Command="{Binding SaveCommand}"
-                            IsEnabled="{Binding IsNotBusy}" />
+                            IsEnabled="{Binding CanInteract}" />
                     <Button Text="Vazgeç"
                             Command="{Binding CancelEditingCardCommand}"
                             Style="{StaticResource SecondaryButton}" />

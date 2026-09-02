@@ -110,7 +110,7 @@
                             <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
                                 <Button Text="Ekstreden İçeri Aktar"
                                         Command="{Binding ImportCardStatementPdfCommand}"
-                                        IsEnabled="{Binding IsNotBusy}" />
+                                        IsEnabled="{Binding CanInteract}" />
                                 <Label Grid.Column="1"
                                        Text="PDF yerel okunur; dosya saklanmaz."
                                        Style="{StaticResource MutedText}"
@@ -202,7 +202,7 @@
                                 SelectedItem="{Binding SelectedCardFallbackStrategy}" />
                         <Button Text="Kart Ekle"
                                 Command="{Binding AddCardCommand}"
-                                IsEnabled="{Binding IsNotBusy}" />
+                                IsEnabled="{Binding CanInteract}" />
                         <VerticalStackLayout BindableLayout.ItemsSource="{Binding DraftCards}"
                                              IsVisible="{Binding HasDraftCards}"
                                              Spacing="7">
@@ -361,7 +361,7 @@
                         </Grid>
                         <Button Text="Mizan'ı Başlat"
                                 Command="{Binding StartMizanCommand}"
-                                IsEnabled="{Binding IsNotBusy}" />
+                                IsEnabled="{Binding CanInteract}" />
                     </VerticalStackLayout>
                 </Border>
 

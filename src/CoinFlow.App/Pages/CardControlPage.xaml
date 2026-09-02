@@ -41,7 +41,7 @@
                     <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
                         <Button Text="Ekstreden İçeri Aktar"
                                 Command="{Binding ImportStatementCommand}"
-                                IsEnabled="{Binding IsNotBusy}" />
+                                IsEnabled="{Binding CanInteract}" />
                         <Button Grid.Column="1"
                                 Text="Elle Gir"
                                 Command="{Binding StartManualStatementCommand}"
@@ -137,7 +137,7 @@
                     <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
                         <Button Text="Ekstreyi Kaydet"
                                 Command="{Binding SaveStatementDraftCommand}"
-                                IsEnabled="{Binding IsNotBusy}" />
+                                IsEnabled="{Binding CanInteract}" />
                         <Button Grid.Column="1"
                                 Text="Vazgeç"
                                 Command="{Binding CancelStatementDraftCommand}"
