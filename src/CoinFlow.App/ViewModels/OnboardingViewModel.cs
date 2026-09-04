@@ -580,6 +580,31 @@ public partial class OnboardingViewModel : ViewModelBase
 
     public void Dismiss() => Completed?.Invoke(false);
 
+    public void RemoveDraftLine(FinancialRecordLine line)
+    {
+        switch (line.Kind)
+        {
+            case FinancialRecordKind.Salary:
+                _salaries.RemoveAll(x => x.Id == line.Id);
+                break;
+            case FinancialRecordKind.CreditCard:
+                _cards.RemoveAll(x => x.Id == line.Id);
+                break;
+            case FinancialRecordKind.Loan:
+                _loans.RemoveAll(x => x.Id == line.Id);
+                break;
+            case FinancialRecordKind.LargeExpense:
+                _payments.RemoveAll(x => x.Id == line.Id);
+                break;
+            case FinancialRecordKind.TemporaryPlan:
+                _paymentPlans.RemoveAll(x => x.Id == line.Id);
+                break;
+        }
+
+        RefreshDraftLines();
+        SetStatus(string.Empty);
+    }
+
     private OnboardingDraft BuildDraft()
     {
         if (!int.TryParse(PeriodDay, out var salaryDay))
@@ -800,7 +825,7 @@ public partial class OnboardingViewModel : ViewModelBase
             ? $"{DraftPayments.Count} ödeme"
             : "Yaklaşan ödeme eklenmedi";
         ReviewLivingText = TryMoneyText(MonthlyLivingBudget);
-        ReviewCurrentAmountText = TryMoneyText(CurrentAmount);
+        ReviewCurrentAmountText = TryMoneyTextSigned(CurrentAmount);
         ReviewPeriodText = $"Dönem günü {PeriodDay}";
     }
 
@@ -1009,6 +1034,19 @@ public partial class OnboardingViewModel : ViewModelBase
         try
         {
             return Money(ParseNonNegativeMoney(value, "Tutar"));
+        }
+        catch
+        {
+            return value;
+        }
+    }
+
+    // Mevcut tutar negatif olabilir; negatif değeri de biçimli göster.
+    private static string TryMoneyTextSigned(string value)
+    {
+        try
+        {
+            return Money(ParseMoney(value, "Tutar"));
         }
         catch
         {

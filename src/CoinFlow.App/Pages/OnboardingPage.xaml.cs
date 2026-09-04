@@ -1,3 +1,4 @@
+using CoinFlow.App.Models;
 using CoinFlow.App.ViewModels;
 
 namespace CoinFlow.App.Pages;
@@ -39,6 +40,14 @@ public partial class OnboardingPage : ContentPage
 
     private void OnSkipClicked(object? sender, EventArgs e) =>
         _viewModel.Dismiss();
+
+    private void OnRemoveDraftLineClicked(object? sender, EventArgs e)
+    {
+        if (sender is Button { CommandParameter: FinancialRecordLine line })
+        {
+            _viewModel.RemoveDraftLine(line);
+        }
+    }
 
     protected override bool OnBackButtonPressed()
     {
