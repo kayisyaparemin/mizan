@@ -32,15 +32,21 @@ ve düzeltildi** (commit `de1879a`, `main`). Cihazda son doğrulama bekliyor.
 - **Regresyon testi:** `tests/.../StatementImportArchitectureSourceTests.cs` içine
   `ModalStack` üzerinde `while` döngüsünü yasaklayan bir kaynak testi eklendi.
 
-## Sıradaki adımlar
-1. **Cihazda doğrula:** `dev-build.yml` yeşil mi? `dev-latest` APK'sını indir, ekstre
-   import'u dene → ANR gitti mi? (Gitmezse: aynı yöntemle yeni ANR trace al —
-   `adb shell "dumpsys dropbox --print data_app_anr" > trace.txt` — ve layout tarafını
-   kesinleştir.)
-2. **Ayrı iş — "pdf otomatik dolmuyor":** Bu ANR'den bağımsız. Muhtemel nedenler:
-   `PdfPigPdfTextExtractor` sadece **sayfa 1** metnini okuyor + yalnızca **2 parser**
-   var (Akbank Axess, Garanti Bonus). İyileştirme seçenekleri: çok sayfa okuma, daha
-   çok banka parser'ı, OCR fallback. Değerleri bulamazsa "elle gir" ekranı açılır.
+## Durum / sıradaki adımlar
+- ✅ **ANR düzeldi (cihazda doğrulandı):** uygulama artık donmuyor, okunamayan PDF'te
+  düzgünce "Elle Gir" diyaloğu çıkıyor.
+- ✅ **Garanti Bonus parse düzeltildi (gerçek ekstreyle doğrulandı):** parser tarihleri
+  ay adıyla ("24 Ağustos 2026") okuyabiliyor + "Min. Ödeme Tutarı" etiketini tanıyor.
+  `CreditCardStatementParsers.cs` (ay-adı tarih desteği + Garanti etiketleri) ve
+  `CreditCardStatementImportTests.cs` (regresyon testi).
+- ⚠️ **Akbank Axess otomatik okunamıyor — açık iş:** Akbank ekstresi ToUnicode haritası
+  olmayan korumalı/özel bir font kullanıyor; PdfPig (zaten en güncel 0.1.16) sayfadan
+  gerçek metni çıkaramıyor (glyph-scramble). PdfPig ile çözülemez. Seçenekler:
+  (a) OCR fallback (sayfayı görüntüye çevir + Tesseract; Android'de ek bağımlılık),
+  (b) fontun glyph→unicode haritasını çözmek (kırılgan, font sürümüne bağlı).
+  Şimdilik Akbank "elle gir" ekranına düşüyor (çökme yok).
+- 🔜 İstenirse: daha çok banka parser'ı; PdfPigPdfTextExtractor sadece **sayfa 1** okuyor,
+  bazı bankalarda özet 2. sayfada olabilir (çok sayfa okuma değerlendirilebilir).
 
 ## Derleme / test / dağıtım
 - **Testler (çapraz platform, Android SDK gerekmez):**

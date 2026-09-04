@@ -51,12 +51,12 @@ public sealed class GarantiBonusStatementParser : BankStatementParserBase
             text,
             sourceDocumentFingerprint,
             "Garanti BBVA Bonus",
-            ["EKSTRE TARIHI", "HESAP KESIM TARIHI", "KESIM TARIHI"],
+            ["HESAP KESIM TARIHI", "EKSTRE TARIHI", "KESIM TARIHI"],
             ["SON ODEME TARIHI"],
             ["DONEM BORCU", "EKSTRE BORCU", "EKSTRE TUTARI", "TOPLAM BORC"],
-            ["ASGARI ODEME TUTARI", "ASGARI TUTAR", "ASGARI ODEME"],
-            ["BIR SONRAKI EKSTRE TARIHI", "SONRAKI KESIM TARIHI", "BIR SONRAKI HESAP KESIM TARIHI"],
-            ["BIR SONRAKI SON ODEME TARIHI", "SONRAKI SON ODEME TARIHI"]);
+            ["MIN. ODEME TUTARI", "MINIMUM ODEME TUTARI", "MIN ODEME TUTARI", "ASGARI ODEME TUTARI", "ASGARI TUTAR", "ASGARI ODEME"],
+            ["BIR SONRAKI HESAP KESIMINIZ", "BIR SONRAKI HESAP KESIM TARIHI", "BIR SONRAKI EKSTRE TARIHI", "SONRAKI KESIM TARIHI"],
+            ["BIR SONRAKI SON ODEME TARIHI", "SONRAKI SON ODEME TARIHI", "SON ODEMENIZ"]);
 }
 
 public abstract class BankStatementParserBase : ICreditCardStatementParser
@@ -80,6 +80,32 @@ public abstract class BankStatementParserBase : ICreditCardStatementParser
         RegexOptions.IgnoreCase | RegexOptions.Compiled |
         RegexOptions.CultureInvariant | RegexOptions.NonBacktracking,
         RegexTimeout);
+
+    // Bazı bankalar (ör. Garanti) tarihleri "24 Ağustos 2026" biçiminde,
+    // ay adıyla yazıyor. Metin Normalize() ile büyük harf + ASCII'ye dönüştüğü
+    // için ay adları da büyük/ASCII olur (Ağustos -> AGUSTOS, Eylül -> EYLUL).
+    private static readonly Regex MonthNameDateRegex = new(
+        @"(?<day>\d{1,2})\s+(?<month>OCAK|SUBAT|MART|NISAN|MAYIS|HAZIRAN|TEMMUZ|AGUSTOS|EYLUL|EKIM|KASIM|ARALIK)\s+(?<year>\d{4})",
+        RegexOptions.Compiled | RegexOptions.CultureInvariant |
+        RegexOptions.NonBacktracking,
+        RegexTimeout);
+
+    private static readonly IReadOnlyDictionary<string, int> TurkishMonths =
+        new Dictionary<string, int>(StringComparer.Ordinal)
+        {
+            ["OCAK"] = 1,
+            ["SUBAT"] = 2,
+            ["MART"] = 3,
+            ["NISAN"] = 4,
+            ["MAYIS"] = 5,
+            ["HAZIRAN"] = 6,
+            ["TEMMUZ"] = 7,
+            ["AGUSTOS"] = 8,
+            ["EYLUL"] = 9,
+            ["EKIM"] = 10,
+            ["KASIM"] = 11,
+            ["ARALIK"] = 12
+        };
 
     public abstract string BankName { get; }
     public abstract bool CanParse(string text);
@@ -197,9 +223,7 @@ public abstract class BankStatementParserBase : ICreditCardStatementParser
         {
             foreach (var window in WindowsAfterLabel(text, label, 120))
             {
-                var match = DateRegex.Match(window);
-                if (match.Success &&
-                    TryParseDate(match.Groups["date"].Value, out var date))
+                if (TryFindDateInWindow(window, out var date))
                 {
                     return date;
                 }
@@ -207,6 +231,32 @@ public abstract class BankStatementParserBase : ICreditCardStatementParser
         }
 
         return null;
+    }
+
+    private static bool TryFindDateInWindow(string window, out DateOnly date)
+    {
+        var numeric = DateRegex.Match(window);
+        if (numeric.Success &&
+            TryParseDate(numeric.Groups["date"].Value, out date))
+        {
+            return true;
+        }
+
+        var named = MonthNameDateRegex.Match(window);
+        if (named.Success &&
+            TurkishMonths.TryGetValue(named.Groups["month"].Value, out var month) &&
+            int.TryParse(named.Groups["day"].Value, out var day) &&
+            int.TryParse(named.Groups["year"].Value, out var year) &&
+            year is >= 2000 and <= 2100 &&
+            day >= 1 &&
+            day <= DateTime.DaysInMonth(year, month))
+        {
+            date = new DateOnly(year, month, day);
+            return true;
+        }
+
+        date = default;
+        return false;
     }
 
     private static decimal? FindMoney(
