@@ -210,6 +210,72 @@ public sealed class PersistenceAndSeedTests
     }
 
     [Fact]
+    public async Task SettledCard_PersistsKnownNextDatesAndRetiresStatement()
+    {
+        var path = TempPath();
+        try
+        {
+            Guid cardId;
+            await using (var store = new SqliteCoinFlowStore(
+                             path,
+                             true,
+                             Today))
+            {
+                var service = TestFactory.Service(store);
+                await service.LoadCanonicalDevelopmentDataAsync();
+                var card = Assert.Single(
+                    (await service.GetFinancialPlanAsync()).CreditCards);
+                cardId = card.Id;
+                var cardWithStatement = card with
+                {
+                    CurrentStatement = new CreditCardStatement
+                    {
+                        CreditCardId = cardId,
+                        StatementDate = new DateOnly(2026, 8, 25),
+                        DueDate = new DateOnly(2026, 9, 5),
+                        StatementAmount = 15_000m,
+                        MinimumPaymentAmount = 6_000m,
+                        NextStatementDate = new DateOnly(2026, 9, 25),
+                        NextDueDate = new DateOnly(2026, 10, 5)
+                    },
+                    CurrentStatementPaymentPlan = new CurrentStatementPaymentPlan
+                    {
+                        Mode = CurrentStatementPaymentMode.Minimum
+                    }
+                };
+                var reconciler = new CreditCardActualPaymentReconciler(
+                    new CreditCardStatementCalculator());
+                var settledCard = reconciler.Apply(
+                    cardWithStatement,
+                    new DateOnly(2026, 9, 5),
+                    6_000m,
+                    0.05m);
+                await service.SaveCreditCardAsync(settledCard);
+            }
+
+            await using var reopened = new SqliteCoinFlowStore(
+                path,
+                true,
+                Today);
+            var persisted = Assert.Single(
+                (await TestFactory.Service(reopened)
+                    .GetFinancialPlanAsync()).CreditCards,
+                x => x.Id == cardId);
+
+            Assert.Null(persisted.CurrentStatement);
+            Assert.Null(persisted.CurrentStatementPaymentPlan);
+            Assert.Equal(new DateOnly(2026, 9, 25),
+                persisted.KnownNextStatementDate);
+            Assert.Equal(new DateOnly(2026, 10, 5),
+                persisted.KnownNextDueDate);
+        }
+        finally
+        {
+            DeleteDatabase(path);
+        }
+    }
+
+    [Fact]
     public async Task SavedStatement_PersistsAcrossReopen()
     {
         var path = TempPath();

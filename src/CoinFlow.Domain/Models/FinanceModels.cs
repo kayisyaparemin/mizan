@@ -134,6 +134,12 @@ public sealed record CreditCard
     public decimal? ProjectionFallbackFixedAmount { get; init; }
     public CreditCardStatement? CurrentStatement { get; init; }
     public CurrentStatementPaymentPlan? CurrentStatementPaymentPlan { get; init; }
+    // Settled statement'tan devralınan, tek kerelik bilinen kesim/son ödeme
+    // tarihi. CurrentStatement emekliye ayrılınca bankanın bildirdiği bir
+    // sonraki tarih kaybolmasın diye burada taşınır; bir sonraki settlement'ta
+    // tüketilip yeniden hesaplanır.
+    public DateOnly? KnownNextStatementDate { get; init; }
+    public DateOnly? KnownNextDueDate { get; init; }
     public IReadOnlyList<CardCharge> Charges { get; init; } = [];
     public IReadOnlyList<CreditCardPaymentPlan> PaymentPlans { get; init; } = [];
 

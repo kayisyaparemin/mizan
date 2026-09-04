@@ -50,6 +50,7 @@ public sealed class CreditCardStatementCalculator
         ValidateInterestRate(carryInterestRate);
         var actualStatement = card.CurrentStatement;
         var firstClose = actualStatement?.StatementDate ??
+                         card.KnownNextStatementDate ??
                          ResolveStatementCloseOnOrAfter(
                              card.BalanceAsOfDate,
                              card.StatementClosingDay);
@@ -214,22 +215,23 @@ public sealed class CreditCardStatementCalculator
         DateOnly statementCloseDate,
         bool isCurrentActualStatement)
     {
-        if (card.CurrentStatement is not { } statement)
+        if (card.CurrentStatement is { } statement)
         {
-            return ResolvePaymentDueDate(
-                statementCloseDate,
-                card.PaymentDueDay);
-        }
+            if (isCurrentActualStatement)
+            {
+                return statement.DueDate;
+            }
 
-        if (isCurrentActualStatement)
-        {
-            return statement.DueDate;
+            if (statement.NextStatementDate == statementCloseDate &&
+                statement.NextDueDate is { } nextDueDate)
+            {
+                return nextDueDate;
+            }
         }
-
-        if (statement.NextStatementDate == statementCloseDate &&
-            statement.NextDueDate is { } nextDueDate)
+        else if (card.KnownNextStatementDate == statementCloseDate &&
+                  card.KnownNextDueDate is { } knownDueDate)
         {
-            return nextDueDate;
+            return knownDueDate;
         }
 
         return ResolvePaymentDueDate(
@@ -524,6 +526,14 @@ public sealed class CreditCardStatementCalculator
         {
             throw new InvalidOperationException(
                 "Bu ekstre için özel ödeme tutarı 0 ile ekstre tutarı arasında olmalıdır.");
+        }
+
+        if (card.KnownNextDueDate is { } knownDue &&
+            (card.KnownNextStatementDate is not { } knownClose ||
+             knownDue <= knownClose))
+        {
+            throw new InvalidOperationException(
+                "Bilinen bir sonraki son ödeme tarihi bilinen kesim tarihinden sonra olmalıdır.");
         }
     }
 

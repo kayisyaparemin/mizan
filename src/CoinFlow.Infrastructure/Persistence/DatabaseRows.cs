@@ -80,6 +80,8 @@ internal sealed class CreditCardRow
     public decimal? FixedPaymentAmount { get; set; }
     public int ProjectionFallbackStrategy { get; set; }
     public decimal? ProjectionFallbackFixedAmount { get; set; }
+    public string? KnownNextStatementDate { get; set; }
+    public string? KnownNextDueDate { get; set; }
 }
 
 [Table("card_installments")]

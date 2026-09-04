@@ -40,12 +40,14 @@ public sealed class CreditCardActualPaymentReconciler(
                 2,
                 MidpointRounding.AwayFromZero)
             : 0m;
+        // statement.StatementCloseDate is the exact close Project() used for
+        // the cycle being settled (identical to CurrentStatement.StatementDate
+        // when an actual statement is present). Charges posted on or before it
+        // are already reflected in statementBalance/CarriedBalance above and
+        // must be dropped, or a later projection would double-count them.
         var remainingCharges = card.Charges
-            .Where(charge => CreditCardStatementCalculator
-                .ResolveChargeStatementClose(
-                    charge.PostingDate,
-                    firstClose,
-                    card.StatementClosingDay) != statement.StatementCloseDate)
+            .Where(charge =>
+                charge.PostingDate > statement.StatementCloseDate)
             .ToArray();
 
         return card with
@@ -56,7 +58,14 @@ public sealed class CreditCardActualPaymentReconciler(
             Charges = remainingCharges,
             PaymentPlans = card.PaymentPlans
                 .Where(x => x.DueDate != paymentDueDate)
-                .ToArray()
+                .ToArray(),
+            // Settled statement artık gelecekteki projection için authoritative
+            // değil; devralınan tek bilgi bankanın bildirdiği bir sonraki
+            // kesim/son ödeme tarihidir.
+            CurrentStatement = null,
+            CurrentStatementPaymentPlan = null,
+            KnownNextStatementDate = card.CurrentStatement?.NextStatementDate,
+            KnownNextDueDate = card.CurrentStatement?.NextDueDate
         };
     }
 

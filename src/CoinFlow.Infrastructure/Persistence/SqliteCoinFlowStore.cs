@@ -1012,7 +1012,10 @@ public sealed class SqliteCoinFlowStore : ICoinFlowStore, IAsyncDisposable
         ProjectionFallbackStrategy =
             (int)value.ProjectionFallbackStrategy,
         ProjectionFallbackFixedAmount =
-            value.ProjectionFallbackFixedAmount
+            value.ProjectionFallbackFixedAmount,
+        KnownNextStatementDate =
+            FormatNullableDate(value.KnownNextStatementDate),
+        KnownNextDueDate = FormatNullableDate(value.KnownNextDueDate)
     };
 
     private static CreditCard FromRow(
@@ -1044,6 +1047,9 @@ public sealed class SqliteCoinFlowStore : ICoinFlowStore, IAsyncDisposable
                 (ProjectionFallbackStrategy)row.ProjectionFallbackStrategy,
             ProjectionFallbackFixedAmount =
                 row.ProjectionFallbackFixedAmount,
+            KnownNextStatementDate =
+                ParseNullableDate(row.KnownNextStatementDate),
+            KnownNextDueDate = ParseNullableDate(row.KnownNextDueDate),
             CurrentStatement = currentStatement is null
                 ? null
                 : FromRow(currentStatement),
