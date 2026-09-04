@@ -58,6 +58,22 @@ public sealed class StatementImportArchitectureSourceTests
         }
     }
 
+    [Fact]
+    public void FeedbackPageResolution_HasNoUnboundedModalLoop()
+    {
+        var source = ReadSource(
+            "src",
+            "CoinFlow.App",
+            "Services",
+            "UserFeedbackService.cs");
+
+        // ModalStack is shared across the navigation context, so its top entry
+        // is the same regardless of which page is asked. Looping over it never
+        // terminates and pins the UI thread at 100% CPU (ANR).
+        Assert.DoesNotContain("while (page.Navigation.ModalStack", source);
+        Assert.DoesNotContain("while (page.Navigation.NavigationStack", source);
+    }
+
     private static string ReadSource(params string[] path) =>
         File.ReadAllText(Path.Combine([RepositoryRoot(), .. path]));
 

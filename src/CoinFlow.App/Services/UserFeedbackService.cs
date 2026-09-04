@@ -49,20 +49,22 @@ public sealed class UserFeedbackService : IUserFeedbackService
 
     private static Page ResolveTopPage(Page page)
     {
-        while (page.Navigation.ModalStack.LastOrDefault() is { } modal)
-        {
-            page = modal;
-        }
-
-        return page switch
-        {
-            NavigationPage { CurrentPage: { } current } =>
-                ResolveTopPage(current),
-            FlyoutPage { Detail: { } detail } =>
-                ResolveTopPage(detail),
-            TabbedPage { CurrentPage: { } current } =>
-                ResolveTopPage(current),
-            _ => page
-        };
+        // ModalStack is shared across the navigation context, so its top entry
+        // is the visible modal regardless of which page we ask for it. Read it
+        // once instead of looping: re-selecting the same top modal in a while
+        // loop never terminates and pins the UI thread at 100% CPU (ANR).
+        var top = page.Navigation.ModalStack.LastOrDefault() ?? page;
+        return DescendToVisiblePage(top);
     }
+
+    private static Page DescendToVisiblePage(Page page) => page switch
+    {
+        NavigationPage { CurrentPage: { } current } =>
+            DescendToVisiblePage(current),
+        FlyoutPage { Detail: { } detail } =>
+            DescendToVisiblePage(detail),
+        TabbedPage { CurrentPage: { } current } =>
+            DescendToVisiblePage(current),
+        _ => page
+    };
 }

@@ -95,27 +95,37 @@
                     <Entry Text="{Binding StatementDraftAmount}" Keyboard="Numeric" />
                     <Label Text="Asgari ödeme" Style="{StaticResource FieldLabel}" />
                     <Entry Text="{Binding StatementDraftMinimum}" Keyboard="Numeric" />
-                    <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
-                        <VerticalStackLayout Spacing="6">
-                            <Label Text="Kesim tarihi" Style="{StaticResource FieldLabel}" />
-                            <DatePicker Date="{Binding StatementDraftDate}" />
-                        </VerticalStackLayout>
-                        <VerticalStackLayout Grid.Column="1" Spacing="6">
-                            <Label Text="Son ödeme" Style="{StaticResource FieldLabel}" />
-                            <DatePicker Date="{Binding StatementDraftDueDate}" />
-                        </VerticalStackLayout>
+                    <!-- Grid hücrelerine dogrudan yerlesim: iç içe VerticalStackLayout'lar
+                         MAUI Android'de arrange sonsuz döngüsünü (ANR) tetikleyebiliyordu. -->
+                    <Grid ColumnDefinitions="*,*"
+                          RowDefinitions="Auto,Auto"
+                          ColumnSpacing="8"
+                          RowSpacing="6">
+                        <Label Text="Kesim tarihi" Style="{StaticResource FieldLabel}" />
+                        <Label Grid.Column="1"
+                               Text="Son ödeme"
+                               Style="{StaticResource FieldLabel}" />
+                        <DatePicker Grid.Row="1"
+                                    Date="{Binding StatementDraftDate}" />
+                        <DatePicker Grid.Row="1"
+                                    Grid.Column="1"
+                                    Date="{Binding StatementDraftDueDate}" />
                     </Grid>
-                    <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
-                        <VerticalStackLayout Spacing="6">
-                            <Label Text="Sonraki tahmini kesim" Style="{StaticResource FieldLabel}" />
-                            <Label Text="{Binding StatementDraftNextStatementDate}"
-                                   FontFamily="OpenSansSemibold" />
-                        </VerticalStackLayout>
-                        <VerticalStackLayout Grid.Column="1" Spacing="6">
-                            <Label Text="Sonraki tahmini son ödeme" Style="{StaticResource FieldLabel}" />
-                            <Label Text="{Binding StatementDraftNextDueDate}"
-                                   FontFamily="OpenSansSemibold" />
-                        </VerticalStackLayout>
+                    <Grid ColumnDefinitions="*,*"
+                          RowDefinitions="Auto,Auto"
+                          ColumnSpacing="8"
+                          RowSpacing="6">
+                        <Label Text="Sonraki tahmini kesim" Style="{StaticResource FieldLabel}" />
+                        <Label Grid.Column="1"
+                               Text="Sonraki tahmini son ödeme"
+                               Style="{StaticResource FieldLabel}" />
+                        <Label Grid.Row="1"
+                               Text="{Binding StatementDraftNextStatementDate}"
+                               FontFamily="OpenSansSemibold" />
+                        <Label Grid.Row="1"
+                               Grid.Column="1"
+                               Text="{Binding StatementDraftNextDueDate}"
+                               FontFamily="OpenSansSemibold" />
                     </Grid>
 
                     <Label Text="Bu ekstreyi nasıl ödemeyi planlıyorsun?"
