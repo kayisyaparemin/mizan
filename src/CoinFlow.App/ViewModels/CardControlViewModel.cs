@@ -31,6 +31,9 @@ public partial class CardControlViewModel(
     private CancellationTokenSource? _statementImportCancellation;
 
     public ObservableCollection<DatedAmountLine> FutureCharges { get; } = [];
+    public ObservableCollection<CardPaymentPreferenceLine>
+        PaymentPreferenceHistory
+    { get; } = [];
 
     [ObservableProperty] private string title = "Kart";
     [ObservableProperty] private string subtitle = string.Empty;
@@ -51,6 +54,7 @@ public partial class CardControlViewModel(
     [ObservableProperty] private bool hasNoActualStatement = true;
     [ObservableProperty] private bool hasFutureCharges;
     [ObservableProperty] private bool isCurrentStatementCustom;
+    [ObservableProperty] private bool hasPaymentPreferenceHistory;
     [ObservableProperty] private string currentStatementCustomAmount = string.Empty;
 
     [ObservableProperty] private bool hasStatementDraft;
@@ -639,6 +643,7 @@ public partial class CardControlViewModel(
         LimitText = Money(card.Limit, 2);
         HasActualStatement = card.CurrentStatement is not null;
         HasNoActualStatement = !HasActualStatement;
+        RefreshPaymentPreferenceHistory(card);
 
         if (card.CurrentStatement is { } statement)
         {
@@ -739,4 +744,32 @@ public partial class CardControlViewModel(
         _ => "Henüz seçilmedi"
     };
 
+    private static string PreferenceLabel(
+        CreditCardPaymentPreference preference) => preference.Mode switch
+    {
+        CurrentStatementPaymentMode.Full => "Tamamı",
+        CurrentStatementPaymentMode.Custom =>
+            $"Başka tutar: {Money(preference.CustomAmount.GetValueOrDefault(), 2)}",
+        _ => "Asgari"
+    };
+
+    private void RefreshPaymentPreferenceHistory(CreditCard card)
+    {
+        PaymentPreferenceHistory.Clear();
+        var ordered = card.PaymentPreferences
+            .OrderByDescending(x => x.EffectiveFromStatementDate)
+            .ThenByDescending(x => x.CreatedAt)
+            .ToArray();
+        for (var index = 0; index < ordered.Length; index++)
+        {
+            var preference = ordered[index];
+            PaymentPreferenceHistory.Add(new CardPaymentPreferenceLine(
+                preference.Id,
+                PreferenceLabel(preference),
+                $"{preference.EffectiveFromStatementDate.ToString("d MMMM yyyy", TurkishCulture)} ekstresinden itibaren",
+                index == 0));
+        }
+
+        HasPaymentPreferenceHistory = PaymentPreferenceHistory.Count > 0;
+    }
 }

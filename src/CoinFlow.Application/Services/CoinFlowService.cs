@@ -12,6 +12,7 @@ public sealed class CoinFlowService(
     SimulationCalculator simulationCalculator,
     TargetAmountCalculator targetAmountCalculator,
     PaymentAssignmentStrategyResolver strategyResolver,
+    CreditCardPaymentPreferenceResolver paymentPreferenceResolver,
     SalaryPeriodCalculator salaryPeriodCalculator,
     ProjectionBoundaryResolver projectionBoundaryResolver,
     FinancialSnapshotService snapshotService,
@@ -739,10 +740,63 @@ public sealed class CoinFlowService(
     {
         var normalized = NormalizeCreditCard(card);
         ValidateCreditCardPaymentSettings(normalized);
+        normalized = await AppendPaymentPreferenceHistoryAsync(
+            normalized,
+            cancellationToken);
+        CreditCardPaymentPreferenceResolver.Validate(
+            normalized.PaymentPreferences);
         await store.UpsertCreditCardAsync(normalized, cancellationToken);
         await CapturePlanningChangeAsync(
             "Kart planı değişti",
             cancellationToken);
+    }
+
+    /// <summary>
+    /// Ekstre ödeme tercihi değiştiyse effective-dated geçmişe yeni bir kayıt
+    /// ekler. Geçmiş kayıtlar hiçbir zaman değiştirilmez (I6). Geçmiş her zaman
+    /// store'daki canonical kayıttan okunur; böylece kartı sıfırdan kuran
+    /// onboarding/commitments ekranları geçmişi sıfırlayamaz.
+    /// </summary>
+    private async Task<CreditCard> AppendPaymentPreferenceHistoryAsync(
+        CreditCard card,
+        CancellationToken cancellationToken)
+    {
+        var existing = (await store.GetCreditCardsAsync(cancellationToken))
+            .FirstOrDefault(x => x.Id == card.Id);
+        var history = existing?.PaymentPreferences ?? [];
+
+        // Ekstre yoksa kaydedilecek bir ekstre ödeme kararı da yoktur; mevcut
+        // geçmiş aynen korunur.
+        if (card.CurrentStatement is not { } statement ||
+            card.CurrentStatementPaymentPlan is not { } plan)
+        {
+            return card with { PaymentPreferences = history };
+        }
+
+        var effective = paymentPreferenceResolver.Resolve(
+            statement.StatementDate,
+            history);
+        if (CreditCardPaymentPreferenceResolver.RepresentsSameDecision(
+                effective,
+                plan))
+        {
+            return card with { PaymentPreferences = history };
+        }
+
+        var appended = new CreditCardPaymentPreference
+        {
+            CreditCardId = card.Id,
+            Mode = plan.Mode,
+            CustomAmount = plan.Mode == CurrentStatementPaymentMode.Custom
+                ? plan.CustomAmount
+                : null,
+            EffectiveFromStatementDate = statement.StatementDate,
+            CreatedAt = clock.UtcNow
+        };
+        return card with
+        {
+            PaymentPreferences = history.Append(appended).ToArray()
+        };
     }
 
     public async Task SaveCreditCardStatementAsync(

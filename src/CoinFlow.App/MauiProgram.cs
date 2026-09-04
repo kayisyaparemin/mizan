@@ -39,6 +39,7 @@ public static class MauiProgram
                 services.GetRequiredService<IClock>().Today));
         builder.Services.AddSingleton<SalaryPeriodCalculator>();
         builder.Services.AddSingleton<PaymentAssignmentStrategyResolver>();
+        builder.Services.AddSingleton<CreditCardPaymentPreferenceResolver>();
         builder.Services.AddSingleton<SalaryFundingPlanner>();
         builder.Services.AddSingleton<SalaryResolver>();
         builder.Services.AddSingleton<IncomeProjectionCalculator>();

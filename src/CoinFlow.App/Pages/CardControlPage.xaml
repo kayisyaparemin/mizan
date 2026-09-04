@@ -200,6 +200,34 @@
                 </VerticalStackLayout>
             </Border>
 
+            <Border IsVisible="{Binding HasPaymentPreferenceHistory}">
+                <VerticalStackLayout Spacing="10">
+                    <Label Text="Ödeme tercihi geçmişi"
+                           Style="{StaticResource SectionTitle}" />
+                    <Label Text="Her ekstre için verdiğin karar burada saklanır. Eski kararlar değişmez."
+                           Style="{StaticResource MutedText}" />
+                    <VerticalStackLayout Spacing="8"
+                                         BindableLayout.ItemsSource="{Binding PaymentPreferenceHistory}">
+                        <BindableLayout.ItemTemplate>
+                            <DataTemplate>
+                                <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
+                                    <Label Text="{Binding Choice}"
+                                           FontFamily="OpenSansSemibold" />
+                                    <Label Grid.Column="1"
+                                           Text="Şu an geçerli"
+                                           IsVisible="{Binding IsCurrent}"
+                                           Style="{StaticResource Eyebrow}" />
+                                    <Label Grid.Row="1"
+                                           Grid.ColumnSpan="2"
+                                           Text="{Binding EffectiveFrom}"
+                                           Style="{StaticResource MutedText}" />
+                                </Grid>
+                            </DataTemplate>
+                        </BindableLayout.ItemTemplate>
+                    </VerticalStackLayout>
+                </VerticalStackLayout>
+            </Border>
+
             <Border BackgroundColor="{StaticResource SoftPink}">
                 <VerticalStackLayout Spacing="10">
                     <Label Text="Sonraki Ekstre"

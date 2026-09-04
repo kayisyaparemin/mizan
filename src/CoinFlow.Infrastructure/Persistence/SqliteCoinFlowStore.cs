@@ -10,7 +10,7 @@ namespace CoinFlow.Infrastructure.Persistence;
 public sealed class SqliteCoinFlowStore : ICoinFlowStore, IAsyncDisposable
 {
     private const string DateFormat = "yyyy-MM-dd";
-    private const int CurrentSchemaVersion = 10;
+    private const int CurrentSchemaVersion = 11;
     private const int CurrentCardStatementModelVersion = 7;
     private const decimal DefaultPlanningInterestRate = 0.05m;
     private static readonly Guid LegacyInitialAssignmentStrategyId =
@@ -68,6 +68,7 @@ public sealed class SqliteCoinFlowStore : ICoinFlowStore, IAsyncDisposable
             await _database.CreateTableAsync<CreditCardRow>();
             await _database.CreateTableAsync<CardInstallmentRow>();
             await _database.CreateTableAsync<CreditCardPaymentPlanRow>();
+            await _database.CreateTableAsync<CreditCardPaymentPreferenceRow>();
             await _database.CreateTableAsync<CreditCardStatementRow>();
             await _database.CreateTableAsync<PlannedLargeExpenseRow>();
             await _database.CreateTableAsync<SettingsRow>();
@@ -152,6 +153,7 @@ public sealed class SqliteCoinFlowStore : ICoinFlowStore, IAsyncDisposable
             connection.DeleteAll<PaymentPlanRow>();
             connection.DeleteAll<CardInstallmentRow>();
             connection.DeleteAll<CreditCardPaymentPlanRow>();
+            connection.DeleteAll<CreditCardPaymentPreferenceRow>();
             connection.DeleteAll<CreditCardStatementRow>();
             connection.DeleteAll<CreditCardRow>();
             connection.DeleteAll<PlannedLargeExpenseRow>();
@@ -442,11 +444,15 @@ public sealed class SqliteCoinFlowStore : ICoinFlowStore, IAsyncDisposable
         var statements = await _database
             .Table<CreditCardStatementRow>()
             .ToListAsync();
+        var preferences = await _database
+            .Table<CreditCardPaymentPreferenceRow>()
+            .ToListAsync();
         return cards.Select(row => FromRow(
             row,
             charges.Where(x => x.CreditCardId == row.Id),
             payments.Where(x => x.CreditCardId == row.Id),
-            statements.Where(x => x.CreditCardId == row.Id))).ToArray();
+            statements.Where(x => x.CreditCardId == row.Id),
+            preferences.Where(x => x.CreditCardId == row.Id))).ToArray();
     }
 
     public async Task UpsertCreditCardAsync(
@@ -485,6 +491,15 @@ public sealed class SqliteCoinFlowStore : ICoinFlowStore, IAsyncDisposable
                     statement with { CreditCardId = card.Id },
                     card.CurrentStatementPaymentPlan));
             }
+
+            connection.Execute(
+                "DELETE FROM credit_card_payment_preferences WHERE CreditCardId = ?",
+                Key(card.Id));
+            foreach (var preference in card.PaymentPreferences)
+            {
+                connection.Insert(
+                    ToRow(preference with { CreditCardId = card.Id }));
+            }
         });
     }
 
@@ -501,6 +516,9 @@ public sealed class SqliteCoinFlowStore : ICoinFlowStore, IAsyncDisposable
             Key(id));
         await _database.ExecuteAsync(
             "DELETE FROM credit_card_statements WHERE CreditCardId = ?",
+            Key(id));
+        await _database.ExecuteAsync(
+            "DELETE FROM credit_card_payment_preferences WHERE CreditCardId = ?",
             Key(id));
         await _database.ExecuteAsync(
             "DELETE FROM credit_cards WHERE Id = ?",
@@ -1018,11 +1036,42 @@ public sealed class SqliteCoinFlowStore : ICoinFlowStore, IAsyncDisposable
         KnownNextDueDate = FormatNullableDate(value.KnownNextDueDate)
     };
 
+    internal static CreditCardPaymentPreferenceRow ToRow(
+        CreditCardPaymentPreference value) => new()
+        {
+            Id = Key(value.Id),
+            CreditCardId = Key(value.CreditCardId),
+            Mode = (int)value.Mode,
+            CustomAmount = value.CustomAmount,
+            EffectiveFromStatementDate =
+                FormatDate(value.EffectiveFromStatementDate),
+            CreatedAt = value.CreatedAt.ToString(
+                "O",
+                CultureInfo.InvariantCulture),
+            Note = value.Note
+        };
+
+    private static CreditCardPaymentPreference FromRow(
+        CreditCardPaymentPreferenceRow row) => new()
+        {
+            Id = ParseKey(row.Id),
+            CreditCardId = ParseKey(row.CreditCardId),
+            Mode = (CurrentStatementPaymentMode)row.Mode,
+            CustomAmount = row.CustomAmount,
+            EffectiveFromStatementDate =
+                ParseDate(row.EffectiveFromStatementDate),
+            CreatedAt = DateTimeOffset.Parse(
+                row.CreatedAt,
+                CultureInfo.InvariantCulture),
+            Note = row.Note
+        };
+
     private static CreditCard FromRow(
         CreditCardRow row,
         IEnumerable<CardInstallmentRow> charges,
         IEnumerable<CreditCardPaymentPlanRow> paymentPlans,
-        IEnumerable<CreditCardStatementRow> statements)
+        IEnumerable<CreditCardStatementRow> statements,
+        IEnumerable<CreditCardPaymentPreferenceRow> paymentPreferences)
     {
         var currentStatement = statements
             .OrderByDescending(x => x.StatementDate)
@@ -1063,6 +1112,11 @@ public sealed class SqliteCoinFlowStore : ICoinFlowStore, IAsyncDisposable
             PaymentPlans = paymentPlans
                 .Select(FromRow)
                 .OrderBy(x => x.DueDate)
+                .ToArray(),
+            PaymentPreferences = paymentPreferences
+                .Select(FromRow)
+                .OrderBy(x => x.EffectiveFromStatementDate)
+                .ThenBy(x => x.CreatedAt)
                 .ToArray()
         };
     }

@@ -105,6 +105,19 @@ internal sealed class CreditCardPaymentPlanRow
     public decimal? Amount { get; set; }
 }
 
+[Table("credit_card_payment_preferences")]
+internal sealed class CreditCardPaymentPreferenceRow
+{
+    [PrimaryKey] public string Id { get; set; } = string.Empty;
+    [Indexed] public string CreditCardId { get; set; } = string.Empty;
+    public int Mode { get; set; }
+    public decimal? CustomAmount { get; set; }
+    [Indexed] public string EffectiveFromStatementDate { get; set; } =
+        string.Empty;
+    public string CreatedAt { get; set; } = string.Empty;
+    public string Note { get; set; } = string.Empty;
+}
+
 [Table("credit_card_statements")]
 internal sealed class CreditCardStatementRow
 {

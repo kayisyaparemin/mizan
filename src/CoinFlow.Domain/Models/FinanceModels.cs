@@ -142,6 +142,11 @@ public sealed record CreditCard
     public DateOnly? KnownNextDueDate { get; init; }
     public IReadOnlyList<CardCharge> Charges { get; init; } = [];
     public IReadOnlyList<CreditCardPaymentPlan> PaymentPlans { get; init; } = [];
+    // Kullanıcının ekstre ödeme tercihinin effective-dated geçmişi. Append-only:
+    // yeni karar eski kaydı değiştirmez, yeni bir kayıt olarak eklenir.
+    // Projection'ı beslemez; canonical karar CurrentStatementPaymentPlan'dır.
+    public IReadOnlyList<CreditCardPaymentPreference> PaymentPreferences
+    { get; init; } = [];
 
     public decimal KnownTotalDebt => CurrentStatement is null
         ? CarriedBalance + UnbilledSpending + Charges.Sum(x => x.Amount)
@@ -167,6 +172,21 @@ public sealed record CreditCardStatement
     public DateTimeOffset? ImportedAt { get; init; }
     public DateTimeOffset CreatedAt { get; init; } = DateTimeOffset.UtcNow;
     public DateTimeOffset UpdatedAt { get; init; } = DateTimeOffset.UtcNow;
+}
+
+// Ekstre ödeme tercihinin tarihsel kaydı. SalaryScheduleEntry ve
+// PaymentAssignmentStrategy ile aynı effective-dated deseni izler: kayıtlar
+// üzerine yazılmaz, her yeni karar yeni bir satırdır.
+public sealed record CreditCardPaymentPreference
+{
+    public Guid Id { get; init; } = Guid.NewGuid();
+    public Guid CreditCardId { get; init; }
+    public CurrentStatementPaymentMode Mode { get; init; } =
+        CurrentStatementPaymentMode.Minimum;
+    public decimal? CustomAmount { get; init; }
+    public DateOnly EffectiveFromStatementDate { get; init; }
+    public DateTimeOffset CreatedAt { get; init; } = DateTimeOffset.UtcNow;
+    public string Note { get; init; } = string.Empty;
 }
 
 public sealed record CurrentStatementPaymentPlan

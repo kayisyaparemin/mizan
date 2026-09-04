@@ -74,6 +74,12 @@ public sealed record UpcomingPaymentLine(
     string Amount,
     string Detail);
 
+public sealed record CardPaymentPreferenceLine(
+    Guid Id,
+    string Choice,
+    string EffectiveFrom,
+    bool IsCurrent);
+
 public sealed record StrategyHistoryLine(
     Guid Id,
     string EffectiveDate,
