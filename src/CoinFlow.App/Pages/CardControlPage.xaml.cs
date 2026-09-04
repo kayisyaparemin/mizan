@@ -40,4 +40,28 @@ public partial class CardControlPage : ContentPage, IQueryAttributable
             _viewModel.RemoveCharge(line);
         }
     }
+
+    private async void OnUpcomingMinimumClicked(object? sender, EventArgs e)
+    {
+        if (sender is Button { CommandParameter: UpcomingStatementLine line })
+        {
+            await _viewModel.SetUpcomingStatementMinimumAsync(line);
+        }
+    }
+
+    private async void OnUpcomingFullClicked(object? sender, EventArgs e)
+    {
+        if (sender is Button { CommandParameter: UpcomingStatementLine line })
+        {
+            await _viewModel.SetUpcomingStatementFullAsync(line);
+        }
+    }
+
+    private async void OnUpcomingClearClicked(object? sender, EventArgs e)
+    {
+        if (sender is Button { CommandParameter: UpcomingStatementLine line })
+        {
+            await _viewModel.ClearUpcomingStatementPlanAsync(line);
+        }
+    }
 }

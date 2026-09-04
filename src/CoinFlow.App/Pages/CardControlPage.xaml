@@ -220,6 +220,63 @@
                 </VerticalStackLayout>
             </Border>
 
+            <Border IsVisible="{Binding HasUpcomingStatements}">
+                <VerticalStackLayout Spacing="10">
+                    <Label Text="Gelecek Ekstreler"
+                           Style="{StaticResource SectionTitle}" />
+                    <Label Text="Her ayın ekstresini ayrı planlayabilirsin. Seçim yapmadığın aylar genel planı kullanır."
+                           Style="{StaticResource MutedText}" />
+                    <VerticalStackLayout BindableLayout.ItemsSource="{Binding UpcomingStatements}"
+                                         Spacing="12">
+                        <BindableLayout.ItemTemplate>
+                            <DataTemplate>
+                                <Grid ColumnDefinitions="*,Auto"
+                                      RowDefinitions="Auto,Auto,Auto"
+                                      ColumnSpacing="8"
+                                      RowSpacing="4">
+                                    <Label Text="{Binding PeriodText}"
+                                           Style="{StaticResource MutedText}"
+                                           VerticalTextAlignment="Center" />
+                                    <Label Grid.Column="1"
+                                           Text="{Binding EstimateText}"
+                                           FontFamily="OpenSansSemibold"
+                                           VerticalTextAlignment="Center" />
+                                    <Label Grid.Row="1"
+                                           Grid.ColumnSpan="2"
+                                           Text="{Binding PlanText}"
+                                           FontFamily="OpenSansSemibold" />
+                                    <Grid Grid.Row="2"
+                                          Grid.ColumnSpan="2"
+                                          ColumnDefinitions="*,*,Auto"
+                                          ColumnSpacing="6">
+                                        <Button Text="Asgari"
+                                                Clicked="OnUpcomingMinimumClicked"
+                                                CommandParameter="{Binding .}"
+                                                Padding="8,4"
+                                                MinimumHeightRequest="36" />
+                                        <Button Grid.Column="1"
+                                                Text="Tamamı"
+                                                Clicked="OnUpcomingFullClicked"
+                                                CommandParameter="{Binding .}"
+                                                Style="{StaticResource SecondaryButton}"
+                                                Padding="8,4"
+                                                MinimumHeightRequest="36" />
+                                        <Button Grid.Column="2"
+                                                Text="Genel"
+                                                Clicked="OnUpcomingClearClicked"
+                                                CommandParameter="{Binding .}"
+                                                IsVisible="{Binding IsOverridden}"
+                                                Style="{StaticResource SecondaryButton}"
+                                                Padding="8,4"
+                                                MinimumHeightRequest="36" />
+                                    </Grid>
+                                </Grid>
+                            </DataTemplate>
+                        </BindableLayout.ItemTemplate>
+                    </VerticalStackLayout>
+                </VerticalStackLayout>
+            </Border>
+
             <Border>
                 <VerticalStackLayout Spacing="10">
                     <Label Text="Gelecek Kart Hareketleri"
