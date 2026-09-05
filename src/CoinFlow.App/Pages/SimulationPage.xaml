@@ -27,7 +27,9 @@
 
             <Border IsVisible="{Binding IsPlanAvailable}">
                 <VerticalStackLayout Spacing="9">
+                    <Label Text="1 · NE DEĞİŞTİRİYORSUN?" Style="{StaticResource Eyebrow}" />
                     <Label Text="Planı Dene" Style="{StaticResource SectionTitle}" />
+                    <Label Text="Aşağıda seçtiğin değişiklik yalnız hesaplanır; finans kayıtların olduğu gibi kalır." Style="{StaticResource MutedText}" />
                     <Label Text="Plan türü" Style="{StaticResource FieldLabel}" />
                     <Picker ItemsSource="{Binding ScenarioTypes}" SelectedItem="{Binding SelectedScenarioType}" />
                     <Label Text="{Binding ScenarioDescription}" Style="{StaticResource MutedText}" />
@@ -155,7 +157,7 @@
             <VerticalStackLayout IsVisible="{Binding HasCurrentResults}" Spacing="14">
                 <Border BackgroundColor="{StaticResource SoftSky}">
                     <VerticalStackLayout Spacing="10">
-                        <Label Text="BU PLANLA ÖNÜNDE NE VAR?" Style="{StaticResource Eyebrow}" />
+                        <Label Text="2 · SONUÇ NE OLUYOR?" Style="{StaticResource Eyebrow}" />
                         <Label Text="Bu planla önünde ne var?" Style="{StaticResource SectionTitle}" />
                         <VerticalStackLayout BindableLayout.ItemsSource="{Binding NarrativeInsights}"
                                              Spacing="7">

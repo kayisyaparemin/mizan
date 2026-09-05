@@ -66,7 +66,10 @@ public partial class FutureMonthsViewModel(
                         : $"Dönem gelirinden önce vadesi gelen {beforeSalaryCount} ödeme",
                     beforeSalaryCount > 0,
                     row.IsEstimatedCardPayment,
-                    row.HasUndeterminedCardPayment));
+                    row.HasUndeterminedCardPayment,
+                    Money(row.TotalIncome),
+                    Money(row.MandatoryOutflow),
+                    Money(row.LivingBudget)));
             }
 
             HasProjection = Periods.Count > 0;

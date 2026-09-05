@@ -65,29 +65,46 @@
                                 CommandParameter="{Binding .}" />
                         </Border.GestureRecognizers>
                         <VerticalStackLayout Spacing="11">
-                            <Label Text="{Binding Period}"
-                                   FontFamily="OpenSansSemibold"
-                                   FontSize="18" />
-                            <Label Text="{Binding Assignment}" Style="{StaticResource MutedText}" />
-                            <VerticalStackLayout Spacing="7">
+                            <!-- §9 PRIMARY: dönem ve o dönemin sonucu -->
+                            <Grid ColumnDefinitions="*,Auto">
+                                <VerticalStackLayout Spacing="2">
+                                    <Label Text="{Binding Period}"
+                                           FontFamily="OpenSansSemibold"
+                                           FontSize="17" />
+                                    <Label Text="{Binding Assignment}" Style="{StaticResource MutedText}" />
+                                </VerticalStackLayout>
+                                <VerticalStackLayout Grid.Column="1"
+                                                     HorizontalOptions="End"
+                                                     Spacing="1">
+                                    <Label Text="Dönem sonu"
+                                           Style="{StaticResource MutedText}"
+                                           HorizontalTextAlignment="End" />
+                                    <Label Text="{Binding EndingProjectedSavings}"
+                                           Style="{StaticResource SecondaryAmount}"
+                                           HorizontalTextAlignment="End" />
+                                </VerticalStackLayout>
+                            </Grid>
+                            <!-- §9 SECONDARY: dönemin üç temel kalemi -->
+                            <VerticalStackLayout Spacing="6">
                                 <Grid ColumnDefinitions="*,Auto">
-                                    <Label Text="Zorunlular sonrası" Style="{StaticResource MutedText}" />
-                                    <Label Grid.Column="1" Text="{Binding AvailableAfterMandatory}" FontFamily="OpenSansSemibold" />
+                                    <Label Text="Gelir" Style="{StaticResource MutedText}" />
+                                    <Label Grid.Column="1" Text="{Binding Income}" />
+                                </Grid>
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <Label Text="Zorunlu ödemeler" Style="{StaticResource MutedText}" />
+                                    <Label Grid.Column="1" Text="{Binding Mandatory}" />
+                                </Grid>
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <Label Text="Yaşam gideri" Style="{StaticResource MutedText}" />
+                                    <Label Grid.Column="1" Text="{Binding Living}" />
                                 </Grid>
                                 <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding HasCarryOverDeficit}">
-                                    <Label Text="Devreden açık" TextColor="{StaticResource Error}" />
-                                    <Label Grid.Column="1" Text="{Binding CarryOverDeficit}" TextColor="{StaticResource Error}" FontFamily="OpenSansSemibold" />
-                                </Grid>
-                                <Grid ColumnDefinitions="*,Auto">
-                                    <Label Text="Dönem neti" Style="{StaticResource MutedText}" />
-                                    <Label Grid.Column="1" Text="{Binding EstimatedSavings}" FontFamily="OpenSansSemibold" />
-                                </Grid>
-                                <Grid ColumnDefinitions="*,Auto">
-                                    <Label Text="Dönem sonu durumu" Style="{StaticResource MutedText}" />
+                                    <Label Text="Önceki dönemden devreden açık"
+                                           TextColor="{StaticResource DeficitText}" />
                                     <Label Grid.Column="1"
-                                           Text="{Binding EndingProjectedSavings}"
-                                           FontFamily="OpenSansSemibold"
-                                           FontSize="16" />
+                                           Text="{Binding CarryOverDeficit}"
+                                           TextColor="{StaticResource DeficitText}"
+                                           FontFamily="OpenSansSemibold" />
                                 </Grid>
                             </VerticalStackLayout>
                             <FlexLayout Wrap="Wrap" Direction="Row">
@@ -125,8 +142,9 @@
                                 </Border>
                             </FlexLayout>
                             <Grid ColumnDefinitions="*,Auto">
-                                <Label Text="Detayı Gör"
+                                <Label Text="Bu dönemin ödeme ayrıntısı"
                                        HorizontalOptions="End"
+                                       FontSize="13"
                                        FontFamily="OpenSansSemibold"
                                        TextColor="{StaticResource ProjectionText}" />
                                 <Label Grid.Column="1"

@@ -131,8 +131,15 @@ public sealed class ProjectionLine(
     string beforeSalaryWarning,
     bool hasBeforeSalaryWarning,
     bool hasEstimatedPayment,
-    bool hasUndeterminedPayment)
+    bool hasUndeterminedPayment,
+    string income = "",
+    string mandatory = "",
+    string living = "")
 {
+    // §9: kullanıcının dönem kartında ilk aradığı üç kalem.
+    public string Income { get; } = income;
+    public string Mandatory { get; } = mandatory;
+    public string Living { get; } = living;
     public SalaryPeriodProjection Projection { get; } = projection;
     public string Period { get; } = period;
     public string Assignment { get; } = assignment;

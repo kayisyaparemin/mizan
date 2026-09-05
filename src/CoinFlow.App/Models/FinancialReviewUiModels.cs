@@ -64,7 +64,9 @@ public sealed record HistoryCardItem(
     string Planned,
     string Actual,
     string Difference,
-    string Status);
+    string Status,
+    // §8: rakamların yanında tek cümlelik insan dili özet.
+    string Summary = "");
 
 public sealed record PaymentHistoryUiLine(
     string Name,

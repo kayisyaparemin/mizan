@@ -40,7 +40,15 @@ public partial class HistoryViewModel(CoinFlowService service) : ViewModelBase
                     SignedMoney(difference),
                     difference >= 0m
                         ? "Planın üzerinde"
-                        : "Planın altında"));
+                        : "Planın altında",
+                    difference switch
+                    {
+                        0m => "Dönem tam planladığın gibi kapandı.",
+                        > 0m =>
+                            $"Dönem sonunda planladığından {Money(difference, 2)} fazla kaldı.",
+                        _ =>
+                            $"Dönem sonunda planladığından {Money(Math.Abs(difference), 2)} az kaldı."
+                    }));
             }
 
             HasHistory = Periods.Count > 0;

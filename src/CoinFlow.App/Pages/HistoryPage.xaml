@@ -31,6 +31,7 @@
                             <Border Margin="0,0,0,10">
                                 <VerticalStackLayout Spacing="9">
                                     <Grid ColumnDefinitions="*,Auto"><Label Text="{Binding Period}" Style="{StaticResource SectionTitle}" /><Border Grid.Column="1" BackgroundColor="{StaticResource SoftLavender}" StrokeThickness="0" Padding="9,4"><Label Text="{Binding Status}" Style="{StaticResource Eyebrow}" /></Border></Grid>
+                                    <Label Text="{Binding Summary}" Style="{StaticResource AlertBody}" />
                                     <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8">
                                         <VerticalStackLayout><Label Text="PLANLANAN" Style="{StaticResource Eyebrow}" /><Label Text="{Binding Planned}" FontFamily="OpenSansSemibold" /></VerticalStackLayout>
                                         <VerticalStackLayout Grid.Column="1"><Label Text="GERÇEKLEŞEN" Style="{StaticResource Eyebrow}" /><Label Text="{Binding Actual}" FontFamily="OpenSansSemibold" /></VerticalStackLayout>
