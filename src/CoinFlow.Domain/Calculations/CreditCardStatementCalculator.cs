@@ -170,6 +170,18 @@ public sealed class CreditCardStatementCalculator
             return nextStatementDate;
         }
 
+        // Settled statement sonrası CurrentStatement yoktur ama bankanın
+        // bildirdiği bir sonraki kesim tarihi hâlâ bilinir (I11). Bu tarihe
+        // kadar düşen harcamalar genel kesim gününe değil, bilinen exact
+        // tarihe faturalanır. Reconciler, settled ekstreye ait harcamaları
+        // zaten düşürdüğü için kalanların tamamı bu pencereye aittir.
+        if (card.CurrentStatement is null &&
+            card.KnownNextStatementDate is { } knownNextStatementDate &&
+            postingDate <= knownNextStatementDate)
+        {
+            return knownNextStatementDate;
+        }
+
         return ResolveChargeStatementClose(
             postingDate,
             firstProjectionClose,
