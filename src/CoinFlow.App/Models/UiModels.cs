@@ -68,6 +68,18 @@ public sealed record CardPaymentPlanLine(
     };
 }
 
+/// <summary>
+/// En yakın ekstre dışındaki, gelecek bir kart ekstresinin ay bazlı ödeme
+/// planı satırı. <see cref="IsOverridden"/> true ise o ay için genel plandan
+/// bağımsız bir seçim yapılmıştır.
+/// </summary>
+public sealed record UpcomingStatementLine(
+    DateOnly DueDate,
+    string PeriodText,
+    string EstimateText,
+    string PlanText,
+    bool IsOverridden);
+
 public sealed record UpcomingPaymentLine(
     string Date,
     string Name,

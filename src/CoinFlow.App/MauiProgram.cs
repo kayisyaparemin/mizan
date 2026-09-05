@@ -108,6 +108,7 @@ public static class MauiProgram
 #if DEBUG
         builder.Logging.AddDebug();
 #endif
+        Controls.SignedNumericEntry.Configure();
         return builder.Build();
     }
 }

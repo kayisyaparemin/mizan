@@ -30,9 +30,15 @@ public partial class CardControlViewModel(
     private DateOnly? _statementDraftExactNextDueDate;
     private CancellationTokenSource? _statementImportCancellation;
 
+    // En yakın ekstrenin ötesinde, ay bazlı planlanabilen ekstre sayısı.
+    private const int UpcomingStatementCount = 6;
+
     public ObservableCollection<DatedAmountLine> FutureCharges { get; } = [];
     public ObservableCollection<CardPaymentPreferenceLine>
         PaymentPreferenceHistory
+    { get; } = [];
+
+    public ObservableCollection<UpcomingStatementLine> UpcomingStatements
     { get; } = [];
 
     [ObservableProperty] private string title = "Kart";
@@ -53,6 +59,7 @@ public partial class CardControlViewModel(
     [ObservableProperty] private bool hasActualStatement;
     [ObservableProperty] private bool hasNoActualStatement = true;
     [ObservableProperty] private bool hasFutureCharges;
+    [ObservableProperty] private bool hasUpcomingStatements;
     [ObservableProperty] private bool isCurrentStatementCustom;
     [ObservableProperty] private bool hasPaymentPreferenceHistory;
     // Segmentli seçimde hangi seçeneğin geçerli olduğu görünsün diye.
@@ -634,7 +641,7 @@ public partial class CardControlViewModel(
         var plan = RequiredPlan();
         var projections = cardCalculator.Project(
             card,
-            2,
+            UpcomingStatementCount + 1,
             useProjectionFallback: true,
             plan.Settings.CreditCardCarryInterestRate);
         var currentProjection = projections[0];
@@ -740,6 +747,123 @@ public partial class CardControlViewModel(
         }
 
         HasFutureCharges = FutureCharges.Count > 0;
+
+        // En yakın (kesilmiş) ekstrenin kendi planı var; burada yalnızca
+        // gelecek ekstreler ay bazlı planlanır.
+        UpcomingStatements.Clear();
+        foreach (var upcoming in projections.Where(x => !x.IsActualStatement))
+        {
+            UpcomingStatements.Add(new UpcomingStatementLine(
+                upcoming.PaymentDueDate,
+                $"Kesim {upcoming.StatementCloseDate.ToString("dd MMMM", TurkishCulture)} • " +
+                $"Son ödeme {upcoming.PaymentDueDate.ToString("dd MMMM", TurkishCulture)}",
+                upcoming.StatementBalance is decimal balance
+                    ? Money(balance, 2)
+                    : "-",
+                UpcomingPlanLabel(upcoming),
+                upcoming.PaymentResolution ==
+                CreditCardPaymentResolution.DueDateOverride));
+        }
+
+        HasUpcomingStatements = UpcomingStatements.Count > 0;
+    }
+
+    private static string UpcomingPlanLabel(
+        CreditCardStatementProjection projection) =>
+        projection.PaymentResolution switch
+        {
+            CreditCardPaymentResolution.DueDateOverride =>
+                $"Bu ay: {PaymentTypeLabel(projection.AppliedPaymentType)}",
+            CreditCardPaymentResolution.GeneralStrategy =>
+                $"Genel plan: {PaymentTypeLabel(projection.AppliedPaymentType)}",
+            CreditCardPaymentResolution.ProjectionFallback =>
+                $"Kararsızda: {PaymentTypeLabel(projection.AppliedPaymentType)}",
+            _ => "Henüz belirlenmedi"
+        };
+
+    private static string PaymentTypeLabel(
+        CreditCardPaymentType? paymentType) => paymentType switch
+    {
+        CreditCardPaymentType.Minimum => "Asgari",
+        CreditCardPaymentType.FullStatement => "Tamamı",
+        CreditCardPaymentType.FixedAmount => "Sabit tutar",
+        _ => "Belirlenmedi"
+    };
+
+    public Task SetUpcomingStatementMinimumAsync(UpcomingStatementLine line) =>
+        SaveUpcomingStatementPlanAsync(
+            line.DueDate,
+            CreditCardPaymentType.Minimum,
+            "Bu ekstre için asgari ödeme seçildi.");
+
+    public Task SetUpcomingStatementFullAsync(UpcomingStatementLine line) =>
+        SaveUpcomingStatementPlanAsync(
+            line.DueDate,
+            CreditCardPaymentType.FullStatement,
+            "Bu ekstre için tamamı seçildi.");
+
+    public async Task ClearUpcomingStatementPlanAsync(
+        UpcomingStatementLine line)
+    {
+        if (IsBusy)
+        {
+            return;
+        }
+
+        try
+        {
+            IsBusy = true;
+            var card = RequiredCard();
+            await service.RemoveCreditCardPaymentPlanAsync(
+                card.Id,
+                line.DueDate);
+            await LoadAsync(card.Id);
+            await feedback.ShowSuccessAsync(
+                "Bu ekstre yeniden genel plana bırakıldı.");
+        }
+        catch (Exception exception)
+        {
+            var message = UserFacingMessages.FromException(exception);
+            SetStatus(message);
+            await feedback.ShowErrorAsync(message);
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    private async Task SaveUpcomingStatementPlanAsync(
+        DateOnly dueDate,
+        CreditCardPaymentType paymentType,
+        string successMessage)
+    {
+        if (IsBusy)
+        {
+            return;
+        }
+
+        try
+        {
+            IsBusy = true;
+            var card = RequiredCard();
+            await service.SaveCreditCardPaymentPlanAsync(
+                card.Id,
+                dueDate,
+                paymentType);
+            await LoadAsync(card.Id);
+            await feedback.ShowSuccessAsync(successMessage);
+        }
+        catch (Exception exception)
+        {
+            var message = UserFacingMessages.FromException(exception);
+            SetStatus(message);
+            await feedback.ShowErrorAsync(message);
+        }
+        finally
+        {
+            IsBusy = false;
+        }
     }
 
     private static string CurrentPlanLabel(

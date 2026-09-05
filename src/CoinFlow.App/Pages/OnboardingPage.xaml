@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:controls="clr-namespace:CoinFlow.App.Controls"
              x:Class="CoinFlow.App.Pages.OnboardingPage"
              Title="Kurulum">
     <Grid RowDefinitions="*,Auto">
@@ -68,16 +69,26 @@
                                              Spacing="7">
                             <BindableLayout.ItemTemplate>
                                 <DataTemplate>
-                                    <Grid ColumnDefinitions="*,Auto"
+                                    <Grid ColumnDefinitions="*,Auto,Auto"
                                           RowDefinitions="Auto,Auto"
+                                          ColumnSpacing="8"
                                           Padding="8">
                                         <Label Text="{Binding Title}"
-                                               FontFamily="OpenSansSemibold" />
+                                               FontFamily="OpenSansSemibold"
+                                               VerticalTextAlignment="Center" />
                                         <Label Grid.Column="1"
                                                Text="{Binding Amount}"
-                                               FontFamily="OpenSansSemibold" />
+                                               FontFamily="OpenSansSemibold"
+                                               VerticalTextAlignment="Center" />
+                                        <Button Grid.Column="2"
+                                                Text="Sil"
+                                                Clicked="OnRemoveDraftLineClicked"
+                                                CommandParameter="{Binding .}"
+                                                Style="{StaticResource SecondaryButton}"
+                                                Padding="10,4"
+                                                MinimumHeightRequest="36" />
                                         <Label Grid.Row="1"
-                                               Grid.ColumnSpan="2"
+                                               Grid.ColumnSpan="3"
                                                Text="{Binding Subtitle}"
                                                Style="{StaticResource MutedText}" />
                                     </Grid>
@@ -222,16 +233,26 @@
                                              Spacing="7">
                             <BindableLayout.ItemTemplate>
                                 <DataTemplate>
-                                    <Grid ColumnDefinitions="*,Auto"
+                                    <Grid ColumnDefinitions="*,Auto,Auto"
                                           RowDefinitions="Auto,Auto"
+                                          ColumnSpacing="8"
                                           Padding="8">
                                         <Label Text="{Binding Title}"
-                                               FontFamily="OpenSansSemibold" />
+                                               FontFamily="OpenSansSemibold"
+                                               VerticalTextAlignment="Center" />
                                         <Label Grid.Column="1"
                                                Text="{Binding Amount}"
-                                               FontFamily="OpenSansSemibold" />
+                                               FontFamily="OpenSansSemibold"
+                                               VerticalTextAlignment="Center" />
+                                        <Button Grid.Column="2"
+                                                Text="Sil"
+                                                Clicked="OnRemoveDraftLineClicked"
+                                                CommandParameter="{Binding .}"
+                                                Style="{StaticResource SecondaryButton}"
+                                                Padding="10,4"
+                                                MinimumHeightRequest="36" />
                                         <Label Grid.Row="1"
-                                               Grid.ColumnSpan="2"
+                                               Grid.ColumnSpan="3"
                                                Text="{Binding Subtitle}"
                                                Style="{StaticResource MutedText}" />
                                     </Grid>
@@ -270,16 +291,26 @@
                                              Spacing="7">
                             <BindableLayout.ItemTemplate>
                                 <DataTemplate>
-                                    <Grid ColumnDefinitions="*,Auto"
+                                    <Grid ColumnDefinitions="*,Auto,Auto"
                                           RowDefinitions="Auto,Auto"
+                                          ColumnSpacing="8"
                                           Padding="8">
                                         <Label Text="{Binding Title}"
-                                               FontFamily="OpenSansSemibold" />
+                                               FontFamily="OpenSansSemibold"
+                                               VerticalTextAlignment="Center" />
                                         <Label Grid.Column="1"
                                                Text="{Binding Amount}"
-                                               FontFamily="OpenSansSemibold" />
+                                               FontFamily="OpenSansSemibold"
+                                               VerticalTextAlignment="Center" />
+                                        <Button Grid.Column="2"
+                                                Text="Sil"
+                                                Clicked="OnRemoveDraftLineClicked"
+                                                CommandParameter="{Binding .}"
+                                                Style="{StaticResource SecondaryButton}"
+                                                Padding="10,4"
+                                                MinimumHeightRequest="36" />
                                         <Label Grid.Row="1"
-                                               Grid.ColumnSpan="2"
+                                               Grid.ColumnSpan="3"
                                                Text="{Binding Subtitle}"
                                                Style="{StaticResource MutedText}" />
                                     </Grid>
@@ -313,16 +344,26 @@
                                              Spacing="7">
                             <BindableLayout.ItemTemplate>
                                 <DataTemplate>
-                                    <Grid ColumnDefinitions="*,Auto"
+                                    <Grid ColumnDefinitions="*,Auto,Auto"
                                           RowDefinitions="Auto,Auto"
+                                          ColumnSpacing="8"
                                           Padding="8">
                                         <Label Text="{Binding Title}"
-                                               FontFamily="OpenSansSemibold" />
+                                               FontFamily="OpenSansSemibold"
+                                               VerticalTextAlignment="Center" />
                                         <Label Grid.Column="1"
                                                Text="{Binding Amount}"
-                                               FontFamily="OpenSansSemibold" />
+                                               FontFamily="OpenSansSemibold"
+                                               VerticalTextAlignment="Center" />
+                                        <Button Grid.Column="2"
+                                                Text="Sil"
+                                                Clicked="OnRemoveDraftLineClicked"
+                                                CommandParameter="{Binding .}"
+                                                Style="{StaticResource SecondaryButton}"
+                                                Padding="10,4"
+                                                MinimumHeightRequest="36" />
                                         <Label Grid.Row="1"
-                                               Grid.ColumnSpan="2"
+                                               Grid.ColumnSpan="3"
                                                Text="{Binding Subtitle}"
                                                Style="{StaticResource MutedText}" />
                                     </Grid>
@@ -344,7 +385,10 @@
                     <VerticalStackLayout Spacing="10">
                         <Label Text="Mevcut Tutar" Style="{StaticResource FieldLabel}" />
                         <Entry Text="{Binding CurrentAmount}"
-                               Keyboard="Numeric" />
+                               Keyboard="Numeric"
+                               controls:SignedNumericEntry.AllowNegative="True" />
+                        <Label Text="Negatif değer girebilirsin (örn. -1.500)."
+                               Style="{StaticResource MutedText}" />
                     </VerticalStackLayout>
                 </Border>
 

@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:vm="clr-namespace:CoinFlow.App.ViewModels"
              xmlns:models="clr-namespace:CoinFlow.App.Models"
+             xmlns:controls="clr-namespace:CoinFlow.App.Controls"
              x:Class="CoinFlow.App.Pages.PeriodReviewPage"
              x:Name="RootPage"
              x:DataType="vm:PeriodReviewWizardViewModel"
@@ -154,7 +155,7 @@
                         <Label Text="Gelecek hesaplamaları bu tutardan devam eder." Style="{StaticResource MutedText}" />
                         <Label Text="Hesaplanan öneri" Style="{StaticResource FieldLabel}" />
                         <Label Text="{Binding SuggestedStartingSavings}" FontFamily="OpenSansSemibold" FontSize="20" />
-                        <Entry Text="{Binding CurrentStartingSavings}" Placeholder="Yeni planlama başlangıç durumu" Keyboard="Numeric" />
+                        <Entry Text="{Binding CurrentStartingSavings}" Placeholder="Yeni planlama başlangıç durumu" Keyboard="Numeric" controls:SignedNumericEntry.AllowNegative="True" />
                         <Button Text="Güncelle" Command="{Binding RecalculateSuggestedCommand}" Style="{StaticResource SecondaryButton}" />
                         <Label Text="Gerçek durum farklıysa tutarı düzeltebilirsin; fark dönem düzeltmesi olarak saklanır." Style="{StaticResource MutedText}" />
                     </VerticalStackLayout>

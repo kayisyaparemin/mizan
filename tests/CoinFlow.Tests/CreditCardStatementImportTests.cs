@@ -69,6 +69,35 @@ public sealed class CreditCardStatementImportTests
     }
 
     [Fact]
+    public void GarantiParser_ReadsMonthNameDatesAndMinLabel()
+    {
+        // Gerçek Garanti Bonus ekstresinin sayfa-1 düzenini yansıtır: tarihler
+        // ay adıyla ("24 Ağustos 2026") ve asgari ödeme "Min. Ödeme Tutarı"
+        // olarak yazılır; alanlar etiketlerine bitişik gelir.
+        var parser = new GarantiBonusStatementParser();
+        const string text =
+            "T. Garanti Bankası A.Ş. www.garantibbva.com.tr Garanti BBVA Mobil " +
+            "Bonus Trink Bilgileriniz " +
+            "Hesap Kesim Tarihi24 Ağustos 2026Son Ödeme Tarihi03 Eylül 2026" +
+            "Dönem Borcunuz15.000,00 TLMin. Ödeme Tutarı6.000,00 TL" +
+            "Bir sonraki hesap kesiminiz 25 Eylül 2026 Cuma ve son ödemeniz " +
+            "05 Ekim 2026 Pazartesi 'dir.";
+
+        var result = parser.Parse(text, "GRT");
+
+        Assert.True(parser.CanParse(text));
+        Assert.Equal("Garanti BBVA Bonus", result.DetectedBank);
+        Assert.Equal(new DateOnly(2026, 8, 24), result.StatementDate);
+        Assert.Equal(new DateOnly(2026, 9, 3), result.DueDate);
+        Assert.Equal(15_000m, result.StatementAmount);
+        Assert.Equal(6_000m, result.MinimumPaymentAmount);
+        Assert.Equal(new DateOnly(2026, 9, 25), result.NextStatementDate);
+        Assert.Equal(new DateOnly(2026, 10, 5), result.NextDueDate);
+        Assert.True(result.HasRequiredFields);
+        Assert.Empty(result.Warnings);
+    }
+
+    [Fact]
     public async Task Importer_ReturnsLocalFingerprintAndParserResult()
     {
         var importer = new CreditCardStatementImporter(
