@@ -55,6 +55,10 @@ public partial class CardControlViewModel(
     [ObservableProperty] private bool hasFutureCharges;
     [ObservableProperty] private bool isCurrentStatementCustom;
     [ObservableProperty] private bool hasPaymentPreferenceHistory;
+    // Segmentli seçimde hangi seçeneğin geçerli olduğu görünsün diye.
+    [ObservableProperty] private bool isMinimumSelected;
+    [ObservableProperty] private bool isFullSelected;
+    [ObservableProperty] private bool isCustomSelected;
     [ObservableProperty] private string currentStatementCustomAmount = string.Empty;
 
     [ObservableProperty] private bool hasStatementDraft;
@@ -644,6 +648,10 @@ public partial class CardControlViewModel(
         HasActualStatement = card.CurrentStatement is not null;
         HasNoActualStatement = !HasActualStatement;
         RefreshPaymentPreferenceHistory(card);
+        var activeMode = card.CurrentStatementPaymentPlan?.Mode;
+        IsMinimumSelected = activeMode == CurrentStatementPaymentMode.Minimum;
+        IsFullSelected = activeMode == CurrentStatementPaymentMode.Full;
+        IsCustomSelected = activeMode == CurrentStatementPaymentMode.Custom;
 
         if (card.CurrentStatement is { } statement)
         {

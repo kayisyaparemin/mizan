@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.Input;
 using CoinFlow.App.Services;
 using CoinFlow.App.Models;
 using CoinFlow.App.Pages;
+using CoinFlow.Application.Models;
 using CoinFlow.Application.Services;
 using CoinFlow.Domain.Calculations;
 
@@ -62,21 +63,27 @@ public partial class DashboardViewModel(
     [ObservableProperty] private string pendingReviewTitle = string.Empty;
     [ObservableProperty] private string pendingReviewMessage = string.Empty;
     [ObservableProperty] private bool shouldShowOnboarding;
-    [ObservableProperty] private string expandedModule = string.Empty;
-    [ObservableProperty] private bool isCurrentModuleExpanded;
-    [ObservableProperty] private bool isPeriodModuleExpanded;
-    [ObservableProperty] private bool isTwelveModuleExpanded;
-    [ObservableProperty] private bool isUpcomingModuleExpanded;
-    [ObservableProperty] private bool isStructureModuleExpanded;
-    [ObservableProperty] private bool isHistoryModuleExpanded;
-    [ObservableProperty] private bool isSimulatorModuleExpanded;
-    [ObservableProperty] private string currentModuleSummary = "—";
-    [ObservableProperty] private string periodModuleSummary = "—";
-    [ObservableProperty] private string twelveModuleSummary = "—";
-    [ObservableProperty] private string upcomingModuleSummary = "—";
-    [ObservableProperty] private string structureModuleSummary = "—";
-    [ObservableProperty] private string historyModuleSummary = "—";
-    [ObservableProperty] private string simulatorModuleSummary = "—";
+
+    // PRIMARY: ekranı açar açmaz görülmesi gereken tek rakam ve tek cümle.
+    [ObservableProperty] private string headlineAmount = "—";
+    [ObservableProperty] private string headlineCaption = string.Empty;
+    [ObservableProperty] private string periodVerdict = string.Empty;
+    [ObservableProperty] private bool isPeriodVerdictNegative;
+    // SECONDARY: bölüm özetleri.
+    [ObservableProperty] private string twelveMonthCaption = "—";
+    [ObservableProperty] private string structureSummary = "—";
+    [ObservableProperty] private string historySummary = "—";
+    [ObservableProperty] private bool showCalculationDetails;
+
+    /// <summary>
+    /// §11 — yalnız gerçekten anlamlı olan uyarılar, önceliğe göre.
+    /// </summary>
+    public ObservableCollection<DashboardAlert> Alerts { get; } = [];
+    [ObservableProperty] private bool hasAlerts;
+
+    [RelayCommand]
+    private void ToggleCalculationDetails() =>
+        ShowCalculationDetails = !ShowCalculationDetails;
 
     public bool IsDevelopment => BuildInfo.IsDevelopment;
 
@@ -104,6 +111,8 @@ public partial class DashboardViewModel(
                 HasNoUpcomingPayments = true;
                 HasUndeterminedCardPayment = false;
                 HasPendingStrategy = false;
+                Alerts.Clear();
+                HasAlerts = false;
                 HasTwelveMonthInterest = false;
                 PreFirstSalaryPayments.Clear();
                 UpcomingPayments.Clear();
@@ -132,6 +141,8 @@ public partial class DashboardViewModel(
                 HasNoUpcomingPayments = true;
                 HasUndeterminedCardPayment = false;
                 HasPendingStrategy = false;
+                Alerts.Clear();
+                HasAlerts = false;
                 HasTwelveMonthInterest = false;
                 PreFirstSalaryPayments.Clear();
                 UpcomingPayments.Clear();
@@ -145,8 +156,6 @@ public partial class DashboardViewModel(
             }
 
             var currentPlan = await service.GetFinancialPlanAsync();
-            var futurePeriods = await service.GetFuturePeriodsAsync(
-                periodCount: 12);
             var history = await service.GetHistorySummaryAsync(1);
 
             HasFinancialPlan = true;
@@ -248,25 +257,25 @@ public partial class DashboardViewModel(
             HasUpcomingPayments = UpcomingPayments.Count > 0;
             HasNoUpcomingPayments = !HasUpcomingPayments;
             CalculationDetails = BuildDetails(current);
-            CurrentModuleSummary =
-                $"{PlanningStartingState} • Son güncelleme {CurrentSnapshotDate}";
-            PeriodModuleSummary =
-                $"{CurrentPeriodText} • dönem sonu {EndingSavings}";
-            TwelveModuleSummary =
-                $"{TwelveMonthSavings} • en düşük {TightestValue}";
-            UpcomingModuleSummary = HasUpcomingPayments
-                ? $"{UpcomingPayments.Count} yaklaşan ödeme"
-                : "Yaklaşan ödeme yok";
-            StructureModuleSummary =
+
+            // PRIMARY — tek rakam: bu dönem nasıl bitiyor.
+            HeadlineAmount = EndingSavings;
+            HeadlineCaption =
+                $"{current.PeriodEnd.ToString("d MMMM", TurkishCulture)} tarihindeki tahmini durumun";
+            IsPeriodVerdictNegative = current.EndingProjectedSavings < 0m;
+            PeriodVerdict = IsPeriodVerdictNegative
+                ? $"Bu dönemi {Money(Math.Abs(current.EndingProjectedSavings))} açıkla kapatıyorsun."
+                : $"Zorunlu ödemeler ve yaşam giderinden sonra {Money(current.EndingProjectedSavings)} kalıyor.";
+
+            TwelveMonthCaption =
+                $"12 dönem sonunda {TwelveMonthSavings} • en düşük {TightestValue}";
+            StructureSummary =
                 $"{currentPlan.Salaries.Count} gelir • {currentPlan.CreditCards.Count} kart • " +
                 $"{currentPlan.Loans.Count} kredi • {currentPlan.PaymentPlans.Count + currentPlan.PlannedLargeExpenses.Count} ödeme";
-            HistoryModuleSummary = history is null
+            HistorySummary = history is null
                 ? "Henüz kapanan dönem yok"
                 : $"Son dönem: plan {Money(history.Planned)} • gerçekleşen {Money(history.Actual)}";
-            SimulatorModuleSummary =
-                futurePeriods.Count == 0
-                    ? "Simülasyon için plan gerekiyor"
-                    : "Planı değiştirmeden karar dene";
+            BuildAlerts(dashboard, current, review.IsDue);
         }
         catch (Exception exception)
         {
@@ -316,16 +325,56 @@ public partial class DashboardViewModel(
         }
     }
 
-    [RelayCommand]
-    private void ToggleModule(string module)
+    /// <summary>
+    /// §11 — uyarılar yalnız aksiyon veya gerçek dikkat gerektirdiğinde üretilir.
+    /// Her uyarı "ne oldu / neden önemli / ne yapabilirim" sorularını yanıtlar.
+    /// </summary>
+    private void BuildAlerts(
+        DashboardSnapshot dashboard,
+        SalaryPeriodProjection current,
+        bool reviewIsDue)
     {
-        ExpandedModule = string.Equals(
-            ExpandedModule,
-            module,
-            StringComparison.OrdinalIgnoreCase)
-            ? string.Empty
-            : module;
-        RefreshModuleExpansion();
+        Alerts.Clear();
+
+        if (reviewIsDue)
+        {
+            Alerts.Add(new DashboardAlert(
+                DashboardAlertLevel.Action,
+                "Geçen dönem kapandı",
+                "Ödemelerin ve dönem harcaman netleştiyse gerçekte ne olduğunu kaydet; planını güncel durumundan yeniden kurayım.",
+                "Güncelle",
+                OpenPeriodReviewCommand));
+        }
+
+        if (dashboard.HasUndeterminedCardPayments)
+        {
+            Alerts.Add(new DashboardAlert(
+                DashboardAlertLevel.Action,
+                "Kart ödeme tercihin eksik",
+                "Bir kredi kartı için bu ekstreyi nasıl ödeyeceğini seçmedin. Seçmeden dönem sonu tahminin eksik kalır.",
+                "Kartlara git",
+                OpenCommitmentsCommand));
+        }
+
+        if (current.EndingProjectedSavings < 0m)
+        {
+            Alerts.Add(new DashboardAlert(
+                DashboardAlertLevel.Attention,
+                "Bu dönem açık veriyor",
+                $"Dönem sonunda {Money(Math.Abs(current.EndingProjectedSavings))} açık oluşuyor. Simülatörde bir ödemeyi ertelemeyi veya kart ödemeni değiştirmeyi deneyebilirsin.",
+                "Simülatörü aç",
+                OpenSimulationCommand));
+        }
+
+        if (dashboard.PendingStrategy is { } pending)
+        {
+            Alerts.Add(new DashboardAlert(
+                DashboardAlertLevel.Information,
+                "Planlanan düzen değişikliği var",
+                $"{pending.EffectiveFromSalaryDate.ToString("d MMMM yyyy", TurkishCulture)} döneminden itibaren {ModeText(pending.Mode).ToLower(TurkishCulture)}."));
+        }
+
+        HasAlerts = Alerts.Count > 0;
     }
 
     [RelayCommand]
@@ -397,14 +446,4 @@ public partial class DashboardViewModel(
     private static string PeriodText(SalaryPeriod period) =>
         $"{period.Start.ToString("dd MMM", TurkishCulture)} → {period.End.ToString("dd MMM yyyy", TurkishCulture)}";
 
-    private void RefreshModuleExpansion()
-    {
-        IsCurrentModuleExpanded = ExpandedModule == "current";
-        IsPeriodModuleExpanded = ExpandedModule == "period";
-        IsTwelveModuleExpanded = ExpandedModule == "twelve";
-        IsUpcomingModuleExpanded = ExpandedModule == "upcoming";
-        IsStructureModuleExpanded = ExpandedModule == "structure";
-        IsHistoryModuleExpanded = ExpandedModule == "history";
-        IsSimulatorModuleExpanded = ExpandedModule == "simulator";
-    }
 }

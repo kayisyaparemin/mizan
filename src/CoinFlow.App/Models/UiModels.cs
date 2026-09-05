@@ -80,6 +80,36 @@ public sealed record CardPaymentPreferenceLine(
     string EffectiveFrom,
     bool IsCurrent);
 
+/// <summary>
+/// Uyarı önceliği. Her durum için kırmızı kullanmamak adına üç seviye vardır.
+/// </summary>
+public enum DashboardAlertLevel
+{
+    /// Kullanıcının bir şey yapması gerekiyor.
+    Action,
+    /// Bilmesi gerekiyor ama hemen aksiyon şart değil.
+    Attention,
+    /// Sadece bilgi.
+    Information
+}
+
+/// <summary>
+/// Kullanıcıya "ne oldu / neden önemli / ne yapabilirim" üçlüsünü veren uyarı.
+/// Teknik exception metinleri buraya girmez.
+/// </summary>
+public sealed record DashboardAlert(
+    DashboardAlertLevel Level,
+    string Title,
+    string Message,
+    string ActionText = "",
+    System.Windows.Input.ICommand? Action = null)
+{
+    public bool IsAction => Level == DashboardAlertLevel.Action;
+    public bool IsAttention => Level == DashboardAlertLevel.Attention;
+    public bool HasAction =>
+        Action is not null && !string.IsNullOrWhiteSpace(ActionText);
+}
+
 public sealed record StrategyHistoryLine(
     Guid Id,
     string EffectiveDate,

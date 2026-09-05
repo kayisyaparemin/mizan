@@ -177,26 +177,61 @@
                     </Grid>
                     <Grid ColumnDefinitions="*,*,*" ColumnSpacing="6">
                         <Button Text="Asgari"
-                                Command="{Binding SetCurrentStatementMinimumCommand}" />
+                                Style="{StaticResource SegmentButton}"
+                                Command="{Binding SetCurrentStatementMinimumCommand}">
+                            <Button.Triggers>
+                                <DataTrigger TargetType="Button"
+                                             Binding="{Binding IsMinimumSelected}"
+                                             Value="True">
+                                    <Setter Property="BackgroundColor" Value="{StaticResource SoftLavender}" />
+                                    <Setter Property="TextColor" Value="{StaticResource PrimaryDeep}" />
+                                    <Setter Property="FontFamily" Value="OpenSansSemibold" />
+                                </DataTrigger>
+                            </Button.Triggers>
+                        </Button>
                         <Button Grid.Column="1"
                                 Text="Tamamı"
-                                Command="{Binding SetCurrentStatementFullCommand}"
-                                Style="{StaticResource SecondaryButton}" />
+                                Style="{StaticResource SegmentButton}"
+                                Command="{Binding SetCurrentStatementFullCommand}">
+                            <Button.Triggers>
+                                <DataTrigger TargetType="Button"
+                                             Binding="{Binding IsFullSelected}"
+                                             Value="True">
+                                    <Setter Property="BackgroundColor" Value="{StaticResource SoftLavender}" />
+                                    <Setter Property="TextColor" Value="{StaticResource PrimaryDeep}" />
+                                    <Setter Property="FontFamily" Value="OpenSansSemibold" />
+                                </DataTrigger>
+                            </Button.Triggers>
+                        </Button>
                         <Button Grid.Column="2"
-                                Text="Başka"
-                                Command="{Binding ShowCurrentStatementCustomCommand}"
-                                Style="{StaticResource SecondaryButton}" />
+                                Text="Özel"
+                                Style="{StaticResource SegmentButton}"
+                                Command="{Binding ShowCurrentStatementCustomCommand}">
+                            <Button.Triggers>
+                                <DataTrigger TargetType="Button"
+                                             Binding="{Binding IsCustomSelected}"
+                                             Value="True">
+                                    <Setter Property="BackgroundColor" Value="{StaticResource SoftLavender}" />
+                                    <Setter Property="TextColor" Value="{StaticResource PrimaryDeep}" />
+                                    <Setter Property="FontFamily" Value="OpenSansSemibold" />
+                                </DataTrigger>
+                            </Button.Triggers>
+                        </Button>
                     </Grid>
-                    <Grid ColumnDefinitions="*,Auto"
-                          ColumnSpacing="8"
-                          IsVisible="{Binding IsCurrentStatementCustom}">
-                        <Entry Text="{Binding CurrentStatementCustomAmount}"
-                               Placeholder="Özel tutar"
-                               Keyboard="Numeric" />
-                        <Button Grid.Column="1"
-                                Text="Kaydet"
-                                Command="{Binding SaveCurrentStatementCustomCommand}" />
-                    </Grid>
+                    <!-- §6: tutar alanı yalnız "Özel" seçilince görünür -->
+                    <VerticalStackLayout Spacing="6"
+                                         IsVisible="{Binding IsCurrentStatementCustom}">
+                        <Label Text="Özel ödeme tutarı"
+                               Style="{StaticResource FieldLabel}" />
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                            <Entry Text="{Binding CurrentStatementCustomAmount}"
+                                   Placeholder="Örn. 25.000,00"
+                                   Keyboard="Numeric" />
+                            <Button Grid.Column="1"
+                                    Text="Kaydet"
+                                    Command="{Binding SaveCurrentStatementCustomCommand}" />
+                        </Grid>
+                    </VerticalStackLayout>
                 </VerticalStackLayout>
             </Border>
 

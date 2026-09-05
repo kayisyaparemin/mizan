@@ -131,6 +131,18 @@ public partial class CommitmentsViewModel(
     [ObservableProperty] private SelectionOption<CurrentStatementPaymentMode>? selectedCurrentStatementPaymentMode;
     [ObservableProperty] private string currentStatementCustomPayment = string.Empty;
     [ObservableProperty] private bool isCurrentStatementCustomPayment;
+    // §14 progressive disclosure: varsayılan davranış kuralları gelişmiş
+    // bölümde saklı; kullanıcı isterse açar.
+    [ObservableProperty] private bool showAdvancedCardOptions;
+    [ObservableProperty] private bool hasNoIncomeItems = true;
+    [ObservableProperty] private bool hasNoCreditCardItems = true;
+    [ObservableProperty] private bool hasNoLoanItems = true;
+    [ObservableProperty] private bool hasNoRegularPaymentItems = true;
+    [ObservableProperty] private bool hasNoOneTimePaymentItems = true;
+
+    [RelayCommand]
+    private void ToggleAdvancedCardOptions() =>
+        ShowAdvancedCardOptions = !ShowAdvancedCardOptions;
     [ObservableProperty] private string closingDay = "25";
     [ObservableProperty] private string dueDay = "5";
     [ObservableProperty] private string minimumRate = "40";
@@ -1134,6 +1146,12 @@ public partial class CommitmentsViewModel(
         HasLoanItems = LoanItems.Count > 0;
         HasRegularPaymentItems = RegularPaymentItems.Count > 0;
         HasOneTimePaymentItems = OneTimePaymentItems.Count > 0;
+        // §12 — her bölümün kendi boş durumu olsun.
+        HasNoIncomeItems = !HasIncomeItems;
+        HasNoCreditCardItems = !HasCreditCardItems;
+        HasNoLoanItems = !HasLoanItems;
+        HasNoRegularPaymentItems = !HasRegularPaymentItems;
+        HasNoOneTimePaymentItems = !HasOneTimePaymentItems;
         FirstCardId = CreditCardItems.FirstOrDefault()?.Id;
         StructureSummary =
             $"{IncomeItems.Count} gelir • {CreditCardItems.Count} kart • " +

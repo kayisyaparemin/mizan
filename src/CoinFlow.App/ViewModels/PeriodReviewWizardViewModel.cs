@@ -17,6 +17,9 @@ public partial class PeriodReviewWizardViewModel(
     private PeriodReviewContext? _context;
     private decimal _lastSuggestedSavings;
     private bool _loaded;
+    // "Her şey planlandığı gibi" kısayolunun geri döneceği planlanan değerler.
+    private string _plannedLivingText = string.Empty;
+    private string _plannedInterestText = "0";
 
     public ObservableCollection<ActualPaymentInputItem> Payments { get; } = [];
     public ObservableCollection<ActualFlowInputItem> Flows { get; } = [];
@@ -117,9 +120,11 @@ public partial class PeriodReviewWizardViewModel(
                 "0.##",
                 TurkishCulture);
             ActualLivingSpend = plannedLivingText;
+            _plannedLivingText = plannedLivingText;
             ActualInterest = finalPlan.PlannedDeficitInterest.ToString(
                 "0.##",
                 TurkishCulture);
+            _plannedInterestText = ActualInterest;
             _lastSuggestedSavings = _context.SuggestedStartingSavings;
             SuggestedStartingSavings = Money(_lastSuggestedSavings, 2);
             CurrentStartingSavings = _lastSuggestedSavings.ToString(
@@ -159,6 +164,54 @@ public partial class PeriodReviewWizardViewModel(
         {
             IsBusy = false;
         }
+    }
+
+    /// <summary>
+    /// §7 — "Her şey planlandığı gibi" hızlı yolu. Alanlar zaten planlanan
+    /// değerlerle dolu geldiği için kullanıcıyı tek tek doğrulatmadan doğrudan
+    /// sonuç adımına götürür. Kullanıcı sonucu görüp geri dönebilir.
+    /// </summary>
+    [RelayCommand]
+    private async Task EverythingAsPlannedAsync()
+    {
+        try
+        {
+            SetStatus(string.Empty);
+            ResetToPlannedValues();
+            await RefreshPreviewAsync(true);
+            CurrentStep = 3;
+        }
+        catch (Exception exception)
+        {
+            SetStatus(UserFacingMessages.FromException(exception));
+        }
+    }
+
+    private void ResetToPlannedValues()
+    {
+        foreach (var payment in Payments)
+        {
+            payment.ActualAmount = payment.PlannedAmountValue?.ToString(
+                "0.##",
+                TurkishCulture) ?? string.Empty;
+            payment.ActualDate = payment.PlannedDate.ToDateTime(
+                TimeOnly.MinValue);
+            payment.Note = string.Empty;
+            payment.SelectedStatus = payment.StatusOptions.First(x =>
+                x.Value == (payment.PlannedAmountValue is null
+                    ? ActualPaymentStatus.Unpaid
+                    : ActualPaymentStatus.Paid));
+        }
+
+        ActualLivingSpend = _plannedLivingText;
+        ActualInterest = _plannedInterestText;
+        Flows.Clear();
+        ShowLivingBreakdown = false;
+        GroceryAmount = string.Empty;
+        FuelAmount = string.Empty;
+        DiningAmount = string.Empty;
+        EntertainmentAmount = string.Empty;
+        OtherLivingAmount = string.Empty;
     }
 
     [RelayCommand]

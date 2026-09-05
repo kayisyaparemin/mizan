@@ -145,6 +145,13 @@ public partial class OnboardingViewModel : ViewModelBase
     [ObservableProperty] private SelectionOption<CurrentStatementPaymentMode>? selectedCurrentStatementPaymentMode;
     [ObservableProperty] private string currentStatementCustomPayment = string.Empty;
     [ObservableProperty] private bool isCurrentStatementCustomPayment;
+    // §14 progressive disclosure: varsayılan davranış kuralları gelişmiş
+    // bölümde saklı; kullanıcı isterse açar.
+    [ObservableProperty] private bool showAdvancedCardOptions;
+
+    [RelayCommand]
+    private void ToggleAdvancedCardOptions() =>
+        ShowAdvancedCardOptions = !ShowAdvancedCardOptions;
     private string? _cardStatementFingerprint;
     private CreditCardStatementSource _cardStatementSource =
         CreditCardStatementSource.Manual;

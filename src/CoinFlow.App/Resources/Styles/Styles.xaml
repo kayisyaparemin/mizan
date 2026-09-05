@@ -81,6 +81,95 @@
         <Setter Property="BackgroundColor" Value="{StaticResource SoftSky}" />
         <Setter Property="TextColor" Value="{StaticResource Ink}" />
     </Style>
+    <!-- Bölüm içinden detaya götüren, aksiyon olmayan bağlantı. Buton
+         görünümü vermez; böylece gerçek aksiyon butonlarıyla karışmaz. -->
+    <Style x:Key="LinkButton" TargetType="Button">
+        <Setter Property="BackgroundColor" Value="Transparent" />
+        <Setter Property="TextColor" Value="{StaticResource ProjectionText}" />
+        <Setter Property="FontFamily" Value="OpenSansSemibold" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="Padding" Value="0,6" />
+        <Setter Property="MinimumHeightRequest" Value="34" />
+        <Setter Property="HorizontalOptions" Value="Start" />
+    </Style>
+
+    <!-- ================= Bilgi hiyerarşisi ================= -->
+    <!-- PRIMARY: ekranın tek büyük rakamı. -->
+    <Style x:Key="PrimaryAmount" TargetType="Label">
+        <Setter Property="FontFamily" Value="OpenSansSemibold" />
+        <Setter Property="FontSize" Value="40" />
+        <Setter Property="TextColor" Value="{StaticResource Ink}" />
+    </Style>
+    <Style x:Key="PrimaryCaption" TargetType="Label">
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="TextColor" Value="{StaticResource InkSoft}" />
+    </Style>
+    <!-- SECONDARY: bölüm içindeki önemli rakam. -->
+    <Style x:Key="SecondaryAmount" TargetType="Label">
+        <Setter Property="FontFamily" Value="OpenSansSemibold" />
+        <Setter Property="FontSize" Value="20" />
+        <Setter Property="TextColor" Value="{StaticResource Ink}" />
+    </Style>
+    <!-- Kart başlığı: buton değil, başlık. -->
+    <Style x:Key="CardHeading" TargetType="Label">
+        <Setter Property="FontFamily" Value="OpenSansSemibold" />
+        <Setter Property="FontSize" Value="15" />
+        <Setter Property="TextColor" Value="{StaticResource Ink}" />
+    </Style>
+
+    <!-- ================= Uyarı seviyeleri (§11) ================= -->
+    <!-- 🔴 Aksiyon gerekiyor -->
+    <Style x:Key="AlertActionSurface" TargetType="Border">
+        <Setter Property="BackgroundColor" Value="{StaticResource DeficitSurface}" />
+        <Setter Property="Stroke" Value="{StaticResource DeficitText}" />
+        <Setter Property="StrokeThickness" Value="1" />
+    </Style>
+    <!-- 🟡 Dikkat -->
+    <Style x:Key="AlertAttentionSurface" TargetType="Border">
+        <Setter Property="BackgroundColor" Value="{StaticResource WarningSurface}" />
+        <Setter Property="Stroke" Value="{StaticResource WarningText}" />
+        <Setter Property="StrokeThickness" Value="1" />
+    </Style>
+    <!-- ℹ️ Bilgi -->
+    <Style x:Key="AlertInfoSurface" TargetType="Border">
+        <Setter Property="BackgroundColor" Value="{StaticResource SoftSky}" />
+        <Setter Property="StrokeThickness" Value="0" />
+    </Style>
+    <Style x:Key="AlertTitle" TargetType="Label">
+        <Setter Property="FontFamily" Value="OpenSansSemibold" />
+        <Setter Property="FontSize" Value="15" />
+        <Setter Property="TextColor" Value="{StaticResource Ink}" />
+    </Style>
+    <Style x:Key="AlertBody" TargetType="Label">
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="TextColor" Value="{StaticResource InkSoft}" />
+    </Style>
+
+    <!-- ================= Boş durumlar (§12) ================= -->
+    <Style x:Key="EmptyStateTitle" TargetType="Label">
+        <Setter Property="FontFamily" Value="OpenSansSemibold" />
+        <Setter Property="FontSize" Value="16" />
+        <Setter Property="TextColor" Value="{StaticResource Ink}" />
+    </Style>
+    <Style x:Key="EmptyStateBody" TargetType="Label">
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="TextColor" Value="{StaticResource Muted}" />
+    </Style>
+
+    <!-- Segmentli seçim (Asgari / Tamamı / Özel) -->
+    <Style x:Key="SegmentButton" TargetType="Button">
+        <Setter Property="BackgroundColor" Value="{StaticResource SoftYellow}" />
+        <Setter Property="TextColor" Value="{StaticResource InkSoft}" />
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="CornerRadius" Value="12" />
+        <Setter Property="Padding" Value="8,10" />
+        <Setter Property="MinimumHeightRequest" Value="46" />
+    </Style>
+    <Style x:Key="SegmentButtonSelected" TargetType="Button" BasedOn="{StaticResource SegmentButton}">
+        <Setter Property="BackgroundColor" Value="{StaticResource SoftLavender}" />
+        <Setter Property="TextColor" Value="{StaticResource PrimaryDeep}" />
+        <Setter Property="FontFamily" Value="OpenSansSemibold" />
+    </Style>
     <Style TargetType="Switch">
         <Setter Property="OnColor" Value="{StaticResource SoftLavender}" />
         <Setter Property="ThumbColor" Value="{StaticResource SoftYellow}" />

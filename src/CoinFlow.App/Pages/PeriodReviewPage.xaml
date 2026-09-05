@@ -51,7 +51,15 @@
                         <Label Grid.Row="9" Text="Planlanan dönem sonu" FontFamily="OpenSansSemibold" /><Label Grid.Row="9" Grid.Column="1" Text="{Binding PlannedEnding}" FontFamily="OpenSansSemibold" />
                     </Grid>
                 </Border>
-                <Button Text="Evet, Gerçekte Ne Oldu?" Command="{Binding NextCommand}" />
+                <!-- §7: en sık durum tek dokunuş. Sonuç ekranından geri dönülebilir. -->
+                <Button Text="Her şey planlandığı gibi oldu"
+                        Command="{Binding EverythingAsPlannedCommand}" />
+                <Button Text="Bazı şeyler farklı oldu"
+                        Style="{StaticResource SecondaryButton}"
+                        Command="{Binding NextCommand}" />
+                <Label Text="Farklı olan bir şey yoksa ilk seçenekle doğrudan sonucu görebilirsin."
+                       Style="{StaticResource MutedText}"
+                       HorizontalTextAlignment="Center" />
             </VerticalStackLayout>
 
             <VerticalStackLayout IsVisible="{Binding IsStep2}" Spacing="14">

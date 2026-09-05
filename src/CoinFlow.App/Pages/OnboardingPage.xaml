@@ -196,14 +196,24 @@
                                 <Entry Text="{Binding CardMinimumRate}" Keyboard="Numeric" />
                             </VerticalStackLayout>
                         </Grid>
-                        <Label Text="Ekstreyi nasıl ödeyeceksin?"
-                               Style="{StaticResource FieldLabel}" />
-                        <Picker ItemsSource="{Binding CardPaymentStrategies}"
-                                SelectedItem="{Binding SelectedCardPaymentStrategy}" />
-                        <Label Text="Kararsız ekstrelerde"
-                               Style="{StaticResource FieldLabel}" />
-                        <Picker ItemsSource="{Binding CardFallbackStrategies}"
-                                SelectedItem="{Binding SelectedCardFallbackStrategy}" />
+                        <!-- §14: bu iki alan varsayılan davranış kuralıdır.
+                             Kurulumda zorunlu değil; isteyen açar. -->
+                        <Button Text="Gelişmiş ödeme ayarları"
+                                Style="{StaticResource LinkButton}"
+                                Command="{Binding ToggleAdvancedCardOptionsCommand}" />
+                        <VerticalStackLayout Spacing="8"
+                                             IsVisible="{Binding ShowAdvancedCardOptions}">
+                            <Label Text="Sonraki ekstrelerde varsayılan ödeme şeklin"
+                                   Style="{StaticResource FieldLabel}" />
+                            <Picker ItemsSource="{Binding CardPaymentStrategies}"
+                                    SelectedItem="{Binding SelectedCardPaymentStrategy}" />
+                            <Label Text="Henüz karar vermediğin ekstreler tahminde nasıl sayılsın?"
+                                   Style="{StaticResource FieldLabel}" />
+                            <Picker ItemsSource="{Binding CardFallbackStrategies}"
+                                    SelectedItem="{Binding SelectedCardFallbackStrategy}" />
+                            <Label Text="Bu ayarlar yalnız tahmini etkiler; gerçek ödemeni her ekstrede sen belirlersin."
+                                   Style="{StaticResource MutedText}" />
+                        </VerticalStackLayout>
                         <Button Text="Kart Ekle"
                                 Command="{Binding AddCardCommand}"
                                 IsEnabled="{Binding CanInteract}" />

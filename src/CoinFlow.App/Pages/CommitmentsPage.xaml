@@ -197,19 +197,28 @@
                             </VerticalStackLayout>
                         </Grid>
 
-                        <Label Text="Ekstreyi nasıl ödeyeceksin?" Style="{StaticResource FieldLabel}" />
-                        <Picker ItemsSource="{Binding PaymentStrategies}" SelectedItem="{Binding SelectedPaymentStrategy}" />
-                        <Entry Text="{Binding FixedPaymentAmount}"
-                               IsVisible="{Binding IsFixedPaymentStrategy}"
-                               Placeholder="Sabit ödeme tutarı"
-                               Keyboard="Numeric" />
+                        <!-- §14: varsayılan davranış kuralları gelişmiş bölümde. -->
+                        <Button Text="Gelişmiş ödeme ayarları"
+                                Style="{StaticResource LinkButton}"
+                                Command="{Binding ToggleAdvancedCardOptionsCommand}" />
+                        <VerticalStackLayout Spacing="8"
+                                             IsVisible="{Binding ShowAdvancedCardOptions}">
+                            <Label Text="Sonraki ekstrelerde varsayılan ödeme şeklin" Style="{StaticResource FieldLabel}" />
+                            <Picker ItemsSource="{Binding PaymentStrategies}" SelectedItem="{Binding SelectedPaymentStrategy}" />
+                            <Entry Text="{Binding FixedPaymentAmount}"
+                                   IsVisible="{Binding IsFixedPaymentStrategy}"
+                                   Placeholder="Her ekstrede ödeyeceğin sabit tutar"
+                                   Keyboard="Numeric" />
 
-                        <Label Text="Henüz karar vermediğin ekstrelerde" Style="{StaticResource FieldLabel}" />
-                        <Picker ItemsSource="{Binding ProjectionFallbackStrategies}" SelectedItem="{Binding SelectedProjectionFallbackStrategy}" />
-                        <Entry Text="{Binding ProjectionFallbackFixedAmount}"
-                               IsVisible="{Binding IsFixedProjectionFallback}"
-                               Placeholder="Hesaplamada kullanılacak sabit tutar"
-                               Keyboard="Numeric" />
+                            <Label Text="Henüz karar vermediğin ekstreler tahminde nasıl sayılsın?" Style="{StaticResource FieldLabel}" />
+                            <Picker ItemsSource="{Binding ProjectionFallbackStrategies}" SelectedItem="{Binding SelectedProjectionFallbackStrategy}" />
+                            <Entry Text="{Binding ProjectionFallbackFixedAmount}"
+                                   IsVisible="{Binding IsFixedProjectionFallback}"
+                                   Placeholder="Tahminde kullanılacak sabit tutar"
+                                   Keyboard="Numeric" />
+                            <Label Text="Bu ayarlar yalnız tahmini etkiler; gerçek ödemeni her ekstrede sen belirlersin."
+                                   Style="{StaticResource MutedText}" />
+                        </VerticalStackLayout>
 
                         <Label Text="Gelecek kart harcamaları" Style="{StaticResource SectionTitle}" />
                         <Grid ColumnDefinitions="*,*,Auto" ColumnSpacing="6">
@@ -264,6 +273,8 @@
             <Border>
                 <VerticalStackLayout Spacing="9">
                     <Label Text="Gelirler" Style="{StaticResource SectionTitle}" />
+                    <Label Text="Henüz gelir eklemedin." Style="{StaticResource EmptyStateTitle}" IsVisible="{Binding HasNoIncomeItems}" />
+                    <Label Text="Maaşını eklediğinde Mizan dönemlerini ve projeksiyonunu buradan kurmaya başlar." Style="{StaticResource EmptyStateBody}" IsVisible="{Binding HasNoIncomeItems}" />
                     <VerticalStackLayout BindableLayout.ItemsSource="{Binding IncomeItems}" Spacing="8">
                         <BindableLayout.ItemTemplate>
                             <DataTemplate>
@@ -287,6 +298,8 @@
             <Border BackgroundColor="{StaticResource SoftSky}">
                 <VerticalStackLayout Spacing="9">
                     <Label Text="Kredi Kartları" Style="{StaticResource SectionTitle}" />
+                    <Label Text="Henüz kredi kartı eklemedin." Style="{StaticResource EmptyStateTitle}" IsVisible="{Binding HasNoCreditCardItems}" />
+                    <Label Text="İlk kartını eklediğinde gelecek ekstrelerini ve ödeme planını burada göreceksin." Style="{StaticResource EmptyStateBody}" IsVisible="{Binding HasNoCreditCardItems}" />
                     <VerticalStackLayout BindableLayout.ItemsSource="{Binding CreditCardItems}" Spacing="8">
                         <BindableLayout.ItemTemplate>
                             <DataTemplate>
@@ -313,6 +326,8 @@
             <Border>
                 <VerticalStackLayout Spacing="9">
                     <Label Text="Krediler" Style="{StaticResource SectionTitle}" />
+                    <Label Text="Henüz kredi eklemedin." Style="{StaticResource EmptyStateTitle}" IsVisible="{Binding HasNoLoanItems}" />
+                    <Label Text="Kredi taksitlerin dönem planına otomatik olarak dahil edilir." Style="{StaticResource EmptyStateBody}" IsVisible="{Binding HasNoLoanItems}" />
                     <VerticalStackLayout BindableLayout.ItemsSource="{Binding LoanItems}" Spacing="8">
                         <BindableLayout.ItemTemplate>
                             <DataTemplate>
@@ -336,6 +351,8 @@
             <Border BackgroundColor="{StaticResource SoftPink}">
                 <VerticalStackLayout Spacing="9">
                     <Label Text="Düzenli Ödemeler" Style="{StaticResource SectionTitle}" />
+                    <Label Text="Henüz düzenli ödeme eklemedin." Style="{StaticResource EmptyStateTitle}" IsVisible="{Binding HasNoRegularPaymentItems}" />
+                    <Label Text="Kira, abonelik veya taksit gibi tekrar eden ödemelerini buraya ekleyebilirsin." Style="{StaticResource EmptyStateBody}" IsVisible="{Binding HasNoRegularPaymentItems}" />
                     <VerticalStackLayout BindableLayout.ItemsSource="{Binding RegularPaymentItems}" Spacing="8">
                         <BindableLayout.ItemTemplate>
                             <DataTemplate>
@@ -359,6 +376,8 @@
             <Border>
                 <VerticalStackLayout Spacing="9">
                     <Label Text="Tek Seferlik / Geçici Ödemeler" Style="{StaticResource SectionTitle}" />
+                    <Label Text="Henüz tek seferlik ödeme eklemedin." Style="{StaticResource EmptyStateTitle}" IsVisible="{Binding HasNoOneTimePaymentItems}" />
+                    <Label Text="Belirli bir tarihte yapacağın büyük ödemeleri ekleyince dönem tahminine yansır." Style="{StaticResource EmptyStateBody}" IsVisible="{Binding HasNoOneTimePaymentItems}" />
                     <VerticalStackLayout BindableLayout.ItemsSource="{Binding OneTimePaymentItems}" Spacing="8">
                         <BindableLayout.ItemTemplate>
                             <DataTemplate>
