@@ -140,9 +140,39 @@ public partial class SimulationViewModel(
     [ObservableProperty] private string applyButtonText = "Planı Uygula";
     [ObservableProperty] private string applyConfirmationText =
         "Bu plan gerçek finans planına eklenecek.";
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasCashChart))]
+    [NotifyPropertyChangedFor(nameof(CashChartCaption))]
+    private SimulatorChartSeries cashChart = SimulatorChartSeries.Empty;
     [ObservableProperty] private string targetAmount = string.Empty;
     [ObservableProperty] private string targetResult = string.Empty;
     [ObservableProperty] private bool hasTargetResult;
+
+    public bool HasCashChart => CashChart.HasData;
+
+    /// <summary>
+    /// Grafiğin taşıdığı asıl bilgi, eğrinin sıfırı kestiği ay. Kesmiyorsa
+    /// bunu söylemek de bir cevaptır.
+    /// </summary>
+    public string CashChartCaption
+    {
+        get
+        {
+            if (!CashChart.HasData)
+            {
+                return string.Empty;
+            }
+
+            if (CashChart.FirstNonNegativePoint is { } recovery)
+            {
+                return CashChart.Points[0] == recovery
+                    ? "Dönem sonu nakit · ilk dönemden itibaren artıda"
+                    : $"Dönem sonu nakit · açık {recovery.PeriodStart:MMMM yyyy} döneminde kapanıyor";
+            }
+
+            return "Dönem sonu nakit · açık 12 dönem içinde kapanmıyor";
+        }
+    }
 
     public bool HasDraftConditions => DraftConditions.Count > 0;
     public bool HasNoDraftConditions => IsPlanAvailable && !HasDraftConditions;
@@ -430,6 +460,7 @@ public partial class SimulationViewModel(
         NarrativeInsights.Clear();
         SummaryMetrics.Clear();
         InterestComparison.Clear();
+        CashChart = SimulatorChartSeries.Empty;
         HasResults = false;
         IsResultStale = false;
         ResetApplyState(clearRequest: true);
@@ -547,6 +578,7 @@ public partial class SimulationViewModel(
             NarrativeInsights.Clear();
             SummaryMetrics.Clear();
             InterestComparison.Clear();
+            CashChart = SimulatorChartSeries.Empty;
             HasResults = false;
             IsResultStale = false;
             _lastRequests = [];
@@ -922,6 +954,9 @@ public partial class SimulationViewModel(
         {
             InterestComparison.Add(row);
         }
+        CashChart = SimulatorInsightService.BuildCashChart(
+            result.Baseline,
+            result.Scenario);
         FriendlySummary = string.Join(Environment.NewLine,
             projectionSummary.NarrativeInsights);
         var transition = result.Scenario.FirstOrDefault(x =>

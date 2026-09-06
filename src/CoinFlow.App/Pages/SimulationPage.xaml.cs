@@ -1,3 +1,5 @@
+using System.ComponentModel;
+using CoinFlow.App.Drawables;
 using CoinFlow.App.Services;
 using CoinFlow.App.ViewModels;
 using CoinFlow.Application.Models;
@@ -16,6 +18,32 @@ public partial class SimulationPage : ContentPage
         InitializeComponent();
         BindingContext = _viewModel = viewModel;
         _feedback = feedback;
+        _viewModel.PropertyChanged += OnViewModelPropertyChanged;
+        SyncCashChart();
+    }
+
+    /// <summary>
+    /// GraphicsView veriyi binding ile almaz; seriyi drawable'a elle verip
+    /// yeniden çizim istememiz gerekiyor.
+    /// </summary>
+    private void OnViewModelPropertyChanged(
+        object? sender,
+        PropertyChangedEventArgs eventArgs)
+    {
+        if (eventArgs.PropertyName == nameof(SimulationViewModel.CashChart))
+        {
+            SyncCashChart();
+        }
+    }
+
+    private void SyncCashChart()
+    {
+        if (Resources["CashChartDrawable"] is
+            CashProjectionChartDrawable drawable)
+        {
+            drawable.Series = _viewModel.CashChart;
+            CashChartView.Invalidate();
+        }
     }
 
     protected override async void OnAppearing()

@@ -39,6 +39,78 @@ public sealed class SimulatorInsightServiceTests
     }
 
     [Fact]
+    public void CashChart_AlwaysKeepsZeroInsideTheScale()
+    {
+        // Her iki uç da artıdayken bile sıfır ölçekte kalmalı: grafiğin
+        // taşıdığı asıl bilgi sıfır çizgisi.
+        var series = SimulatorInsightService.BuildCashChart(
+        [
+            Row(new DateOnly(2026, 9, 10), opening: 0m, income: 0m, ending: 40_000m),
+            Row(new DateOnly(2026, 10, 10), opening: 0m, income: 0m, ending: 90_000m)
+        ]);
+
+        Assert.Equal(0m, series.Minimum);
+        Assert.Equal(90_000m, series.Maximum);
+        Assert.False(series.CrossesZero);
+        Assert.False(series.HasScenario);
+    }
+
+    [Fact]
+    public void CashChart_ReportsTheMonthTheDeficitCloses()
+    {
+        var series = SimulatorInsightService.BuildCashChart(
+        [
+            Row(new DateOnly(2026, 9, 10), opening: 0m, income: 0m, ending: -80_000m),
+            Row(new DateOnly(2026, 10, 10), opening: 0m, income: 0m, ending: -20_000m),
+            Row(new DateOnly(2026, 11, 10), opening: 0m, income: 0m, ending: 15_000m),
+            Row(new DateOnly(2026, 12, 10), opening: 0m, income: 0m, ending: 60_000m)
+        ]);
+
+        Assert.True(series.CrossesZero);
+        Assert.Equal(-80_000m, series.Minimum);
+        Assert.Equal(60_000m, series.Maximum);
+        Assert.Equal(
+            new DateOnly(2026, 11, 10),
+            series.FirstNonNegativePoint!.PeriodStart);
+    }
+
+    [Fact]
+    public void CashChart_WithScenario_TracksBothLinesAndScenarioRecovery()
+    {
+        var baseline = new[]
+        {
+            Row(new DateOnly(2026, 9, 10), opening: 0m, income: 0m, ending: -80_000m),
+            Row(new DateOnly(2026, 10, 10), opening: 0m, income: 0m, ending: -60_000m)
+        };
+        var scenario = new[]
+        {
+            Row(new DateOnly(2026, 9, 10), opening: 0m, income: 0m, ending: 20_000m),
+            Row(new DateOnly(2026, 10, 10), opening: 0m, income: 0m, ending: 45_000m)
+        };
+
+        var series = SimulatorInsightService.BuildCashChart(baseline, scenario);
+
+        Assert.True(series.HasScenario);
+        Assert.Equal(-80_000m, series.Minimum);
+        Assert.Equal(45_000m, series.Maximum);
+        Assert.Equal(-80_000m, series.Points[0].Baseline);
+        Assert.Equal(20_000m, series.Points[0].Scenario);
+        // Kapanış senaryo çizgisine göre raporlanır, baza göre değil.
+        Assert.Equal(
+            new DateOnly(2026, 9, 10),
+            series.FirstNonNegativePoint!.PeriodStart);
+    }
+
+    [Fact]
+    public void CashChart_WithoutPeriods_IsEmpty()
+    {
+        var series = SimulatorInsightService.BuildCashChart([]);
+
+        Assert.False(series.HasData);
+        Assert.Null(series.FirstNonNegativePoint);
+    }
+
+    [Fact]
     public void InterestComparison_CountsFinancingCostAsInterest()
     {
         // 150.000 çekip 180.000 ödüyorsan aradaki 30.000 faizdir. Tabloya

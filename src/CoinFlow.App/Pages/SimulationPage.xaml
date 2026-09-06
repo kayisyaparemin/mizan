@@ -1,9 +1,13 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:drawables="clr-namespace:CoinFlow.App.Drawables"
              x:Class="CoinFlow.App.Pages.SimulationPage"
              x:Name="PageRoot"
              Title="Simülatör">
+    <ContentPage.Resources>
+        <drawables:CashProjectionChartDrawable x:Key="CashChartDrawable" />
+    </ContentPage.Resources>
     <ScrollView>
         <VerticalStackLayout Padding="20,18,20,36" Spacing="16">
             <Label Text="PLANLAMADAN ÖNCE DENE" Style="{StaticResource Eyebrow}" />
@@ -176,6 +180,32 @@
                                 </DataTemplate>
                             </BindableLayout.ItemTemplate>
                         </VerticalStackLayout>
+                    </VerticalStackLayout>
+                </Border>
+
+                <Border IsVisible="{Binding HasCashChart}">
+                    <VerticalStackLayout Spacing="8">
+                        <Label Text="Nakit Seyri" Style="{StaticResource SectionTitle}" />
+                        <Label Text="{Binding CashChartCaption}"
+                               Style="{StaticResource MutedText}"
+                               FontSize="12" />
+                        <GraphicsView x:Name="CashChartView"
+                                      Drawable="{StaticResource CashChartDrawable}"
+                                      HeightRequest="200" />
+                        <FlexLayout Wrap="Wrap" Direction="Row">
+                            <Border Padding="9,4" Margin="0,0,6,3"
+                                    BackgroundColor="{StaticResource ProjectionSurface}">
+                                <Label Text="Bu planla"
+                                       FontSize="11"
+                                       TextColor="{StaticResource ProjectionText}" />
+                            </Border>
+                            <Border Padding="9,4" Margin="0,0,6,3"
+                                    BackgroundColor="{StaticResource DebtSurface}">
+                                <Label Text="Şimdiki durum"
+                                       FontSize="11"
+                                       TextColor="{StaticResource Muted}" />
+                            </Border>
+                        </FlexLayout>
                     </VerticalStackLayout>
                 </Border>
 
