@@ -203,6 +203,35 @@ public sealed class SimulationTests
     }
 
     [Fact]
+    public void Financing_CreditsPrincipalOnDrawdownDate()
+    {
+        // Kredi, alındığı dönemde parayı hesaba koymalı. Yalnızca taksitleri
+        // modellemek krediyi saf maliyet gibi gösterirdi.
+        var result = new SimulationCalculator(_projection, _installments)
+            .Calculate(
+                TestFactory.CanonicalPlan(),
+                new DateOnly(2026, 8, 20),
+                new SimulationRequest(
+                    SimulationScenarioType.FinancingLoan,
+                    "Finansman",
+                    120_000m,
+                    new DateOnly(2026, 12, 1),
+                    9,
+                    new DateOnly(2026, 12, 20),
+                    TotalRepaymentAmount: 145_000m));
+
+        var drawdown = result.Rows.Single(x =>
+            x.Scenario.Period.Contains(new DateOnly(2026, 12, 1)));
+        Assert.Equal(0m, drawdown.Baseline.OtherIncome);
+        Assert.Equal(120_000m, drawdown.Scenario.OtherIncome);
+        Assert.True(drawdown.ProjectedSavingsDifference > 0m);
+
+        // Anapara girmesine rağmen toplam maliyet geri ödemenin kendisidir.
+        Assert.Equal(145_000m, result.Risk.TotalScenarioCost);
+        Assert.Equal(25_000m, result.Risk.FinancingCost);
+    }
+
+    [Fact]
     public void FutureIncome_IncreasesOnlyScenarioProjection()
     {
         var result = new SimulationCalculator(_projection, _installments)
@@ -1016,12 +1045,25 @@ public sealed class SimulationTests
             Assert.Equal(145_000m, financing.Installments.Sum(x => x.Amount));
             Assert.Equal(new DateOnly(2026, 12, 20), financing.Installments[0].DueDate);
             Assert.Equal(new DateOnly(2027, 8, 20), financing.Installments[^1].DueDate);
+            // Kredi iki taraflıdır: taksitler çıkarken anapara da girmeli.
+            var financingProceeds = Assert.Single(
+                (await service.GetFinancialPlanAsync()).OtherIncomes,
+                x => x.Id == financingId);
+            Assert.Equal(120_000m, financingProceeds.Amount);
+            Assert.Equal(
+                new DateOnly(2026, 12, 1),
+                financingProceeds.ExactDate);
             var afterFinancing = await service.GetFuturePeriodsAsync();
             Assert.True(afterFinancing.Single(x =>
                     x.Period.Contains(new DateOnly(2026, 12, 20)))
                 .InstallmentPayments > beforeFinancing.Single(x =>
                     x.Period.Contains(new DateOnly(2026, 12, 20)))
                 .InstallmentPayments);
+            Assert.Equal(
+                120_000m,
+                afterFinancing.Single(x =>
+                        x.Period.Contains(financingProceeds.ExactDate))
+                    .OtherIncome);
 
             var card = Assert.Single(
                 (await service.GetFinancialPlanAsync()).CreditCards);
@@ -1097,9 +1139,11 @@ public sealed class SimulationTests
             Assert.Equal(
                 SimulationApplyDestination.Income,
                 incomeResult.Destination);
+            // Finansman anaparası da bir gelir kalemi olduğu için burada iki
+            // kayıt vardır; bu senaryonunkini kimliğiyle seçiyoruz.
             var income = Assert.Single(
-                (await service.GetFinancialPlanAsync()).OtherIncomes);
-            Assert.Equal(incomeId, income.Id);
+                (await service.GetFinancialPlanAsync()).OtherIncomes,
+                x => x.Id == incomeId);
             Assert.Equal(100_000m, income.Amount);
             Assert.Equal(100_000m, (await service.GetFuturePeriodsAsync())
                 .Single(x => x.Period.Contains(income.ExactDate)).OtherIncome);
@@ -1160,8 +1204,9 @@ public sealed class SimulationTests
                 350_000m,
                 refreshedSimulation.Baseline.Sum(x =>
                     x.PlannedLargeCashExpenses));
+            // 100.000 Bonus + 120.000 uygulanan kredi anaparası.
             Assert.Equal(
-                100_000m,
+                220_000m,
                 refreshedSimulation.Baseline.Sum(x => x.OtherIncome));
 
             await store.DisposeAsync();

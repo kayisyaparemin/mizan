@@ -210,11 +210,7 @@ public sealed class SimulationCalculator(
             SimulationScenarioType.CreditCardInstallmentPurchase =>
                 AddCardPurchase(plan, request),
             SimulationScenarioType.FinancingLoan =>
-                AddInstallmentPlan(
-                    plan,
-                    request,
-                    request.TotalRepaymentAmount ?? request.Amount,
-                    PaymentPlanKind.Installment),
+                AddFinancingLoan(plan, request),
             SimulationScenarioType.CashDebt =>
                 AddInstallmentPlan(
                     plan,
@@ -396,6 +392,35 @@ public sealed class SimulationCalculator(
         {
             CreditCards = plan.CreditCards
                 .Select(x => x.Id == card.Id ? updated : x)
+                .ToArray()
+        };
+    }
+
+    // Kredi iki taraflıdır: anapara çekildiği gün hesaba girer, geri ödeme
+    // taksitlerle çıkar. Yalnızca taksitleri modellemek krediyi saf maliyet
+    // gibi gösterir ve "kredi çeksem açığımı kapatır mıyım" sorusunu
+    // cevaplanamaz kılar. Anapara, taksit planıyla aynı ScenarioId'yi taşır;
+    // uygulama katmanı senaryo planını bu kimlikle difflediği için gelir
+    // kalemi de kendiliğinden kalıcılaşır.
+    private FinancialPlan AddFinancingLoan(
+        FinancialPlan plan,
+        SimulationRequest request)
+    {
+        var withRepayment = AddInstallmentPlan(
+            plan,
+            request,
+            request.TotalRepaymentAmount ?? request.Amount,
+            PaymentPlanKind.Installment);
+        return withRepayment with
+        {
+            OtherIncomes = withRepayment.OtherIncomes
+                .Append(new OneTimeIncome
+                {
+                    Id = request.ScenarioId,
+                    Description = request.Name.Trim(),
+                    Amount = request.Amount,
+                    ExactDate = request.StartDate
+                })
                 .ToArray()
         };
     }

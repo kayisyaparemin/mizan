@@ -201,18 +201,21 @@ jobs:
           cat > release-notes.md <<NOTES
           # Mizan $version
 
-          Bu sürüm, tek seferlik gelirin projeksiyonda sessizce kaybolmasına yol açan hatayı giderir.
+          Bu sürüm, simülatörde kredi senaryosunu doğru modeller.
 
           ### Düzeltmeler
 
-          - Son güncelleme tarihi ile ilk maaş günü arasına düşen tek seferlik
-            gelir artık ilk döneme yazılıyor. Önceden bu aralıktaki gelir hiçbir
-            dönemle eşleşmediği için hesaba hiç katılmıyor, üstelik hiçbir uyarı
-            da verilmiyordu; simülatörün varsayılan tarihi tam bu aralığa
-            düştüğü için "şu para gelse ne olur" denemeleri sonucu değiştirmiyordu.
-          - Simülatörde son güncelleme tarihinden önceye gelir girildiğinde artık
-            net bir uyarı veriliyor. O tarihteki para zaten mevcut tutarın
-            içindedir; sessizce yok sayılmak yerine söyleniyor.
+          - "Finansman / kredi" senaryosu artık kredi tutarını işlem tarihinde
+            gelir olarak da yazıyor. Önceden yalnızca geri ödeme taksitleri
+            modelleniyordu; kredi saf maliyet gibi görünüyor ve "kredi çeksem
+            açığımı kapatır mıyım" sorusu cevaplanamıyordu. Simülasyonu
+            uyguladığında kredi anaparası da finans planına kaydediliyor.
+
+          ### Bu sürümde dikkat
+
+          - Krediyi daha önce "tek seferlik gelir + finansman" diye iki koşulla
+            modellediyseniz, artık bunu tek "Finansman / kredi" koşuluyla
+            yapın. İkisini birlikte kullanmak kredi tutarını iki kez sayar.
           NOTES
 
       - name: Upload signed APK artifact

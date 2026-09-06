@@ -291,7 +291,7 @@ public partial class SimulationViewModel(
             SimulationScenarioType.CreditCardInstallmentPurchase =>
                 "Taksitler ilgili kart ekstrelerine yansıtılır.",
             SimulationScenarioType.FinancingLoan =>
-                "Toplam geri ödeme, ilk ödeme tarihinden başlayarak taksitlere bölünür.",
+                "Kredi tutarı işlem tarihinde gelir olarak eklenir; toplam geri ödeme, ilk ödeme tarihinden başlayarak taksitlere bölünür.",
             SimulationScenarioType.CashDebt =>
                 "Borç tutarı, seçtiğin ödeme sayısına kuruş farkı bırakmadan bölünür.",
             SimulationScenarioType.FutureOneTimePayment =>
