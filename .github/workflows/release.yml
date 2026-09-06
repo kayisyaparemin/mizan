@@ -201,21 +201,19 @@ jobs:
           cat > release-notes.md <<NOTES
           # Mizan $version
 
-          Bu sürüm, simülatörde kredi senaryosunu doğru modeller.
+          Bu sürüm, bir planın faizi nereden ve ne kadar değiştirdiğini görünür kılar.
 
-          ### Düzeltmeler
+          ### Yenilikler
 
-          - "Finansman / kredi" senaryosu artık kredi tutarını işlem tarihinde
-            gelir olarak da yazıyor. Önceden yalnızca geri ödeme taksitleri
-            modelleniyordu; kredi saf maliyet gibi görünüyor ve "kredi çeksem
-            açığımı kapatır mıyım" sorusu cevaplanamıyordu. Simülasyonu
-            uyguladığında kredi anaparası da finans planına kaydediliyor.
-
-          ### Bu sürümde dikkat
-
-          - Krediyi daha önce "tek seferlik gelir + finansman" diye iki koşulla
-            modellediyseniz, artık bunu tek "Finansman / kredi" koşuluyla
-            yapın. İkisini birlikte kullanmak kredi tutarını iki kez sayar.
+          - Simülatör sonucuna "Faiz Karşılaştırması" eklendi: kredi kartı faizi,
+            finansman açığı (KMH) faizi ve toplam, şimdiki durum ile denenen plan
+            yan yana. Motor bu iki faizi zaten ayrı hesaplıyordu ama ekranda
+            görünmüyordu.
+          - Ayrım önemli, çünkü bir plan ikisini ters yönde hareket ettirebilir:
+            kartı erken kapatmak kart faizini düşürürken parayı erken çıkardığı
+            için açık faizini yükseltebilir. Tek toplam bunu gizliyordu.
+          - Bir kalem değişmediğinde fark sütunu "0,00 TL" yerine "Değişmiyor"
+            yazıyor; sıfır, o faizin hiç olmadığı gibi okunuyordu.
           NOTES
 
       - name: Upload signed APK artifact

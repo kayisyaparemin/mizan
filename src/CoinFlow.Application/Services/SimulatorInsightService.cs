@@ -342,6 +342,52 @@ public sealed class SimulatorInsightService
 
     private static string Money(decimal value) =>
         $"{value.ToString("N2", TurkishCulture)} TL";
+
+    // Bir senaryo faizi tek yönde hareket ettirmez: kartı erken kapatmak kart
+    // faizini düşürürken parayı erkenden çıkardığı için açık faizini
+    // yükseltebilir. Tek toplam bunu gizlediğinden kalemler ayrı gösterilir.
+    public static IReadOnlyList<SimulatorInterestRow> BuildInterestComparison(
+        ProjectionInterestSummary baseline,
+        ProjectionInterestSummary scenario) =>
+    [
+        InterestRow(
+            "Kredi kartı faizi",
+            baseline.CreditCardInterest,
+            scenario.CreditCardInterest),
+        InterestRow(
+            "Finansman açığı (KMH) faizi",
+            baseline.DeficitFinancingInterest,
+            scenario.DeficitFinancingInterest),
+        InterestRow(
+            "Toplam faiz",
+            baseline.TotalInterestCost,
+            scenario.TotalInterestCost,
+            isTotal: true)
+    ];
+
+    private static SimulatorInterestRow InterestRow(
+        string label,
+        decimal baseline,
+        decimal scenario,
+        bool isTotal = false)
+    {
+        var difference = scenario - baseline;
+        // Sağdaki rakam farktır, faizin kendisi değil. Sıfırken "0,00 TL"
+        // yazmak "bu faiz yok" diye okunuyordu; değişmediğini söylüyoruz.
+        var differenceText = difference switch
+        {
+            0m => "Değişmiyor",
+            > 0m => $"+{Money(difference)}",
+            _ => Money(difference)
+        };
+        return new SimulatorInterestRow(
+            label,
+            Money(baseline),
+            Money(scenario),
+            differenceText,
+            difference,
+            isTotal);
+    }
 }
 
 public static class SimulatorProjectionMath

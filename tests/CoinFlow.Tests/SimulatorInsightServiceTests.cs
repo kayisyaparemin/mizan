@@ -9,6 +9,54 @@ public sealed class SimulatorInsightServiceTests
     private readonly SimulatorInsightService _service = new();
 
     [Fact]
+    public void InterestComparison_KeepsCardAndDeficitInterestApart()
+    {
+        // Kartı erkenden kapatan bir senaryo kart faizini düşürürken parayı
+        // erken çıkardığı için açık faizini yükseltebilir. Tek toplam bu ters
+        // hareketi gizler; kalemler ayrı kalmalı (I8).
+        var rows = SimulatorInsightService.BuildInterestComparison(
+            new ProjectionInterestSummary(7_081m, 6_236m),
+            new ProjectionInterestSummary(941m, 10_858m));
+
+        Assert.Equal(3, rows.Count);
+
+        var card = rows[0];
+        Assert.Equal(-6_140m, card.DifferenceAmount);
+        Assert.True(card.IsSaving);
+        Assert.False(card.IsExtra);
+        Assert.False(card.IsTotal);
+
+        var deficit = rows[1];
+        Assert.Equal(4_622m, deficit.DifferenceAmount);
+        Assert.True(deficit.IsExtra);
+        Assert.StartsWith("+", deficit.Difference);
+
+        var total = rows[2];
+        Assert.True(total.IsTotal);
+        Assert.Equal(-1_518m, total.DifferenceAmount);
+        Assert.True(total.IsSaving);
+        Assert.Contains("→", total.Transition);
+    }
+
+    [Fact]
+    public void InterestComparison_SaysUnchangedInsteadOfZero()
+    {
+        // Fark sütununda "0,00 TL" yazmak "bu faiz yok" diye okunuyordu.
+        var rows = SimulatorInsightService.BuildInterestComparison(
+            new ProjectionInterestSummary(7_324.30m, 0m),
+            new ProjectionInterestSummary(7_324.30m, 0m));
+
+        Assert.All(rows, row =>
+        {
+            Assert.Equal(0m, row.DifferenceAmount);
+            Assert.Equal("Değişmiyor", row.Difference);
+            Assert.False(row.IsSaving);
+            Assert.False(row.IsExtra);
+        });
+        Assert.Equal("7.324,30 TL → 7.324,30 TL", rows[0].Transition);
+    }
+
+    [Fact]
     public void PeriodNeed_ComposesCashRequirementsWithoutOpeningState()
     {
         var row = Row(

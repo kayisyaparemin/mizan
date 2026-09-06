@@ -18,6 +18,22 @@ public sealed record SimulatorProjectionSummary(
     public bool HasKeyMetrics => KeyMetrics.Count > 0;
 }
 
+// Faiz karşılaştırma tablosunun tek satırı. Motor kart faizi ile finansman
+// açığı faizini ayrı tutar (I8); sunumda da ayrı kalmaları gerekiyor, çünkü
+// bir senaryo birini düşürürken diğerini yükseltebilir.
+public sealed record SimulatorInterestRow(
+    string Label,
+    string Baseline,
+    string Scenario,
+    string Difference,
+    decimal DifferenceAmount,
+    bool IsTotal = false)
+{
+    public bool IsSaving => DifferenceAmount < 0m;
+    public bool IsExtra => DifferenceAmount > 0m;
+    public string Transition => $"{Baseline} → {Scenario}";
+}
+
 public sealed record SimulatorSummaryMetric(
     string Label,
     string Value,

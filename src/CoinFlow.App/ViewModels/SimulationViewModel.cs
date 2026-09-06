@@ -37,6 +37,8 @@ public partial class SimulationViewModel(
     public ObservableCollection<SimulatorPeriodView> Results { get; } = [];
     public ObservableCollection<string> NarrativeInsights { get; } = [];
     public ObservableCollection<SimulatorSummaryMetric> SummaryMetrics { get; } = [];
+    public ObservableCollection<SimulatorInterestRow> InterestComparison
+    { get; } = [];
     public ObservableCollection<SelectionOption<DateOnly>> StrategySalaryDates { get; } = [];
     public IReadOnlyList<SelectionOption<PaymentAssignmentMode>> StrategyModes { get; } =
     [
@@ -407,6 +409,7 @@ public partial class SimulationViewModel(
         Results.Clear();
         NarrativeInsights.Clear();
         SummaryMetrics.Clear();
+        InterestComparison.Clear();
         HasResults = false;
         IsResultStale = false;
         ResetApplyState(clearRequest: true);
@@ -523,6 +526,7 @@ public partial class SimulationViewModel(
             Results.Clear();
             NarrativeInsights.Clear();
             SummaryMetrics.Clear();
+            InterestComparison.Clear();
             HasResults = false;
             IsResultStale = false;
             _lastRequests = [];
@@ -867,6 +871,13 @@ public partial class SimulationViewModel(
             result.AdditionalInterestCost < 0m
                 ? result.InterestSaving
                 : result.AdditionalInterestCost);
+        InterestComparison.Clear();
+        foreach (var row in SimulatorInsightService.BuildInterestComparison(
+                     result.BaselineInterest,
+                     result.ScenarioInterest))
+        {
+            InterestComparison.Add(row);
+        }
         FriendlySummary = string.Join(Environment.NewLine,
             projectionSummary.NarrativeInsights);
         var transition = result.Scenario.FirstOrDefault(x =>

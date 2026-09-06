@@ -230,6 +230,52 @@
                     </VerticalStackLayout>
                 </Border>
 
+                <Border>
+                    <VerticalStackLayout Spacing="11">
+                        <Label Text="Faiz Karşılaştırması"
+                               Style="{StaticResource SectionTitle}" />
+                        <Label Text="12 dönem toplamı · sağdaki rakam bu planın getirdiği fark, alt satır şimdiki durum → bu planla"
+                               Style="{StaticResource MutedText}"
+                               FontSize="12" />
+                        <VerticalStackLayout BindableLayout.ItemsSource="{Binding InterestComparison}"
+                                             Spacing="10">
+                            <BindableLayout.ItemTemplate>
+                                <DataTemplate>
+                                    <VerticalStackLayout Spacing="5">
+                                        <BoxView HeightRequest="1" Color="{StaticResource Line}" />
+                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                                            <Label Text="{Binding Label}"
+                                                   Style="{StaticResource MutedText}">
+                                                <Label.Triggers>
+                                                    <DataTrigger TargetType="Label" Binding="{Binding IsTotal}" Value="True">
+                                                        <Setter Property="FontFamily" Value="OpenSansSemibold" />
+                                                    </DataTrigger>
+                                                </Label.Triggers>
+                                            </Label>
+                                            <Label Grid.Column="1"
+                                                   Text="{Binding Difference}"
+                                                   FontFamily="OpenSansSemibold"
+                                                   TextColor="{StaticResource ProjectionText}">
+                                                <Label.Triggers>
+                                                    <DataTrigger TargetType="Label" Binding="{Binding IsSaving}" Value="True">
+                                                        <Setter Property="TextColor" Value="{StaticResource PositiveText}" />
+                                                    </DataTrigger>
+                                                    <DataTrigger TargetType="Label" Binding="{Binding IsExtra}" Value="True">
+                                                        <Setter Property="TextColor" Value="{StaticResource DeficitText}" />
+                                                    </DataTrigger>
+                                                </Label.Triggers>
+                                            </Label>
+                                        </Grid>
+                                        <Label Text="{Binding Transition}"
+                                               Style="{StaticResource MutedText}"
+                                               FontSize="12" />
+                                    </VerticalStackLayout>
+                                </DataTemplate>
+                            </BindableLayout.ItemTemplate>
+                        </VerticalStackLayout>
+                    </VerticalStackLayout>
+                </Border>
+
                 <Label Text="12 Dönem Finansal Görünüm" Style="{StaticResource SectionTitle}" />
                 <VerticalStackLayout BindableLayout.ItemsSource="{Binding Results}" Spacing="8">
                     <BindableLayout.ItemTemplate>
