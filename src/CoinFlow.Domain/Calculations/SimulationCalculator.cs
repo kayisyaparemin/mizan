@@ -15,7 +15,7 @@ public enum SimulationScenarioType
     FutureIncome,
     SalaryChange,
     PaymentStrategyChange,
-    CreditCardFullPayment
+    CreditCardPaymentMode
 }
 
 public sealed record SimulationRequest(
@@ -29,7 +29,12 @@ public sealed record SimulationRequest(
     decimal? TotalRepaymentAmount = null,
     PaymentAssignmentMode? NewPaymentAssignmentMode = null,
     DateOnly? EffectiveSalaryDate = null,
-    Guid ScenarioId = default);
+    Guid ScenarioId = default,
+    // CreditCardPaymentMode senaryosu için: hangi ödeme şekli ve kapsamı.
+    // Kapsam false ise yalnızca StartDate'teki ekstre, true ise kartın genel
+    // ödeme şekli değişir.
+    CreditCardPaymentType? CardPaymentType = null,
+    bool AppliesToAllStatements = false);
 
 public sealed record SimulationImpactRow(
     SalaryPeriodProjection Baseline,
@@ -250,8 +255,8 @@ public sealed class SimulationCalculator(
                 },
             SimulationScenarioType.PaymentStrategyChange =>
                 AddPaymentStrategy(plan, request),
-            SimulationScenarioType.CreditCardFullPayment =>
-                AddCardFullPayment(plan, request),
+            SimulationScenarioType.CreditCardPaymentMode =>
+                AddCardPaymentMode(plan, request),
             _ => throw new ArgumentOutOfRangeException(nameof(request.Type))
         };
 
@@ -360,34 +365,43 @@ public sealed class SimulationCalculator(
         };
     }
 
-    private static FinancialPlan AddCardFullPayment(
+    // Kartı asgari yerine tamamen ödemek (veya tersi) faizi doğrudan
+    // değiştirir, ama etkisi tek yönlü değildir: erken kapatmak kart faizini
+    // düşürürken parayı erken çıkardığı için açık faizini yükseltebilir.
+    // Kapsam iki türlüdür — tek ekstre için vade tarihine override, sürekli
+    // için kartın genel ödeme şekli.
+    private static FinancialPlan AddCardPaymentMode(
         FinancialPlan plan,
         SimulationRequest request)
     {
         if (request.CreditCardId is null)
         {
             throw new InvalidOperationException(
-                "Tam ödeme planı için bir kredi kartı seçmelisin.");
+                "Ödeme şekli planı için bir kredi kartı seçmelisin.");
         }
 
         var card = plan.CreditCards.SingleOrDefault(x =>
                        x.Id == request.CreditCardId.Value)
                    ?? throw new InvalidOperationException(
                        "Seçilen kredi kartı bulunamadı.");
-        var updated = card with
-        {
-            PaymentPlans = card.PaymentPlans
-                .Where(x => x.DueDate != request.StartDate)
-                .Append(new CreditCardPaymentPlan
-                {
-                    Id = request.ScenarioId,
-                    CreditCardId = card.Id,
-                    DueDate = request.StartDate,
-                    PaymentType = CreditCardPaymentType.FullStatement
-                })
-                .OrderBy(x => x.DueDate)
-                .ToArray()
-        };
+        var paymentType = request.CardPaymentType ??
+                          CreditCardPaymentType.FullStatement;
+        var updated = request.AppliesToAllStatements
+            ? card with { PaymentStrategy = ToStrategy(paymentType) }
+            : card with
+            {
+                PaymentPlans = card.PaymentPlans
+                    .Where(x => x.DueDate != request.StartDate)
+                    .Append(new CreditCardPaymentPlan
+                    {
+                        Id = request.ScenarioId,
+                        CreditCardId = card.Id,
+                        DueDate = request.StartDate,
+                        PaymentType = paymentType
+                    })
+                    .OrderBy(x => x.DueDate)
+                    .ToArray()
+            };
         return plan with
         {
             CreditCards = plan.CreditCards
@@ -395,6 +409,16 @@ public sealed class SimulationCalculator(
                 .ToArray()
         };
     }
+
+    private static CreditCardPaymentStrategy ToStrategy(
+        CreditCardPaymentType paymentType) => paymentType switch
+    {
+        CreditCardPaymentType.Minimum => CreditCardPaymentStrategy.Minimum,
+        CreditCardPaymentType.FullStatement =>
+            CreditCardPaymentStrategy.FullStatement,
+        _ => throw new InvalidOperationException(
+            "Kart ödeme şekli yalnızca asgari veya tamamı olabilir.")
+    };
 
     // Kredi iki taraflıdır: anapara çekildiği gün hesaba girer, geri ödeme
     // taksitlerle çıkar. Yalnızca taksitleri modellemek krediyi saf maliyet
@@ -533,7 +557,7 @@ public sealed class SimulationCalculator(
             SimulationScenarioType.FutureIncome or
                 SimulationScenarioType.SalaryChange or
             SimulationScenarioType.PaymentStrategyChange => 0m,
-            SimulationScenarioType.CreditCardFullPayment => 0m,
+            SimulationScenarioType.CreditCardPaymentMode => 0m,
             SimulationScenarioType.FinancingLoan =>
                 request.TotalRepaymentAmount ?? request.Amount,
             SimulationScenarioType.RecurringPayment =>
@@ -618,7 +642,7 @@ public sealed class SimulationCalculator(
         }
 
         if (request.Type is not SimulationScenarioType.PaymentStrategyChange and
-            not SimulationScenarioType.CreditCardFullPayment &&
+            not SimulationScenarioType.CreditCardPaymentMode &&
             request.Amount <= 0m)
         {
             throw new ArgumentOutOfRangeException(
@@ -646,11 +670,19 @@ public sealed class SimulationCalculator(
                 "Ödeme sayısı 1 ile 120 arasında olmalıdır.");
         }
 
-        if (request.Type == SimulationScenarioType.CreditCardFullPayment &&
-            request.CreditCardId is null)
+        if (request.Type == SimulationScenarioType.CreditCardPaymentMode)
         {
-            throw new InvalidOperationException(
-                "Tam ödeme planı için bir kredi kartı seçmelisin.");
+            if (request.CreditCardId is null)
+            {
+                throw new InvalidOperationException(
+                    "Ödeme şekli planı için bir kredi kartı seçmelisin.");
+            }
+
+            if (request.CardPaymentType is CreditCardPaymentType.FixedAmount)
+            {
+                throw new InvalidOperationException(
+                    "Kart ödeme şekli yalnızca asgari veya tamamı olabilir.");
+            }
         }
 
         if (request.Type == SimulationScenarioType.FinancingLoan &&

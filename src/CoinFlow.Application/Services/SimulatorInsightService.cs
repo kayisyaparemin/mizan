@@ -346,24 +346,43 @@ public sealed class SimulatorInsightService
     // Bir senaryo faizi tek yönde hareket ettirmez: kartı erken kapatmak kart
     // faizini düşürürken parayı erkenden çıkardığı için açık faizini
     // yükseltebilir. Tek toplam bunu gizlediğinden kalemler ayrı gösterilir.
+    /// <param name="scenarioFinancingCost">
+    /// Denenen plandaki kredinin geri ödeme ile anapara farkı. Bu da faizdir:
+    /// 120.000 çekip 145.000 ödüyorsan 25.000'i faiz yüküdür. Projeksiyonun
+    /// dönem sonu rakamı bunu zaten içerir, ama kart/KMH faizinden ayrı
+    /// tutulduğu için tabloya elle katılması gerekir; katılmazsa krediyi
+    /// faiz düşürüyormuş gibi gösterir.
+    /// </param>
     public static IReadOnlyList<SimulatorInterestRow> BuildInterestComparison(
         ProjectionInterestSummary baseline,
-        ProjectionInterestSummary scenario) =>
-    [
-        InterestRow(
-            "Kredi kartı faizi",
-            baseline.CreditCardInterest,
-            scenario.CreditCardInterest),
-        InterestRow(
-            "Finansman açığı (KMH) faizi",
-            baseline.DeficitFinancingInterest,
-            scenario.DeficitFinancingInterest),
-        InterestRow(
-            "Toplam faiz",
+        ProjectionInterestSummary scenario,
+        decimal? scenarioFinancingCost = null)
+    {
+        var financing = scenarioFinancingCost ?? 0m;
+        var rows = new List<SimulatorInterestRow>
+        {
+            InterestRow(
+                "Kredi kartı faizi",
+                baseline.CreditCardInterest,
+                scenario.CreditCardInterest),
+            InterestRow(
+                "Finansman açığı (KMH) faizi",
+                baseline.DeficitFinancingInterest,
+                scenario.DeficitFinancingInterest)
+        };
+
+        if (financing > 0m)
+        {
+            rows.Add(InterestRow("Kredi finansman maliyeti", 0m, financing));
+        }
+
+        rows.Add(InterestRow(
+            "Toplam faiz yükü",
             baseline.TotalInterestCost,
-            scenario.TotalInterestCost,
-            isTotal: true)
-    ];
+            scenario.TotalInterestCost + financing,
+            isTotal: true));
+        return rows;
+    }
 
     private static SimulatorInterestRow InterestRow(
         string label,

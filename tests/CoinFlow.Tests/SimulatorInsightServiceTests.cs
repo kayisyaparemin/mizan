@@ -39,6 +39,44 @@ public sealed class SimulatorInsightServiceTests
     }
 
     [Fact]
+    public void InterestComparison_CountsFinancingCostAsInterest()
+    {
+        // 150.000 çekip 180.000 ödüyorsan aradaki 30.000 faizdir. Tabloya
+        // katılmazsa kredi, KMH faizini sıfırladığı için faiz düşürüyormuş
+        // gibi görünür; oysa toplam yük artıyor.
+        var rows = SimulatorInsightService.BuildInterestComparison(
+            new ProjectionInterestSummary(7_081m, 6_236m),
+            new ProjectionInterestSummary(7_081m, 0m),
+            scenarioFinancingCost: 30_000m);
+
+        Assert.Equal(4, rows.Count);
+
+        var financing = rows[2];
+        Assert.Equal("Kredi finansman maliyeti", financing.Label);
+        Assert.Equal(30_000m, financing.DifferenceAmount);
+        Assert.True(financing.IsExtra);
+
+        var total = rows[3];
+        Assert.True(total.IsTotal);
+        Assert.Equal(23_764m, total.DifferenceAmount);
+        Assert.True(total.IsExtra);
+        Assert.Contains("37.081,00", total.Transition);
+    }
+
+    [Fact]
+    public void InterestComparison_OmitsFinancingRowWhenThereIsNoLoan()
+    {
+        var rows = SimulatorInsightService.BuildInterestComparison(
+            new ProjectionInterestSummary(7_081m, 6_236m),
+            new ProjectionInterestSummary(941m, 10_858m));
+
+        Assert.Equal(3, rows.Count);
+        Assert.DoesNotContain(
+            rows,
+            x => x.Label == "Kredi finansman maliyeti");
+    }
+
+    [Fact]
     public void InterestComparison_SaysUnchangedInsteadOfZero()
     {
         // Fark sütununda "0,00 TL" yazmak "bu faiz yok" diye okunuyordu.

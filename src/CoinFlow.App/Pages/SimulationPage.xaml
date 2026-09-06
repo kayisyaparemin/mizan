@@ -58,6 +58,15 @@
                         <Picker ItemsSource="{Binding CreditCards}" SelectedItem="{Binding SelectedCreditCard}" Title="Kart seç" />
                     </VerticalStackLayout>
 
+                    <VerticalStackLayout IsVisible="{Binding IsCardPayoff}" Spacing="7">
+                        <Label Text="Ödeme şekli" Style="{StaticResource FieldLabel}" />
+                        <Picker ItemsSource="{Binding CardPaymentModes}"
+                                SelectedItem="{Binding SelectedCardPaymentMode}" />
+                        <Label Text="Kapsam" Style="{StaticResource FieldLabel}" />
+                        <Picker ItemsSource="{Binding CardPaymentScopes}"
+                                SelectedItem="{Binding SelectedCardPaymentScope}" />
+                    </VerticalStackLayout>
+
                     <VerticalStackLayout IsVisible="{Binding NeedsPaymentCount}" Spacing="7">
                         <Label Text="Ödeme / taksit sayısı" Style="{StaticResource FieldLabel}" />
                         <Entry Text="{Binding PaymentCount}" Keyboard="Numeric" />

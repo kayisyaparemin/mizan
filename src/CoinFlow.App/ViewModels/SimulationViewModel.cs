@@ -28,7 +28,7 @@ public partial class SimulationViewModel(
         new("Tek seferlik gelir", SimulationScenarioType.FutureIncome),
         new("Gelir değişikliği", SimulationScenarioType.SalaryChange),
         new("Gelir kullanım düzeni değişikliği", SimulationScenarioType.PaymentStrategyChange),
-        new("Kart ekstresini tamamen kapat", SimulationScenarioType.CreditCardFullPayment)
+        new("Kart ödeme şeklini değiştir", SimulationScenarioType.CreditCardPaymentMode)
     ];
 
     public ObservableCollection<SelectionOption<Guid>> CreditCards { get; } = [];
@@ -44,6 +44,19 @@ public partial class SimulationViewModel(
     [
         new("Geçmiş dönemi kapatırım", PaymentAssignmentMode.PreviousPeriod),
         new("Gelecek dönemi karşılarım", PaymentAssignmentMode.UpcomingPeriod)
+    ];
+
+    public IReadOnlyList<SelectionOption<CreditCardPaymentType>>
+        CardPaymentModes { get; } =
+    [
+        new("Tamamını öde", CreditCardPaymentType.FullStatement),
+        new("Asgari öde", CreditCardPaymentType.Minimum)
+    ];
+
+    public IReadOnlyList<SelectionOption<bool>> CardPaymentScopes { get; } =
+    [
+        new("Yalnızca bu ekstre", false),
+        new("Bundan sonraki tüm ekstreler", true)
     ];
 
     private IReadOnlyList<SimulationRequest> _lastRequests = [];
@@ -73,6 +86,8 @@ public partial class SimulationViewModel(
     [ObservableProperty] private bool isRegularScenario = true;
     [ObservableProperty] private SelectionOption<PaymentAssignmentMode>? selectedStrategyMode;
     [ObservableProperty] private SelectionOption<DateOnly>? selectedStrategySalaryDate;
+    [ObservableProperty] private SelectionOption<CreditCardPaymentType>? selectedCardPaymentMode;
+    [ObservableProperty] private SelectionOption<bool>? selectedCardPaymentScope;
     [ObservableProperty] private string scenarioDescription = string.Empty;
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanApplyPlan))]
@@ -266,7 +281,7 @@ public partial class SimulationViewModel(
         IsCard = type is
             SimulationScenarioType.CreditCardSinglePayment or
             SimulationScenarioType.CreditCardInstallmentPurchase or
-            SimulationScenarioType.CreditCardFullPayment;
+            SimulationScenarioType.CreditCardPaymentMode;
         NeedsPaymentCount = type is
             SimulationScenarioType.CreditCardInstallmentPurchase or
             SimulationScenarioType.FinancingLoan or
@@ -278,11 +293,16 @@ public partial class SimulationViewModel(
             SimulationScenarioType.RecurringPayment;
         IsFinancing = type == SimulationScenarioType.FinancingLoan;
         IsStrategyChange = type == SimulationScenarioType.PaymentStrategyChange;
-        IsCardPayoff = type == SimulationScenarioType.CreditCardFullPayment;
+        IsCardPayoff = type == SimulationScenarioType.CreditCardPaymentMode;
         NeedsAmount = !IsStrategyChange && !IsCardPayoff;
         StartDateLabel = IsCardPayoff
-            ? "Tam ödeme tarihi"
+            ? "Hangi ekstreden itibaren (son ödeme tarihi)"
             : "Başlangıç / işlem tarihi";
+        if (IsCardPayoff)
+        {
+            SelectedCardPaymentMode ??= CardPaymentModes[0];
+            SelectedCardPaymentScope ??= CardPaymentScopes[0];
+        }
         IsRegularScenario = !IsStrategyChange;
         ScenarioDescription = type switch
         {
@@ -306,8 +326,8 @@ public partial class SimulationViewModel(
                 "Yeni gelir, seçtiğin tarihten itibaren kullanılır.",
             SimulationScenarioType.PaymentStrategyChange =>
                 "Yeni düzen yalnızca seçtiğin dönemden itibaren hesaplanır; Simülasyon Yap finans kayıtlarını değiştirmez.",
-            SimulationScenarioType.CreditCardFullPayment =>
-                "Seçilen tarihte ekstrenin tamamı ödenir; sonraki dönemlerde kart faizi ve nakit akışı yeniden projekte edilir.",
+            SimulationScenarioType.CreditCardPaymentMode =>
+                "Kartın ödeme şeklini değiştirir. Kart faizi ile finansman açığı faizi ters yönde hareket edebilir; Faiz Karşılaştırması ikisini ayrı gösterir.",
             _ => string.Empty
         };
     }
@@ -584,7 +604,13 @@ public partial class SimulationViewModel(
             repayment,
             IsStrategyChange ? SelectedStrategyMode?.Value : null,
             IsStrategyChange ? SelectedStrategySalaryDate?.Value : null,
-            _editingConditionId ?? Guid.NewGuid());
+            _editingConditionId ?? Guid.NewGuid(),
+            IsCardPayoff
+                ? SelectedCardPaymentMode?.Value ??
+                  throw new InvalidOperationException(
+                      "Kart ödeme şeklini seçmelisin.")
+                : null,
+            IsCardPayoff && SelectedCardPaymentScope?.Value == true);
     }
 
     private string BuildApplyConfirmation(IReadOnlyList<SimulationRequest> requests)
@@ -605,7 +631,7 @@ public partial class SimulationViewModel(
     {
         var summary = request.Type is
             SimulationScenarioType.PaymentStrategyChange or
-            SimulationScenarioType.CreditCardFullPayment
+            SimulationScenarioType.CreditCardPaymentMode
                 ? request.Name.Trim()
                 : $"{Money(request.Amount)} {request.Name.Trim()}";
         var detail = request.Type switch
@@ -614,8 +640,8 @@ public partial class SimulationViewModel(
                 $"Kart: {CardLabel(request.CreditCardId)}\n{request.PaymentCount} taksit\nİşlem: {request.StartDate:dd MMMM yyyy}",
             SimulationScenarioType.CreditCardSinglePayment =>
                 $"Kart: {CardLabel(request.CreditCardId)}\nİşlem: {request.StartDate:dd MMMM yyyy}",
-            SimulationScenarioType.CreditCardFullPayment =>
-                $"Kart: {CardLabel(request.CreditCardId)}\nTam ödeme: {request.StartDate:dd MMMM yyyy}",
+            SimulationScenarioType.CreditCardPaymentMode =>
+                $"Kart: {CardLabel(request.CreditCardId)}\n{CardModeLabel(request.CardPaymentType)} · {CardScopeLabel(request.AppliesToAllStatements)}\n{request.StartDate:dd MMMM yyyy}",
             SimulationScenarioType.FinancingLoan =>
                 $"{request.PaymentCount} taksit • toplam {Money(request.TotalRepaymentAmount.GetValueOrDefault())}\nİlk ödeme: {request.FirstPaymentDate:dd MMMM yyyy}",
             SimulationScenarioType.CashDebt or
@@ -717,8 +743,8 @@ public partial class SimulationViewModel(
                 $"{amount} • Yeni gelir",
             SimulationScenarioType.PaymentStrategyChange =>
                 $"{StrategyModeLabel(request.NewPaymentAssignmentMode)} • {request.EffectiveSalaryDate:dd MMMM yyyy} dönemi",
-            SimulationScenarioType.CreditCardFullPayment =>
-                $"{CardLabel(request.CreditCardId)} • Ekstre tam ödeme",
+            SimulationScenarioType.CreditCardPaymentMode =>
+                $"{CardLabel(request.CreditCardId)} • {CardModeLabel(request.CardPaymentType)}",
             _ => request.Name
         };
     }
@@ -736,7 +762,7 @@ public partial class SimulationViewModel(
             SimulationScenarioType.FutureIncome => "Tek seferlik gelir",
             SimulationScenarioType.SalaryChange => "Gelir değişikliği",
             SimulationScenarioType.PaymentStrategyChange => "Gelir kullanım düzeni",
-            SimulationScenarioType.CreditCardFullPayment => "Kart ekstresini kapat",
+            SimulationScenarioType.CreditCardPaymentMode => "Kart ödeme şekli",
             _ => "Koşul"
         };
 
@@ -748,6 +774,16 @@ public partial class SimulationViewModel(
         mode == PaymentAssignmentMode.PreviousPeriod
             ? "Geçmiş dönemi kapatırım"
             : "Gelecek dönemi karşılarım";
+
+    private static string CardModeLabel(CreditCardPaymentType? paymentType) =>
+        paymentType == CreditCardPaymentType.Minimum
+            ? "Asgari öde"
+            : "Tamamını öde";
+
+    private static string CardScopeLabel(bool appliesToAllStatements) =>
+        appliesToAllStatements
+            ? "Bundan sonraki tüm ekstreler"
+            : "Yalnızca bu ekstre";
 
     private void LoadConditionIntoForm(SimulationRequest request)
     {
@@ -771,6 +807,11 @@ public partial class SimulationViewModel(
         SelectedStrategySalaryDate = request.EffectiveSalaryDate is { } date
             ? StrategySalaryDates.FirstOrDefault(x => x.Value == date)
             : SelectedStrategySalaryDate;
+        SelectedCardPaymentMode = request.CardPaymentType is { } cardPaymentType
+            ? CardPaymentModes.First(x => x.Value == cardPaymentType)
+            : SelectedCardPaymentMode;
+        SelectedCardPaymentScope = CardPaymentScopes.First(x =>
+            x.Value == request.AppliesToAllStatements);
     }
 
     private void ResetConditionForm()
@@ -785,6 +826,8 @@ public partial class SimulationViewModel(
         SelectedScenarioType = ScenarioTypes[0];
         SelectedCreditCard = CreditCards.FirstOrDefault();
         SelectedStrategySalaryDate = StrategySalaryDates.FirstOrDefault();
+        SelectedCardPaymentMode = CardPaymentModes[0];
+        SelectedCardPaymentScope = CardPaymentScopes[0];
         OnPropertyChanged(nameof(IsEditingCondition));
         OnPropertyChanged(nameof(AddConditionButtonText));
     }
@@ -874,7 +917,8 @@ public partial class SimulationViewModel(
         InterestComparison.Clear();
         foreach (var row in SimulatorInsightService.BuildInterestComparison(
                      result.BaselineInterest,
-                     result.ScenarioInterest))
+                     result.ScenarioInterest,
+                     result.Risk.FinancingCost))
         {
             InterestComparison.Add(row);
         }

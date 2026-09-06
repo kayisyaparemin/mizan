@@ -201,19 +201,24 @@ jobs:
           cat > release-notes.md <<NOTES
           # Mizan $version
 
-          Bu sürüm, bir planın faizi nereden ve ne kadar değiştirdiğini görünür kılar.
+          Bu sürüm faiz karşılaştırmasını tamamlar ve kart ödeme şeklini denenebilir hale getirir.
 
           ### Yenilikler
 
-          - Simülatör sonucuna "Faiz Karşılaştırması" eklendi: kredi kartı faizi,
-            finansman açığı (KMH) faizi ve toplam, şimdiki durum ile denenen plan
-            yan yana. Motor bu iki faizi zaten ayrı hesaplıyordu ama ekranda
-            görünmüyordu.
-          - Ayrım önemli, çünkü bir plan ikisini ters yönde hareket ettirebilir:
-            kartı erken kapatmak kart faizini düşürürken parayı erken çıkardığı
-            için açık faizini yükseltebilir. Tek toplam bunu gizliyordu.
-          - Bir kalem değişmediğinde fark sütunu "0,00 TL" yerine "Değişmiyor"
-            yazıyor; sıfır, o faizin hiç olmadığı gibi okunuyordu.
+          - "Kart ekstresini tamamen kapat" senaryosu "Kart ödeme şeklini
+            değiştir" oldu. Artık asgari ile tamamı arasında seçim yapılabiliyor
+            ve kapsam seçiliyor: yalnızca o ekstre ya da bundan sonraki tüm
+            ekstreler. Böylece "hep tamamını ödesem faizim ne olur" sorusu
+            Finansal Yapı'ya gidip gelmeden cevaplanıyor.
+
+          ### Düzeltmeler
+
+          - Kredi finansman maliyeti artık Faiz Karşılaştırması'na kendi satırı
+            olarak giriyor ve toplama dahil ediliyor. 120.000 çekip 145.000
+            ödüyorsan aradaki 25.000 de faizdir; tabloya katılmadığı için kredi,
+            yalnızca açık faizini sıfırladığından faiz düşürüyormuş gibi
+            görünüyordu. Dönem sonu rakamı bu maliyeti zaten içeriyordu, tablo
+            içermiyordu.
           NOTES
 
       - name: Upload signed APK artifact

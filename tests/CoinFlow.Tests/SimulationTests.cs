@@ -183,6 +183,74 @@ public sealed class SimulationTests
     }
 
     [Fact]
+    public void CardPaymentMode_MinimumOnOneStatement_OverridesThatDueDateOnly()
+    {
+        var plan = TestFactory.CanonicalPlan();
+        var card = Assert.Single(plan.CreditCards);
+        var calculator = new SimulationCalculator(_projection, _installments);
+
+        var scenarioPlan = calculator.BuildScenarioPlan(
+            plan,
+            new SimulationRequest(
+                SimulationScenarioType.CreditCardPaymentMode,
+                "Ekim asgari",
+                0m,
+                new DateOnly(2026, 10, 8),
+                CreditCardId: card.Id,
+                CardPaymentType: CreditCardPaymentType.Minimum));
+
+        var scenarioCard = Assert.Single(scenarioPlan.CreditCards);
+        var overridePlan = Assert.Single(
+            scenarioCard.PaymentPlans,
+            x => x.DueDate == new DateOnly(2026, 10, 8));
+        Assert.Equal(CreditCardPaymentType.Minimum, overridePlan.PaymentType);
+        // Tek ekstre kapsamında kartın genel şekli değişmemeli.
+        Assert.Equal(card.PaymentStrategy, scenarioCard.PaymentStrategy);
+    }
+
+    [Fact]
+    public void CardPaymentMode_AllStatements_ChangesTheCardStrategy()
+    {
+        var plan = TestFactory.CanonicalPlan();
+        var card = Assert.Single(plan.CreditCards);
+        var calculator = new SimulationCalculator(_projection, _installments);
+
+        var scenarioPlan = calculator.BuildScenarioPlan(
+            plan,
+            new SimulationRequest(
+                SimulationScenarioType.CreditCardPaymentMode,
+                "Hep tamamı",
+                0m,
+                new DateOnly(2026, 10, 8),
+                CreditCardId: card.Id,
+                CardPaymentType: CreditCardPaymentType.FullStatement,
+                AppliesToAllStatements: true));
+
+        var scenarioCard = Assert.Single(scenarioPlan.CreditCards);
+        Assert.Equal(
+            CreditCardPaymentStrategy.FullStatement,
+            scenarioCard.PaymentStrategy);
+        // Sürekli kapsamda tek tarihe override eklenmemeli.
+        Assert.Equal(card.PaymentPlans.Count, scenarioCard.PaymentPlans.Count);
+    }
+
+    [Fact]
+    public void CardPaymentMode_RejectsFixedAmount()
+    {
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            SimulationCalculator.Validate(
+                new SimulationRequest(
+                    SimulationScenarioType.CreditCardPaymentMode,
+                    "Sabit tutar",
+                    0m,
+                    new DateOnly(2026, 10, 8),
+                    CreditCardId: Guid.NewGuid(),
+                    CardPaymentType: CreditCardPaymentType.FixedAmount)));
+
+        Assert.Contains("asgari veya tamamı", exception.Message);
+    }
+
+    [Fact]
     public void Financing_ReportsTotalAndFinancingCost()
     {
         var result = new SimulationCalculator(_projection, _installments)
@@ -315,7 +383,7 @@ public sealed class SimulationTests
             CreditCards = [card]
         };
         var request = new SimulationRequest(
-            SimulationScenarioType.CreditCardFullPayment,
+            SimulationScenarioType.CreditCardPaymentMode,
             "Axess'i tamamen kapat",
             0m,
             new DateOnly(2026, 12, 5),
@@ -370,7 +438,7 @@ public sealed class SimulationTests
                 plan,
                 new DateOnly(2026, 8, 20),
                 new SimulationRequest(
-                    SimulationScenarioType.CreditCardFullPayment,
+                    SimulationScenarioType.CreditCardPaymentMode,
                     "Axess'i tamamen kapat",
                     0m,
                     payoffDate,
@@ -1112,7 +1180,7 @@ public sealed class SimulationTests
                 [1].PaymentDueDate;
             await service.ApplySimulationAsync(
                 new SimulationRequest(
-                    SimulationScenarioType.CreditCardFullPayment,
+                    SimulationScenarioType.CreditCardPaymentMode,
                     "Axess'i kapat",
                     0m,
                     payoffDate,

@@ -386,7 +386,7 @@ public sealed class CoinFlowService(
             .Where(x => x.Type is
                 SimulationScenarioType.CreditCardSinglePayment or
                 SimulationScenarioType.CreditCardInstallmentPurchase or
-                SimulationScenarioType.CreditCardFullPayment)
+                SimulationScenarioType.CreditCardPaymentMode)
             .Select(x => x.CreditCardId ?? throw new InvalidOperationException(
                 "Kart koşulunda kredi kartı bulunamadı."))
             .Distinct()
@@ -430,7 +430,7 @@ public sealed class CoinFlowService(
                         "Plan finans planına eklendi."),
                 SimulationScenarioType.CreditCardSinglePayment or
                     SimulationScenarioType.CreditCardInstallmentPurchase or
-                    SimulationScenarioType.CreditCardFullPayment =>
+                    SimulationScenarioType.CreditCardPaymentMode =>
                     AppliedResult(
                         request,
                         batch.CreditCards.Single().Id,
@@ -494,7 +494,7 @@ public sealed class CoinFlowService(
                 AppliedResult(request, request.CreditCardId!.Value,
                     SimulationApplyDestination.CreditCard,
                     "Plan daha önce kredi kartına eklendi."),
-            SimulationScenarioType.CreditCardFullPayment
+            SimulationScenarioType.CreditCardPaymentMode
                 when plan.CreditCards.Any(card =>
                     card.Id == request.CreditCardId &&
                     card.PaymentPlans.Any(payment =>
