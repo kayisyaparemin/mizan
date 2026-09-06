@@ -568,11 +568,28 @@ public sealed class SimulationCalculator(
     private static string PeriodMonth(SalaryPeriod period) =>
         period.Start.ToString("MMMM yyyy", TurkishCulture);
 
-    public static void Validate(SimulationRequest request)
+    /// <param name="projectionAnchorDate">
+    /// Verildiğinde, projeksiyon ufkunun dışına düşen tek seferlik gelir
+    /// reddedilir. Çapadan önceki para zaten mevcut tutarın içindedir (I3);
+    /// sessizce yutulmasındansa kullanıcıya söylenir.
+    /// </param>
+    public static void Validate(
+        SimulationRequest request,
+        DateOnly? projectionAnchorDate = null)
     {
         if (string.IsNullOrWhiteSpace(request.Name))
         {
             throw new InvalidOperationException("Plan adı gereklidir.");
+        }
+
+        if (request.Type == SimulationScenarioType.FutureIncome &&
+            projectionAnchorDate is { } anchor &&
+            request.StartDate < anchor)
+        {
+            throw new InvalidOperationException(
+                $"Gelir tarihi son güncelleme tarihinden ({anchor:dd.MM.yyyy}) " +
+                "önce olamaz. Bu tarihte gelen para zaten mevcut tutarına " +
+                "dahil olmalı; onu güncelle.");
         }
 
         if (request.Type is not SimulationScenarioType.PaymentStrategyChange and

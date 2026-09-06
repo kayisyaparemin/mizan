@@ -22,10 +22,18 @@ public sealed record IncomeProjectionSummary(
 
 public sealed class IncomeProjectionCalculator(SalaryResolver salaryResolver)
 {
+    /// <param name="prePeriodIncomeStart">
+    /// Verildiğinde, bu tarih ile dönem başlangıcı arasına düşen tek seferlik
+    /// gelirler de bu döneme yazılır. Yalnızca ilk dönem için anlamlıdır:
+    /// projeksiyon ufku ilk maaş gününde başladığı için, `[çapa, ilk maaş)`
+    /// aralığındaki gelir hiçbir dönemle eşleşmiyor ve sessizce kayboluyordu.
+    /// Çapadan önceki gelir kapsam dışıdır; o para zaten açılış bakiyesinde (I3).
+    /// </param>
     public IncomeProjectionSummary Calculate(
         SalaryPeriod period,
         IEnumerable<SalaryScheduleEntry> salaries,
-        IEnumerable<OneTimeIncome> otherIncomes)
+        IEnumerable<OneTimeIncome> otherIncomes,
+        DateOnly? prePeriodIncomeStart = null)
     {
         var items = new List<IncomeProjectionItem>();
         var salary = salaryResolver.Resolve(period.Start, salaries);
@@ -39,7 +47,11 @@ public sealed class IncomeProjectionCalculator(SalaryResolver salaryResolver)
         }
 
         items.AddRange(otherIncomes
-            .Where(x => period.Contains(x.ExactDate))
+            .Where(x => period.Contains(x.ExactDate) ||
+                        IsWithinPrePeriodWindow(
+                            x.ExactDate,
+                            prePeriodIncomeStart,
+                            period.Start))
             .Select(x => new IncomeProjectionItem(
                 string.IsNullOrWhiteSpace(x.Description) ? "Diğer gelir" : x.Description,
                 IncomeSourceType.OneTimeIncome,
@@ -51,5 +63,13 @@ public sealed class IncomeProjectionCalculator(SalaryResolver salaryResolver)
         var otherTotal = ordered.Where(x => x.Type == IncomeSourceType.OneTimeIncome).Sum(x => x.Amount);
         return new IncomeProjectionSummary(ordered, salaryTotal, otherTotal, salaryTotal + otherTotal);
     }
+
+    private static bool IsWithinPrePeriodWindow(
+        DateOnly incomeDate,
+        DateOnly? windowStart,
+        DateOnly periodStart) =>
+        windowStart is { } start &&
+        incomeDate >= start &&
+        incomeDate < periodStart;
 }
 

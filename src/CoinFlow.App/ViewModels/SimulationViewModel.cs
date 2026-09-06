@@ -49,6 +49,7 @@ public partial class SimulationViewModel(
     private Guid? _editingConditionId;
     private readonly SemaphoreSlim _applyLock = new(1, 1);
     private bool _preserveOnNextAppearance;
+    private DateOnly? _projectionAnchorDate;
 
     [ObservableProperty] private string name = "Beyaz eşya";
     [ObservableProperty] private string amount = "120000";
@@ -150,6 +151,10 @@ public partial class SimulationViewModel(
         {
             SetStatus(string.Empty);
             var plan = await service.GetFinancialPlanAsync();
+            _projectionAnchorDate =
+                plan.Settings.ProjectionAnchorDate == default
+                    ? null
+                    : plan.Settings.ProjectionAnchorDate;
             IsPlanAvailable = plan.Salaries.Count > 0 &&
                               plan.PaymentAssignmentStrategies.Count > 0 &&
                               plan.Settings.ProjectionAnchorDate != default;
@@ -329,7 +334,7 @@ public partial class SimulationViewModel(
         {
             SetStatus(string.Empty);
             var request = BuildRequest();
-            SimulationCalculator.Validate(request);
+            SimulationCalculator.Validate(request, _projectionAnchorDate);
             var condition = CreateConditionView(request);
             if (_editingConditionId is Guid editingId)
             {

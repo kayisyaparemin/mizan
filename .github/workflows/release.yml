@@ -201,21 +201,18 @@ jobs:
           cat > release-notes.md <<NOTES
           # Mizan $version
 
-          Bu sürüm kredi kartı ekstresi içe aktarmayı, ekstre ödeme kararlarını ve projeksiyon ekranlarını olgunlaştırır.
+          Bu sürüm, tek seferlik gelirin projeksiyonda sessizce kaybolmasına yol açan hatayı giderir.
 
-          ### Değişiklikler
+          ### Düzeltmeler
 
-          - Kredi kartı ekstresini PDF'ten içe aktarma akışı eklendi.
-          - Garanti ekstrelerinde ay adlı tarihler ve "Min. Ödeme" etiketi doğru okunuyor.
-          - Ekstre içe aktarmada uygulamayı donduran (ANR) hatalar giderildi.
-          - Her ekstre için ödeme şekli seçilebiliyor: asgari, tamamı veya özel tutar.
-          - Ekstre ödeme tercihi geçmişi tutuluyor; eski kararlar üzerine yazılmıyor.
-          - Ödenen ekstre artık projeksiyonda borç olarak kalmıyor.
-          - Settlement sonrası harcamalar bankanın bildirdiği kesim tarihine faturalanıyor.
-          - Ana Sayfa, kart ve gözden geçirme ekranları bilgi hiyerarşisine göre yeniden kurgulandı.
-          - 12 Dönem, Geçmiş ve Simülatör ekranları sadeleştirildi.
-          - Negatif mevcut tutar girilebiliyor, onboarding taslakları silinebiliyor.
-          - Ürün kontratı invariant testleri eklendi.
+          - Son güncelleme tarihi ile ilk maaş günü arasına düşen tek seferlik
+            gelir artık ilk döneme yazılıyor. Önceden bu aralıktaki gelir hiçbir
+            dönemle eşleşmediği için hesaba hiç katılmıyor, üstelik hiçbir uyarı
+            da verilmiyordu; simülatörün varsayılan tarihi tam bu aralığa
+            düştüğü için "şu para gelse ne olur" denemeleri sonucu değiştirmiyordu.
+          - Simülatörde son güncelleme tarihinden önceye gelir girildiğinde artık
+            net bir uyarı veriliyor. O tarihteki para zaten mevcut tutarın
+            içindedir; sessizce yok sayılmak yerine söyleniyor.
           NOTES
 
       - name: Upload signed APK artifact

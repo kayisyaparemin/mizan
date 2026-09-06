@@ -13,6 +13,57 @@ public sealed class SimulationTests
     private readonly InstallmentScheduleCalculator _installments = new();
 
     [Fact]
+    public void FutureIncome_BeforeAnchor_IsRejectedInsteadOfSilentlyDropped()
+    {
+        var request = new SimulationRequest(
+            SimulationScenarioType.FutureIncome,
+            "Tek seferlik gelir",
+            150_000m,
+            new DateOnly(2026, 8, 19));
+
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => SimulationCalculator.Validate(
+                request,
+                new DateOnly(2026, 8, 20)));
+
+        Assert.Contains("20.08.2026", exception.Message);
+    }
+
+    [Fact]
+    public void FutureIncome_OnOrAfterAnchor_PassesValidation()
+    {
+        var anchor = new DateOnly(2026, 8, 20);
+
+        SimulationCalculator.Validate(
+            new SimulationRequest(
+                SimulationScenarioType.FutureIncome,
+                "Çapa günü",
+                150_000m,
+                anchor),
+            anchor);
+
+        // Çapa ile ilk maaş arası: eskiden sessizce yutuluyordu, artık geçerli.
+        SimulationCalculator.Validate(
+            new SimulationRequest(
+                SimulationScenarioType.FutureIncome,
+                "İlk maaştan önce",
+                150_000m,
+                new DateOnly(2026, 9, 1)),
+            anchor);
+    }
+
+    [Fact]
+    public void Validate_WithoutAnchor_KeepsPreviousBehaviour()
+    {
+        SimulationCalculator.Validate(
+            new SimulationRequest(
+                SimulationScenarioType.FutureIncome,
+                "Çapasız doğrulama",
+                150_000m,
+                new DateOnly(2020, 1, 1)));
+    }
+
+    [Fact]
     public void InterestFree120000OverNinePayments_IsExactAndBaselineUnchanged()
     {
         var plan = TestFactory.CanonicalPlan();

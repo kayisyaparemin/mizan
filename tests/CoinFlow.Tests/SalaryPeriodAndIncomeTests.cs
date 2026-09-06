@@ -150,6 +150,82 @@ public sealed class SalaryPeriodAndIncomeTests
     }
 
     [Fact]
+    public void OneTimeIncome_BeforePeriodStart_IsIgnoredWithoutPrePeriodWindow()
+    {
+        var calculator = new IncomeProjectionCalculator(new SalaryResolver());
+        var period = new SalaryPeriod(
+            new DateOnly(2027, 3, 10),
+            new DateOnly(2027, 4, 10));
+
+        var result = calculator.Calculate(
+            period,
+            [Salary(100_000m, new DateOnly(2026, 1, 1))],
+            [
+                new OneTimeIncome
+                {
+                    Amount = 50_000m,
+                    ExactDate = new DateOnly(2027, 3, 6)
+                }
+            ]);
+
+        Assert.Equal(0m, result.OtherIncome);
+        Assert.Equal(100_000m, result.TotalIncome);
+    }
+
+    [Fact]
+    public void OneTimeIncome_InsidePrePeriodWindow_IsCountedInThatPeriod()
+    {
+        var calculator = new IncomeProjectionCalculator(new SalaryResolver());
+        var period = new SalaryPeriod(
+            new DateOnly(2027, 3, 10),
+            new DateOnly(2027, 4, 10));
+
+        var result = calculator.Calculate(
+            period,
+            [Salary(100_000m, new DateOnly(2026, 1, 1))],
+            [
+                new OneTimeIncome
+                {
+                    Amount = 50_000m,
+                    ExactDate = new DateOnly(2027, 3, 6),
+                    Description = "Ufuk öncesi gelir"
+                }
+            ],
+            prePeriodIncomeStart: new DateOnly(2027, 3, 5));
+
+        Assert.Equal(50_000m, result.OtherIncome);
+        Assert.Equal(150_000m, result.TotalIncome);
+        Assert.Contains(
+            result.Items,
+            x => x.Name == "Ufuk öncesi gelir" &&
+                 x.SourceDate == new DateOnly(2027, 3, 6));
+    }
+
+    [Fact]
+    public void OneTimeIncome_BeforePrePeriodWindow_StaysOutOfPlan()
+    {
+        var calculator = new IncomeProjectionCalculator(new SalaryResolver());
+        var period = new SalaryPeriod(
+            new DateOnly(2027, 3, 10),
+            new DateOnly(2027, 4, 10));
+
+        var result = calculator.Calculate(
+            period,
+            [Salary(100_000m, new DateOnly(2026, 1, 1))],
+            [
+                new OneTimeIncome
+                {
+                    Amount = 50_000m,
+                    ExactDate = new DateOnly(2027, 3, 4)
+                }
+            ],
+            prePeriodIncomeStart: new DateOnly(2027, 3, 5));
+
+        Assert.Equal(0m, result.OtherIncome);
+        Assert.Equal(100_000m, result.TotalIncome);
+    }
+
+    [Fact]
     public void TargetAmount_ReturnsFirstReachedPeriod()
     {
         var rows = new[] { 100_000m, 180_000m, 270_000m, 340_000m }

@@ -33,6 +33,71 @@ public sealed class FinancialProjectionTests
     }
 
     [Fact]
+    public void OneTimeIncome_BetweenAnchorAndFirstSalary_LandsInFirstPeriod()
+    {
+        // Çapa 20.08.2026, ilk maaş 10.09.2026. Aradaki gelir hiçbir dönemin
+        // içinde değil; ilk döneme yazılmazsa sessizce kaybolur.
+        var plan = TestFactory.CanonicalPlan() with
+        {
+            OtherIncomes =
+            [
+                new OneTimeIncome
+                {
+                    Amount = 150_000m,
+                    ExactDate = new DateOnly(2026, 9, 1),
+                    Description = "Ufuk öncesi tek seferlik gelir"
+                }
+            ]
+        };
+
+        var baseline = _calculator.Calculate(
+            TestFactory.CanonicalPlan(),
+            new DateOnly(2026, 8, 20),
+            2);
+        var rows = _calculator.Calculate(plan, new DateOnly(2026, 8, 20), 2);
+
+        Assert.Equal(150_000m, rows[0].OtherIncome);
+        Assert.Equal(
+            baseline[0].TotalIncome + 150_000m,
+            rows[0].TotalIncome);
+        Assert.Equal(
+            baseline[0].EndingProjectedSavings + 150_000m,
+            rows[0].EndingProjectedSavings);
+        Assert.Contains(
+            rows[0].IncomeItems,
+            x => x.Name == "Ufuk öncesi tek seferlik gelir");
+        Assert.Equal(0m, rows[1].OtherIncome);
+    }
+
+    [Fact]
+    public void OneTimeIncome_BeforeAnchor_StaysOutOfProjection()
+    {
+        // Çapadan önceki para zaten açılış bakiyesinin içinde (I3).
+        var plan = TestFactory.CanonicalPlan() with
+        {
+            OtherIncomes =
+            [
+                new OneTimeIncome
+                {
+                    Amount = 150_000m,
+                    ExactDate = new DateOnly(2026, 8, 19)
+                }
+            ]
+        };
+
+        var baseline = _calculator.Calculate(
+            TestFactory.CanonicalPlan(),
+            new DateOnly(2026, 8, 20),
+            2);
+        var rows = _calculator.Calculate(plan, new DateOnly(2026, 8, 20), 2);
+
+        Assert.Equal(0m, rows[0].OtherIncome);
+        Assert.Equal(
+            baseline[0].EndingProjectedSavings,
+            rows[0].EndingProjectedSavings);
+    }
+
+    [Fact]
     public void CanonicalUpcomingPlan_ExposesPreSalaryObligationsSeparately()
     {
         var result = _calculator.CalculatePlan(

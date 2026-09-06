@@ -66,10 +66,16 @@ public sealed class FinancialProjectionCalculator(
         {
             var budget = fundingPlan.Budgets.Single(x =>
                 x.SalaryDate == period.Start);
+            // Projeksiyon ufku ilk maaş gününde başlar, ama çapa ondan önce
+            // olabilir. `[çapa, ilk maaş)` aralığına düşen tek seferlik gelir
+            // hiçbir dönemle eşleşmediği için sessizce kayboluyordu; ilk döneme
+            // yazıyoruz. Açılış bakiyesine eklemekle aritmetik olarak aynıdır,
+            // ama kalem `IncomeItems` içinde görünür kalır.
             var income = incomeProjectionCalculator.Calculate(
                 period,
                 plan.Salaries,
-                plan.OtherIncomes);
+                plan.OtherIncomes,
+                period.Start == firstSalary ? anchor : null);
             var mandatory = mandatoryPaymentCalculator.Summarize(budget.Items);
             var availableAfterMandatory = income.TotalIncome - mandatory.Total;
             var largeExpenses = budget.Items
