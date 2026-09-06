@@ -201,17 +201,21 @@ jobs:
           cat > release-notes.md <<NOTES
           # Mizan $version
 
-          Bu sürüm Mizan'ın ilk kurulum, Ana Sayfa, Finansal Yapı ve kredi kartı yönetim akışlarını sadeleştirir.
+          Bu sürüm kredi kartı ekstresi içe aktarmayı, ekstre ödeme kararlarını ve projeksiyon ekranlarını olgunlaştırır.
 
           ### Değişiklikler
 
-          - İlk kullanımda Mizan'ı adım adım hazırlayan onboarding akışı eklendi.
-          - Development sürümünde örnek kurulum onboarding üzerinden doldurulabilir hale geldi.
-          - Ana Sayfa tek tek açılan modüllerden oluşan daha sakin bir kontrol merkezine dönüştürüldü.
-          - Gelir ve ödeme yönetimi Finansal Yapı altında anlamlı gruplara ayrıldı.
-          - Global + Ekle akışı gelir, kredi, ödeme ve kart harcaması eklemeyi hızlandırdı.
-          - Kredi kartı ödeme tercihi, fallback seçimi ve gelecek harcamalar için odaklı kart kontrol ekranı eklendi.
-          - Kullanıcı dili Mevcut Tutar, Güncel Durum, Son Güncelleme ve Dönem kavramları etrafında sadeleştirildi.
+          - Kredi kartı ekstresini PDF'ten içe aktarma akışı eklendi.
+          - Garanti ekstrelerinde ay adlı tarihler ve "Min. Ödeme" etiketi doğru okunuyor.
+          - Ekstre içe aktarmada uygulamayı donduran (ANR) hatalar giderildi.
+          - Her ekstre için ödeme şekli seçilebiliyor: asgari, tamamı veya özel tutar.
+          - Ekstre ödeme tercihi geçmişi tutuluyor; eski kararlar üzerine yazılmıyor.
+          - Ödenen ekstre artık projeksiyonda borç olarak kalmıyor.
+          - Settlement sonrası harcamalar bankanın bildirdiği kesim tarihine faturalanıyor.
+          - Ana Sayfa, kart ve gözden geçirme ekranları bilgi hiyerarşisine göre yeniden kurgulandı.
+          - 12 Dönem, Geçmiş ve Simülatör ekranları sadeleştirildi.
+          - Negatif mevcut tutar girilebiliyor, onboarding taslakları silinebiliyor.
+          - Ürün kontratı invariant testleri eklendi.
           NOTES
 
       - name: Upload signed APK artifact
