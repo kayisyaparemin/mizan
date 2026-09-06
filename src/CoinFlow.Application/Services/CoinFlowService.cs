@@ -879,6 +879,56 @@ public sealed class CoinFlowService(
         }, cancellationToken);
     }
 
+    /// <summary>
+    /// Dönem detayındaki kart satırından ödeme şeklini değiştirir. Kararın
+    /// nereye yazılacağı ekstrenin durumuna bağlıdır: kesilmiş ekstrenin
+    /// kararı <see cref="CurrentStatementPaymentPlan"/>'da yaşar ve
+    /// effective-dated tercih geçmişine eklenir (I5); ileride kesilecek
+    /// ekstreler için vadeye özel override kullanılır. Çağıran hangisi
+    /// olduğunu bilmek zorunda değildir.
+    /// </summary>
+    public async Task SetStatementPaymentModeAsync(
+        Guid creditCardId,
+        DateOnly dueDate,
+        CreditCardPaymentType paymentType,
+        CancellationToken cancellationToken = default)
+    {
+        if (paymentType == CreditCardPaymentType.FixedAmount)
+        {
+            throw new InvalidOperationException(
+                "Bu ekrandan yalnızca asgari veya tamamı seçilebilir.");
+        }
+
+        var card = (await store.GetCreditCardsAsync(cancellationToken))
+            .SingleOrDefault(x => x.Id == creditCardId)
+            ?? throw new InvalidOperationException("Kredi kartı bulunamadı.");
+
+        if (card.CurrentStatement is { } statement &&
+            statement.DueDate == dueDate)
+        {
+            await SaveCreditCardAsync(
+                card with
+                {
+                    CurrentStatementPaymentPlan =
+                        new CurrentStatementPaymentPlan
+                        {
+                            Mode = paymentType ==
+                                   CreditCardPaymentType.Minimum
+                                ? CurrentStatementPaymentMode.Minimum
+                                : CurrentStatementPaymentMode.Full
+                        }
+                },
+                cancellationToken);
+            return;
+        }
+
+        await SaveCreditCardPaymentPlanAsync(
+            creditCardId,
+            dueDate,
+            paymentType,
+            cancellationToken: cancellationToken);
+    }
+
     public async Task RemoveCreditCardPaymentPlanAsync(
         Guid creditCardId,
         DateOnly dueDate,

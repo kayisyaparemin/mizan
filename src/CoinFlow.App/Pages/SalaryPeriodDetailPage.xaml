@@ -2,6 +2,7 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="CoinFlow.App.Pages.SalaryPeriodDetailPage"
+             x:Name="PageRoot"
              Title="Dönem Detayı"
              Shell.FlyoutBehavior="Disabled"
              Shell.NavBarIsVisible="True">
@@ -508,6 +509,28 @@
                                                        TextColor="{StaticResource WarningText}" />
                                             </Border>
                                         </FlexLayout>
+                                        <VerticalStackLayout
+                                            IsVisible="{Binding CanChangeCardPaymentMode}"
+                                            Spacing="6">
+                                            <BoxView HeightRequest="1" Color="{StaticResource Line}" />
+                                            <Label Text="Bu ekstreyi nasıl ödeyeceksin?"
+                                                   Style="{StaticResource MutedText}"
+                                                   FontSize="12" />
+                                            <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                                                <Button Text="Tamamını öde"
+                                                        FontSize="13"
+                                                        IsEnabled="{Binding IsMinimumSelected}"
+                                                        Command="{Binding Source={x:Reference PageRoot}, Path=BindingContext.PayFullStatementCommand}"
+                                                        CommandParameter="{Binding .}" />
+                                                <Button Grid.Column="1"
+                                                        Text="Asgari öde"
+                                                        FontSize="13"
+                                                        IsEnabled="{Binding IsFullStatementSelected}"
+                                                        Command="{Binding Source={x:Reference PageRoot}, Path=BindingContext.PayMinimumCommand}"
+                                                        CommandParameter="{Binding .}"
+                                                        Style="{StaticResource SecondaryButton}" />
+                                            </Grid>
+                                        </VerticalStackLayout>
                                     </VerticalStackLayout>
                                 </Border>
                             </DataTemplate>

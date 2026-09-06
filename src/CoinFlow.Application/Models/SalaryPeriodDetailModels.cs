@@ -68,10 +68,21 @@ public sealed record DetailPaymentRow(
     bool IsEstimated,
     bool IsBeforeFundingSalary,
     bool IsUndetermined,
-    string Detail = "")
+    string Detail = "",
+    // Kart satırlarında ödeme şeklini yerinde değiştirebilmek için taşınır.
+    // Yalnızca gelecek dönemlerde doldurulur; kapanmış dönem yeniden
+    // hesaplanmaz (I6).
+    Guid? CreditCardId = null,
+    CreditCardPaymentType? CardPaymentType = null,
+    bool CanChangeCardPaymentMode = false)
 {
     private static readonly CultureInfo TurkishCulture =
         CultureInfo.GetCultureInfo("tr-TR");
+
+    public bool IsMinimumSelected =>
+        CardPaymentType == CreditCardPaymentType.Minimum;
+    public bool IsFullStatementSelected =>
+        CardPaymentType == CreditCardPaymentType.FullStatement;
 
     public string DateText => Date.ToString("dd MMM", TurkishCulture);
     public string AmountText => Amount is decimal value

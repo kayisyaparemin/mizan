@@ -334,6 +334,82 @@ public sealed class CreditCardPaymentPreferenceTests
                 TimeSpan.Zero)
         };
 
+    // Dönem detayındaki buton kesilmiş ekstrenin kararını canonical yerine,
+    // yani CurrentStatementPaymentPlan'a yazmalı ve tercih geçmişine düşmeli.
+    [Fact]
+    public async Task SetStatementPaymentMode_OnCutStatement_WritesCurrentPlan()
+    {
+        await WithStore(async store =>
+        {
+            var service = TestFactory.Service(store, Today);
+            var card = CardWithStatement(CurrentStatementPaymentMode.Minimum);
+            await service.SaveCreditCardAsync(card);
+
+            await service.SetStatementPaymentModeAsync(
+                CardId,
+                card.CurrentStatement!.DueDate,
+                CreditCardPaymentType.FullStatement);
+
+            var persisted = Assert.Single(
+                (await service.GetFinancialPlanAsync()).CreditCards);
+            Assert.Equal(
+                CurrentStatementPaymentMode.Full,
+                persisted.CurrentStatementPaymentPlan!.Mode);
+            // Vadeye özel override'a düşmemeli.
+            Assert.Empty(persisted.PaymentPlans);
+            Assert.Contains(
+                persisted.PaymentPreferences,
+                x => x.Mode == CurrentStatementPaymentMode.Full);
+        });
+    }
+
+    // İleride kesilecek ekstrenin kararı vadeye özel override olarak yazılır;
+    // kesilmiş ekstrenin kararına dokunulmaz.
+    [Fact]
+    public async Task SetStatementPaymentMode_OnFutureStatement_WritesOverride()
+    {
+        await WithStore(async store =>
+        {
+            var service = TestFactory.Service(store, Today);
+            var card = CardWithStatement(CurrentStatementPaymentMode.Minimum);
+            await service.SaveCreditCardAsync(card);
+            var futureDueDate = card.CurrentStatement!.DueDate.AddMonths(1);
+
+            await service.SetStatementPaymentModeAsync(
+                CardId,
+                futureDueDate,
+                CreditCardPaymentType.FullStatement);
+
+            var persisted = Assert.Single(
+                (await service.GetFinancialPlanAsync()).CreditCards);
+            var overridePlan = Assert.Single(persisted.PaymentPlans);
+            Assert.Equal(futureDueDate, overridePlan.DueDate);
+            Assert.Equal(
+                CreditCardPaymentType.FullStatement,
+                overridePlan.PaymentType);
+            Assert.Equal(
+                CurrentStatementPaymentMode.Minimum,
+                persisted.CurrentStatementPaymentPlan!.Mode);
+        });
+    }
+
+    [Fact]
+    public async Task SetStatementPaymentMode_RejectsFixedAmount()
+    {
+        await WithStore(async store =>
+        {
+            var service = TestFactory.Service(store, Today);
+            await service.SaveCreditCardAsync(
+                CardWithStatement(CurrentStatementPaymentMode.Minimum));
+
+            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                service.SetStatementPaymentModeAsync(
+                    CardId,
+                    new DateOnly(2026, 9, 5),
+                    CreditCardPaymentType.FixedAmount));
+        });
+    }
+
     private static CreditCard Card(int closingDay) => new()
     {
         Id = CardId,

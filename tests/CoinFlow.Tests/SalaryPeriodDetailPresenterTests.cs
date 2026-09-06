@@ -11,6 +11,53 @@ public sealed class SalaryPeriodDetailPresenterTests
         TestFactory.ProjectionCalculator();
 
     [Fact]
+    public void Build_CardRowsCarryTheirCardAndCurrentPaymentMode()
+    {
+        var plan = TestFactory.CanonicalPlan();
+        var cardId = Assert.Single(plan.CreditCards).Id;
+        var row = _projection.Calculate(
+            plan,
+            new DateOnly(2026, 8, 20),
+            12)[1];
+
+        var detail = _presenter.Build(row);
+
+        var cardRow = Assert.Single(
+            detail.PaymentRows,
+            x => x.Category == "Kredi Kartı" && x.Amount is not null);
+        Assert.Equal(cardId, cardRow.CreditCardId);
+        Assert.Equal(CreditCardPaymentType.Minimum, cardRow.CardPaymentType);
+        Assert.True(cardRow.IsMinimumSelected);
+        Assert.False(cardRow.IsFullStatementSelected);
+        Assert.True(cardRow.CanChangeCardPaymentMode);
+
+        // Kart olmayan satırlar eylem taşımaz.
+        Assert.All(
+            detail.PaymentRows.Where(x => x.Category != "Kredi Kartı"),
+            x =>
+            {
+                Assert.Null(x.CreditCardId);
+                Assert.False(x.CanChangeCardPaymentMode);
+            });
+    }
+
+    [Fact]
+    public void Build_SimulationScenario_DoesNotOfferPaymentModeChange()
+    {
+        // Simülasyon sonucu geçicidir; oradan plana yazılamamalı.
+        var row = _projection.Calculate(
+            TestFactory.CanonicalPlan(),
+            new DateOnly(2026, 8, 20),
+            12)[1];
+
+        var detail = _presenter.Build(row, isSimulationScenario: true);
+
+        Assert.All(
+            detail.PaymentRows,
+            x => Assert.False(x.CanChangeCardPaymentMode));
+    }
+
+    [Fact]
     public void Build_MapsEngineValuesWithoutChangingProjectionResults()
     {
         var plan = TestFactory.CanonicalPlan();

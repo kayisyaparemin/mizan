@@ -32,7 +32,9 @@ public sealed class SalaryPeriodDetailPresenter
                 DetailSemanticType.Interest))
             .ToArray();
         var transition = BuildTransitionRows(scenario);
-        var payments = BuildPayments(scenario);
+        // Ödeme şekli yalnızca gerçek plan görüntülenirken değiştirilebilir:
+        // simülasyon sonucu geçici, kapanmış dönem ise yeniden hesaplanmaz (I6).
+        var payments = BuildPayments(scenario, !isSimulationScenario);
         var comparison = baseline is null || isSimulationScenario
             ? []
             : BuildComparisonRows(baseline, scenario);
@@ -311,10 +313,14 @@ public sealed class SalaryPeriodDetailPresenter
     }
 
     private static IReadOnlyList<DetailPaymentRow> BuildPayments(
-        SalaryPeriodProjection row)
+        SalaryPeriodProjection row,
+        bool allowCardPaymentModeChange)
     {
         var result = row.MandatoryItems
-            .Select(ToPaymentRow)
+            .Select(item => ToPaymentRow(
+                item,
+                row.CardPaymentStatuses,
+                allowCardPaymentModeChange))
             .ToList();
         result.AddRange(row.LargeExpenseItems.Select(expense =>
             new DetailPaymentRow(
@@ -347,8 +353,12 @@ public sealed class SalaryPeriodDetailPresenter
             .ToArray();
     }
 
-    private static DetailPaymentRow ToPaymentRow(ObligationItem item) =>
-        new(
+    private static DetailPaymentRow ToPaymentRow(
+        ObligationItem item,
+        IReadOnlyList<CreditCardPaymentProjectionStatus> cardStatuses,
+        bool allowCardPaymentModeChange)
+    {
+        var row = new DetailPaymentRow(
             item.DueDate,
             item.Name,
             Category(item.Type),
@@ -359,6 +369,28 @@ public sealed class SalaryPeriodDetailPresenter
             item.PaymentBeforeSalary,
             IsUndetermined: false,
             item.Detail);
+        if (item.Type != ObligationType.CreditCard ||
+            item.PaymentId == Guid.Empty)
+        {
+            return row;
+        }
+
+        var cardId = item.PaymentId;
+
+        // Kart yükümlülüğü PaymentId'de kart kimliğini taşır; uygulanan ödeme
+        // şeklini aynı vadedeki ekstre durumundan okuyoruz.
+        var status = cardStatuses.FirstOrDefault(x =>
+            x.CardId == cardId && x.PaymentDueDate == item.DueDate);
+        return row with
+        {
+            CreditCardId = cardId,
+            CardPaymentType = status?.PaymentType,
+            CanChangeCardPaymentMode = allowCardPaymentModeChange &&
+                                       status?.PaymentType is
+                                           CreditCardPaymentType.Minimum or
+                                           CreditCardPaymentType.FullStatement
+        };
+    }
 
     private static string Category(ObligationType type) => type switch
     {
