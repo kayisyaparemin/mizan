@@ -201,41 +201,37 @@ jobs:
           cat > release-notes.md <<NOTES
           # Mizan $version
 
-          Grafik gitti, liste geri geldi. Mevcut tutar artık Ana Sayfa'da, en
-          üstte.
+          Kart sayfası artık zaman eksenine göre okunuyor. Hiçbir özellik
+          kalkmadı; kaosun sebebi olan sunum değişti.
 
-          ### Simülatör
+          ### Kart sayfası
 
-          - **12 dönem yeniden alt alta listeleniyor.** Nakit Seyri grafiği
-            kaldırıldı; aylar aşağı doğru uzayan kartlar hâlinde geri geldi.
-            Aylık yaşam gideri kadranı da grafikle birlikte gitti.
-          - **Koşul aç/kapa switch'leri duruyor** — kapattığın koşul hesaba
-            girmiyor, liste anında yeniden hesaplanıyor, "Planı Uygula" yalnız
-            açık olanları kaydediyor. Hepsi kapalıyken liste bugünkü planının
-            kendi seyrini gösteriyor.
+          Beş ayrı "Asgari / Tamamı" seçicisi dört farklı şeyi aynı
+          kelimelerle söylüyordu. Aralarındaki tek fark kapsamdı — hangi
+          ekstreleri etkiledikleri — ve ekranda bunu söyleyen hiçbir şey
+          yoktu. Sayfa şimdi üç başlıkla okunuyor:
 
-          ### Ana Sayfa
+          - **ŞU AN** — kesilmiş ekstren ve onu nasıl ödeyeceğin.
+          - **SIRADAKİ** — henüz kesilmemiş ekstreler; istersen tek bir vade
+            için ayrı karar verebilirsin. Gelecek ekstreler listesi açık
+            duruyor, planın kendisi çünkü.
+          - **GENEL** — ayrı karar vermediğin ekstreler için varsayılanlar.
+            Nadiren değiştiği için varsayılan olarak kapalı; başlığa
+            dokununca açılıyor.
 
-          - **Mevcut tutar en üstte, yerinde düzenlenebilir.** İleriye dönük
-            parametreler bir kez girildikten sonra planı değiştiren tek şey
-            bugünkü bakiyen; uygulamayı açınca ilk işin o. Güncellediğinde
-            plan bugünden itibaren yeniden kuruluyor: rakam ve tarih tek bir
-            cümle, ayrılamıyorlar. Ayarlar'daki mevcut tutar alanı kaldırıldı.
-          - **Aynı bilgi bir kez.** Dönem sonu rakamı üç ayrı yerde birden
-            duruyordu: uyarı kutusu, durum özeti ve "Bu dönem nasıl oluşuyor"
-            tablosu. Yalnız durum özeti kaldı; kırılımın tamamı zaten daha
-            ayrıntılı olduğu Dönem Detayı'na bir dokunuş uzakta.
-          - **12 dönem faizi kırılımlı.** Kredi kartı faizi ile finansman
-            açığı (KMH) faizi ayrı satırlarda, altında toplam. İkisi ters
-            yönde hareket edebiliyor — kartı erken kapatmak kart faizini
-            düşürürken KMH faizini yükseltebiliyor — ve tek toplam bunu
-            gizliyordu.
-          - Yaklaşan ödemeler ve kısa yollar aynen duruyor.
+          Genel bölümdeki iki ayar da artık ne olduğunu söylüyor:
+          *"Kartın varsayılan ödeme şekli"* ayrı karar vermediğin her ekstre
+          için geçerli; *"Karar vermediğin ekstrelerde varsayım"* ise bir
+          karar değil, sadece hesabın rakam uydurmaması için yaptığı kabul —
+          ekstre gelince yine sana soruluyor.
 
-          ### 12 Dönem
+          Gelecek ekstreler listesinde her satır kararın nereden geldiğini
+          söylüyor: **Bu vade için**, **Kartın varsayılanı**, ya da
+          **Karar yok · varsayım**. Üçü de "Asgari" ile bitiyordu, ayrımı
+          artık önek yapıyor.
 
-          - Liste artık kendi kutusunda kaymıyor; sayfanın tamamı tek yüzey
-            olarak kayıyor.
+          Ödeme tercihi geçmişi ve gelecek kart hareketleri referans bilgi;
+          ikisi de açılır-kapanır bölümlere alındı.
           NOTES
 
       - name: Upload signed APK artifact

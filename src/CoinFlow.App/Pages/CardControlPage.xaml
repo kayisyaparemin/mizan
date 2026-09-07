@@ -23,6 +23,16 @@
                 </VerticalStackLayout>
             </Border>
 
+            <!-- Sayfa zaman eksenine göre okunuyor. Beş ayrı "asgari/tamamı"
+                 seçicisi dört farklı kavramı aynı kelimelerle sunuyordu;
+                 ayrımı yapan tek şey kapsam — hangi ekstreleri etkilediği.
+                 Başlıklar o kapsamı söylüyor. -->
+            <VerticalStackLayout Spacing="2" Margin="0,6,0,0">
+                <Label Text="ŞU AN" Style="{StaticResource Eyebrow}" />
+                <Label Text="Kesilmiş ekstren ve onu nasıl ödeyeceğin."
+                       Style="{StaticResource MutedText}" />
+            </VerticalStackLayout>
+
             <Border>
                 <VerticalStackLayout Spacing="10">
                     <Label Text="Kesilmiş Ekstre"
@@ -235,33 +245,44 @@
                 </VerticalStackLayout>
             </Border>
 
-            <Border IsVisible="{Binding HasPaymentPreferenceHistory}">
-                <VerticalStackLayout Spacing="10">
-                    <Label Text="Ödeme tercihi geçmişi"
-                           Style="{StaticResource SectionTitle}" />
-                    <Label Text="Her ekstre için verdiğin karar burada saklanır. Eski kararlar değişmez."
-                           Style="{StaticResource MutedText}" />
-                    <VerticalStackLayout Spacing="8"
-                                         BindableLayout.ItemsSource="{Binding PaymentPreferenceHistory}">
-                        <BindableLayout.ItemTemplate>
-                            <DataTemplate>
-                                <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
-                                    <Label Text="{Binding Choice}"
-                                           FontFamily="OpenSansSemibold" />
-                                    <Label Grid.Column="1"
-                                           Text="Şu an geçerli"
-                                           IsVisible="{Binding IsCurrent}"
-                                           Style="{StaticResource Eyebrow}" />
-                                    <Label Grid.Row="1"
-                                           Grid.ColumnSpan="2"
-                                           Text="{Binding EffectiveFrom}"
-                                           Style="{StaticResource MutedText}" />
-                                </Grid>
-                            </DataTemplate>
-                        </BindableLayout.ItemTemplate>
+            <VerticalStackLayout Spacing="4"
+                                 IsVisible="{Binding HasPaymentPreferenceHistory}">
+                <Button Text="{Binding PreferenceHistoryToggleText}"
+                        Style="{StaticResource LinkButton}"
+                        HorizontalOptions="Start"
+                        Command="{Binding TogglePreferenceHistoryCommand}" />
+                <Border IsVisible="{Binding ShowPreferenceHistory}">
+                    <VerticalStackLayout Spacing="10">
+                        <Label Text="Her ekstre için verdiğin karar burada saklanır. Eski kararlar değişmez."
+                               Style="{StaticResource MutedText}" />
+                        <VerticalStackLayout Spacing="8"
+                                             BindableLayout.ItemsSource="{Binding PaymentPreferenceHistory}">
+                            <BindableLayout.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
+                                        <Label Text="{Binding Choice}"
+                                               FontFamily="OpenSansSemibold" />
+                                        <Label Grid.Column="1"
+                                               Text="Şu an geçerli"
+                                               IsVisible="{Binding IsCurrent}"
+                                               Style="{StaticResource Eyebrow}" />
+                                        <Label Grid.Row="1"
+                                               Grid.ColumnSpan="2"
+                                               Text="{Binding EffectiveFrom}"
+                                               Style="{StaticResource MutedText}" />
+                                    </Grid>
+                                </DataTemplate>
+                            </BindableLayout.ItemTemplate>
+                        </VerticalStackLayout>
                     </VerticalStackLayout>
-                </VerticalStackLayout>
-            </Border>
+                </Border>
+            </VerticalStackLayout>
+
+            <VerticalStackLayout Spacing="2" Margin="0,6,0,0">
+                <Label Text="SIRADAKİ" Style="{StaticResource Eyebrow}" />
+                <Label Text="Henüz kesilmemiş ekstreler. İstersen tek bir vade için ayrı karar verebilirsin."
+                       Style="{StaticResource MutedText}" />
+            </VerticalStackLayout>
 
             <Border BackgroundColor="{StaticResource SoftPink}">
                 <VerticalStackLayout Spacing="10">
@@ -340,93 +361,117 @@
                 </VerticalStackLayout>
             </Border>
 
-            <Border>
-                <VerticalStackLayout Spacing="10">
-                    <Label Text="Gelecek Kart Hareketleri"
-                           Style="{StaticResource SectionTitle}" />
-                    <Label Text="Açıklama" Style="{StaticResource FieldLabel}" />
-                    <Entry Text="{Binding ChargeDescription}"
-                           Placeholder="Gelecek taksit" />
-                    <Grid ColumnDefinitions="*,*,Auto" ColumnSpacing="6">
-                        <DatePicker Date="{Binding ChargeDate}" />
-                        <Entry Grid.Column="1"
-                               Text="{Binding ChargeAmount}"
-                               Placeholder="Tutar"
-                               Keyboard="Numeric" />
-                        <Button Grid.Column="2"
-                                Text="Ekle"
-                                Command="{Binding AddChargeCommand}" />
-                    </Grid>
-                    <VerticalStackLayout BindableLayout.ItemsSource="{Binding FutureCharges}"
-                                         IsVisible="{Binding HasFutureCharges}"
-                                         Spacing="7">
-                        <BindableLayout.ItemTemplate>
-                            <DataTemplate>
-                                <Grid ColumnDefinitions="*,Auto,Auto"
-                                      RowDefinitions="Auto,Auto"
-                                      Padding="8">
-                                    <Label Text="{Binding DateText}" />
-                                    <Label Grid.Column="1"
-                                           Text="{Binding AmountText}"
-                                           FontFamily="OpenSansSemibold" />
-                                    <Button Grid.Column="2"
-                                            Text="Sil"
-                                            CommandParameter="{Binding .}"
-                                            Clicked="OnRemoveChargeClicked"
-                                            MinimumHeightRequest="36"
-                                            Padding="10,4" />
-                                    <Label Grid.Row="1"
-                                           Grid.ColumnSpan="2"
-                                           Text="{Binding Description}"
-                                           IsVisible="{Binding HasDescription}"
-                                           Style="{StaticResource MutedText}" />
-                                </Grid>
-                            </DataTemplate>
-                        </BindableLayout.ItemTemplate>
+            <VerticalStackLayout Spacing="4">
+                <Button Text="{Binding FutureChargesToggleText}"
+                        Style="{StaticResource LinkButton}"
+                        HorizontalOptions="Start"
+                        Command="{Binding ToggleFutureChargesCommand}" />
+                <Border IsVisible="{Binding ShowFutureCharges}">
+                    <VerticalStackLayout Spacing="10">
+                        <Label Text="Açıklama" Style="{StaticResource FieldLabel}" />
+                        <Entry Text="{Binding ChargeDescription}"
+                               Placeholder="Gelecek taksit" />
+                        <Grid ColumnDefinitions="*,*,Auto" ColumnSpacing="6">
+                            <DatePicker Date="{Binding ChargeDate}" />
+                            <Entry Grid.Column="1"
+                                   Text="{Binding ChargeAmount}"
+                                   Placeholder="Tutar"
+                                   Keyboard="Numeric" />
+                            <Button Grid.Column="2"
+                                    Text="Ekle"
+                                    Command="{Binding AddChargeCommand}" />
+                        </Grid>
+                        <VerticalStackLayout BindableLayout.ItemsSource="{Binding FutureCharges}"
+                                             IsVisible="{Binding HasFutureCharges}"
+                                             Spacing="7">
+                            <BindableLayout.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid ColumnDefinitions="*,Auto,Auto"
+                                          RowDefinitions="Auto,Auto"
+                                          Padding="8">
+                                        <Label Text="{Binding DateText}" />
+                                        <Label Grid.Column="1"
+                                               Text="{Binding AmountText}"
+                                               FontFamily="OpenSansSemibold" />
+                                        <Button Grid.Column="2"
+                                                Text="Sil"
+                                                CommandParameter="{Binding .}"
+                                                Clicked="OnRemoveChargeClicked"
+                                                MinimumHeightRequest="36"
+                                                Padding="10,4" />
+                                        <Label Grid.Row="1"
+                                               Grid.ColumnSpan="2"
+                                               Text="{Binding Description}"
+                                               IsVisible="{Binding HasDescription}"
+                                               Style="{StaticResource MutedText}" />
+                                    </Grid>
+                                </DataTemplate>
+                            </BindableLayout.ItemTemplate>
+                        </VerticalStackLayout>
+                        <Button Text="Harcamaları Kaydet"
+                                Command="{Binding SaveChargesCommand}" />
                     </VerticalStackLayout>
-                    <Button Text="Harcamaları Kaydet"
-                            Command="{Binding SaveChargesCommand}" />
-                </VerticalStackLayout>
-            </Border>
+                </Border>
+            </VerticalStackLayout>
 
-            <Border>
-                <VerticalStackLayout Spacing="10">
-                    <Label Text="Varsayılan Plan"
-                           Style="{StaticResource SectionTitle}" />
-                    <Label Text="Gelecekteki ekstreleri genelde nasıl ödeyelim?"
-                           Style="{StaticResource MutedText}" />
-                    <Label Text="{Binding PaymentPreferenceText}"
-                           FontFamily="OpenSansSemibold" />
-                    <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
-                        <Button Text="Asgari"
-                                Command="{Binding PayMinimumCommand}" />
-                        <Button Grid.Column="1"
-                                Text="Tamamı"
-                                Command="{Binding PayFullCommand}"
-                                Style="{StaticResource SecondaryButton}" />
-                    </Grid>
-                    <Button Text="Her Ekstrede Sor"
-                            Command="{Binding AskEachStatementCommand}"
-                            BackgroundColor="{StaticResource SoftPink}" />
-                </VerticalStackLayout>
-            </Border>
+            <VerticalStackLayout Spacing="2" Margin="0,6,0,0">
+                <Label Text="GENEL" Style="{StaticResource Eyebrow}" />
+                <Label Text="Ayrı karar vermediğin ekstreler için varsayılanlar. Nadiren değişir."
+                       Style="{StaticResource MutedText}" />
+            </VerticalStackLayout>
 
-            <Border BackgroundColor="{StaticResource SoftSky}">
-                <VerticalStackLayout Spacing="10">
-                    <Label Text="Kararsız Gelecek Ekstrelerde"
-                           Style="{StaticResource SectionTitle}" />
-                    <Label Text="{Binding FallbackText}"
-                           FontFamily="OpenSansSemibold" />
-                    <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
-                        <Button Text="Asgari"
-                                Command="{Binding FallbackMinimumCommand}" />
-                        <Button Grid.Column="1"
-                                Text="Tamamı"
-                                Command="{Binding FallbackFullCommand}"
-                                Style="{StaticResource SecondaryButton}" />
-                    </Grid>
+            <VerticalStackLayout Spacing="16">
+                <Button Text="{Binding AdvancedToggleText}"
+                        Style="{StaticResource LinkButton}"
+                        HorizontalOptions="Start"
+                        Command="{Binding ToggleAdvancedCommand}" />
+                <VerticalStackLayout Spacing="16"
+                                     IsVisible="{Binding ShowAdvanced}">
+                    <Border>
+                        <VerticalStackLayout Spacing="10">
+                            <Label Text="Kartın varsayılan ödeme şekli"
+                                   Style="{StaticResource SectionTitle}" />
+                            <Label Text="Ayrı karar vermediğin her ekstre için geçerli olur."
+                                   Style="{StaticResource MutedText}" />
+                            <Label Text="{Binding PaymentPreferenceText}"
+                                   FontFamily="OpenSansSemibold" />
+                            <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                                <Button Text="Asgari"
+                                        Command="{Binding PayMinimumCommand}" />
+                                <Button Grid.Column="1"
+                                        Text="Tamamı"
+                                        Command="{Binding PayFullCommand}"
+                                        Style="{StaticResource SecondaryButton}" />
+                            </Grid>
+                            <Button Text="Her Ekstrede Sor"
+                                    Command="{Binding AskEachStatementCommand}"
+                                    BackgroundColor="{StaticResource SoftPink}" />
+                        </VerticalStackLayout>
+                    </Border>
+
+                    <Border BackgroundColor="{StaticResource SoftSky}">
+                        <VerticalStackLayout Spacing="10">
+                            <Label Text="Karar vermediğin ekstrelerde varsayım"
+                                   Style="{StaticResource SectionTitle}" />
+                            <!-- Bu bir ödeme kararı değil: "Her Ekstrede Sor"
+                                 seçiliyken projeksiyonun rakam uydurmaması
+                                 için neyi varsayacağını söyler. -->
+                            <Label Text="Bir karar değil, hesaplama varsayımı. Ekstre gelince yine sana sorulur."
+                                   Style="{StaticResource MutedText}" />
+                            <Label Text="{Binding FallbackText}"
+                                   FontFamily="OpenSansSemibold" />
+                            <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                                <Button Text="Asgari"
+                                        Command="{Binding FallbackMinimumCommand}" />
+                                <Button Grid.Column="1"
+                                        Text="Tamamı"
+                                        Command="{Binding FallbackFullCommand}"
+                                        Style="{StaticResource SecondaryButton}" />
+                            </Grid>
+                        </VerticalStackLayout>
+                    </Border>
                 </VerticalStackLayout>
-            </Border>
+            </VerticalStackLayout>
 
             <Button Text="Kart Bilgilerini Düzenle"
                     Command="{Binding OpenCardDetailsCommand}"

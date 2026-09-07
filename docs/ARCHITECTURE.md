@@ -73,6 +73,8 @@ Senaryoyu kaydetmek ayrı bir işlemdir. `CoinFlowService.ApplySimulationAsync` 
 
 Mevcut tutar `CoinFlowService.RefreshCurrentFinancialStateAsync` ile güncellenir: tutar ve `ProjectionAnchorDate = clock.Today` tek bir snapshot olarak birlikte yazılır, ikisi ayrılamaz — "X tarihinde Y param vardı" tek cümledir. Her güncelleme geçmişe yeni bir `FinancialSnapshot` düşer; öncekinin üzerine yazılmaz (I5) ve geçmiş yeniden hesaplanmaz (I6).
 
+Kart kontrol ekranındaki dört ödeme kararı ayrı kapsamlara sahiptir ve model tarafında da ayrıdır: `CurrentStatementPaymentPlan` (tek, kesilmiş ekstre), `CreditCardPaymentPlan` (tek, belirli bir vade), `PaymentStrategy` (tüm gelecek ekstreler), `ProjectionFallbackStrategy` (karar verilmemiş ekstrelerde hesaplama varsayımı — bir ödeme kararı değil). Sunum bu kapsamları zaman eksenine göre gruplar; `CreditCardPaymentResolution` hangi kapsamın geçerli olduğunu döndürdüğü için her satır kararın nereden geldiğini yazabilir.
+
 Kart ve ödeme planı aggregate upsert'leri SQLite transaction içinde ana kayıt ve tüm child satırları birlikte yazar. Apply sonucu hedef bölüm ve entity kimliğini UI'a döndürür; Finansal Yapı sayfası `OnAppearing` sırasında canonical store'u yeniden okur ve istenen gelir/ödeme bölümünü, kart işlemlerinde ise kart kontrol ekranını açar. Projection katmanında cache bulunmadığından Dashboard, 12 Dönem, Target Amount ve sonraki simulator baseline her çağrıda güncel canonical planı kullanır.
 
 12 Dönem ve Simulator, Dönem Detayı'ndan geri dönüşte collection'ı yeniden üretmez; mevcut page instance ve scroll/scenario state korunur. Başka bir kök ekrandan geri gelindiğinde normal canonical reload davranışı devam eder.

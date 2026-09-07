@@ -87,6 +87,41 @@ public partial class CardControlViewModel(
     [ObservableProperty] private bool isStatementDraftCustom;
     [ObservableProperty] private string statementDraftCustomAmount = string.Empty;
 
+    // Beş ayrı "asgari/tamamı" seçicisi dört farklı kavramı aynı kelimelerle
+    // sunuyordu. Ayrımı yapan şey kapsam: hangi ekstreleri etkiliyor. Sayfa
+    // artık zaman eksenine göre okunuyor — ŞU AN / SIRADAKİ / GENEL — ve
+    // nadiren değişen genel ayarlar varsayılan olarak kapalı duruyor.
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(AdvancedToggleText))]
+    private bool showAdvanced;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(PreferenceHistoryToggleText))]
+    private bool showPreferenceHistory;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(FutureChargesToggleText))]
+    private bool showFutureCharges;
+
+    public string AdvancedToggleText => ShowAdvanced
+        ? "Genel ayarları gizle ▴"
+        : "Genel ayarlar ▾";
+    public string PreferenceHistoryToggleText => ShowPreferenceHistory
+        ? "Ödeme tercihi geçmişini gizle ▴"
+        : "Ödeme tercihi geçmişi ▾";
+    public string FutureChargesToggleText => ShowFutureCharges
+        ? "Gelecek kart hareketlerini gizle ▴"
+        : "Gelecek kart hareketleri ▾";
+
+    [RelayCommand]
+    private void ToggleAdvanced() => ShowAdvanced = !ShowAdvanced;
+
+    [RelayCommand]
+    private void TogglePreferenceHistory() =>
+        ShowPreferenceHistory = !ShowPreferenceHistory;
+
+    [RelayCommand]
+    private void ToggleFutureCharges() =>
+        ShowFutureCharges = !ShowFutureCharges;
+
     [ObservableProperty] private DateTime chargeDate = DateTime.Today.AddMonths(1);
     [ObservableProperty] private string chargeAmount = string.Empty;
     [ObservableProperty] private string chargeDescription = string.Empty;
@@ -768,16 +803,22 @@ public partial class CardControlViewModel(
         HasUpcomingStatements = UpcomingStatements.Count > 0;
     }
 
+    /// <summary>
+    /// Her satır hangi kararın geçerli olduğunu değil, o kararın **nereden
+    /// geldiğini** söylemeli: bu vadeye özel mi, kartın varsayılanı mı, yoksa
+    /// hiç karar yok da projeksiyon bir şey mi varsayıyor. Üçü aynı kelimeyle
+    /// ("Asgari") bitiyor; ayrımı önek yapıyor.
+    /// </summary>
     private static string UpcomingPlanLabel(
         CreditCardStatementProjection projection) =>
         projection.PaymentResolution switch
         {
             CreditCardPaymentResolution.DueDateOverride =>
-                $"Bu ay: {PaymentTypeLabel(projection.AppliedPaymentType)}",
+                $"Bu vade için: {PaymentTypeLabel(projection.AppliedPaymentType)}",
             CreditCardPaymentResolution.GeneralStrategy =>
-                $"Genel plan: {PaymentTypeLabel(projection.AppliedPaymentType)}",
+                $"Kartın varsayılanı: {PaymentTypeLabel(projection.AppliedPaymentType)}",
             CreditCardPaymentResolution.ProjectionFallback =>
-                $"Kararsızda: {PaymentTypeLabel(projection.AppliedPaymentType)}",
+                $"Karar yok · varsayım: {PaymentTypeLabel(projection.AppliedPaymentType)}",
             _ => "Henüz belirlenmedi"
         };
 
