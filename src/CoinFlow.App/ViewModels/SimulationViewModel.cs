@@ -53,6 +53,14 @@ public partial class SimulationViewModel(
         new("Asgari öde", CreditCardPaymentType.Minimum)
     ];
 
+    public IReadOnlyList<SelectionOption<int>> ChartRanges { get; } =
+    [
+        new("3 Ay", 3),
+        new("6 Ay", 6),
+        new("9 Ay", 9),
+        new("1 Yıl", 12)
+    ];
+
     public IReadOnlyList<SelectionOption<bool>> CardPaymentScopes { get; } =
     [
         new("Yalnızca bu ekstre", false),
@@ -61,6 +69,8 @@ public partial class SimulationViewModel(
 
     private IReadOnlyList<SimulationRequest> _lastRequests = [];
     private IReadOnlyList<SalaryPeriodProjection> _lastScenarioProjection = [];
+    private IReadOnlyList<SalaryPeriodProjection> _lastBaselineProjection = [];
+    private SimulatorChartSeries _fullCashChart = SimulatorChartSeries.Empty;
     private Guid? _editingConditionId;
     private readonly SemaphoreSlim _applyLock = new(1, 1);
     private bool _preserveOnNextAppearance;
@@ -144,33 +154,99 @@ public partial class SimulationViewModel(
     [NotifyPropertyChangedFor(nameof(HasCashChart))]
     [NotifyPropertyChangedFor(nameof(CashChartCaption))]
     private SimulatorChartSeries cashChart = SimulatorChartSeries.Empty;
+    [ObservableProperty] private int chartRange = 12;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasSelectedPeriod))]
+    private SimulatorPeriodView? selectedPeriod;
+    [ObservableProperty] private int selectedChartIndex = -1;
     [ObservableProperty] private string targetAmount = string.Empty;
     [ObservableProperty] private string targetResult = string.Empty;
     [ObservableProperty] private bool hasTargetResult;
 
     public bool HasCashChart => CashChart.HasData;
+    public bool HasSelectedPeriod => SelectedPeriod is not null;
 
     /// <summary>
-    /// Grafiğin taşıdığı asıl bilgi, eğrinin sıfırı kestiği ay. Kesmiyorsa
-    /// bunu söylemek de bir cevaptır.
+    /// Aralık yalnızca yakınlaştırmadır: hesap 12 dönem için bir kez yapılır,
+    /// seçim görünen pencereyi değiştirir. Ufku kısaltmak ilk dönemlerin
+    /// rakamlarını değiştirmediği için bu güvenli.
+    /// </summary>
+    [RelayCommand]
+    private void SetChartRange(int range)
+    {
+        if (range <= 0 || ChartRange == range)
+        {
+            return;
+        }
+
+        ChartRange = range;
+        RefreshCashChart();
+    }
+
+    [RelayCommand]
+    private void SelectChartIndex(int index)
+    {
+        if (index < 0 || index >= CashChart.Points.Count)
+        {
+            return;
+        }
+
+        SelectedChartIndex = index;
+        SelectedPeriod = index < Results.Count ? Results[index] : null;
+    }
+
+    private void RefreshCashChart()
+    {
+        if (_lastBaselineProjection.Count == 0)
+        {
+            _fullCashChart = SimulatorChartSeries.Empty;
+            CashChart = SimulatorChartSeries.Empty;
+            SelectedChartIndex = -1;
+            SelectedPeriod = null;
+            return;
+        }
+
+        // Tam seri başlık için saklanır: açığın kapandığı ay planın gerçeğidir,
+        // görünen pencereye göre değişmez.
+        _fullCashChart = SimulatorInsightService.BuildCashChart(
+            _lastBaselineProjection,
+            _lastScenarioProjection);
+        CashChart = SimulatorInsightService.BuildCashChart(
+            _lastBaselineProjection,
+            _lastScenarioProjection,
+            ChartRange);
+        // Pencere daralınca seçim dışarıda kalabilir; son döneme çekiyoruz.
+        var index = SelectedChartIndex < 0
+            ? CashChart.Points.Count - 1
+            : Math.Min(SelectedChartIndex, CashChart.Points.Count - 1);
+        SelectChartIndex(index);
+    }
+
+    /// <summary>
+    /// Grafiğin taşıdığı asıl bilgi, eğrinin sıfırı kestiği ay. Bu, planın
+    /// bütününe ait bir gerçektir; yakınlaştırma onu değiştirmemeli. Bu yüzden
+    /// başlık pencereden değil, tam seriden okunur — 3 aya daraltınca "12 dönem
+    /// içinde kapanmıyor" yazıp üstteki anlatıyı yalanlıyordu.
     /// </summary>
     public string CashChartCaption
     {
         get
         {
-            if (!CashChart.HasData)
+            if (!_fullCashChart.HasData)
             {
                 return string.Empty;
             }
 
-            if (CashChart.FirstNonNegativePoint is { } recovery)
+            if (_fullCashChart.FirstNonNegativePoint is { } recovery)
             {
-                return CashChart.Points[0] == recovery
+                return _fullCashChart.Points[0] == recovery
                     ? "Dönem sonu nakit · ilk dönemden itibaren artıda"
-                    : $"Dönem sonu nakit · açık {recovery.PeriodStart:MMMM yyyy} döneminde kapanıyor";
+                    : "Dönem sonu nakit · açık " +
+                      recovery.PeriodStart.ToString("MMMM yyyy", TurkishCulture) +
+                      " döneminde kapanıyor";
             }
 
-            return "Dönem sonu nakit · açık 12 dönem içinde kapanmıyor";
+            return $"Dönem sonu nakit · açık {_fullCashChart.Points.Count} dönem içinde kapanmıyor";
         }
     }
 
@@ -461,6 +537,9 @@ public partial class SimulationViewModel(
         SummaryMetrics.Clear();
         InterestComparison.Clear();
         CashChart = SimulatorChartSeries.Empty;
+        _lastBaselineProjection = [];
+        SelectedChartIndex = -1;
+        SelectedPeriod = null;
         HasResults = false;
         IsResultStale = false;
         ResetApplyState(clearRequest: true);
@@ -498,6 +577,7 @@ public partial class SimulationViewModel(
             LastApplyResult = null;
             ApplyConfirmationText = BuildApplyConfirmation(requests);
             _lastScenarioProjection = result.Scenario;
+            _lastBaselineProjection = result.Baseline;
             Populate(result);
             HasResults = true;
             IsResultStale = false;
@@ -579,6 +659,9 @@ public partial class SimulationViewModel(
             SummaryMetrics.Clear();
             InterestComparison.Clear();
             CashChart = SimulatorChartSeries.Empty;
+            _lastBaselineProjection = [];
+            SelectedChartIndex = -1;
+            SelectedPeriod = null;
             HasResults = false;
             IsResultStale = false;
             _lastRequests = [];
@@ -954,9 +1037,10 @@ public partial class SimulationViewModel(
         {
             InterestComparison.Add(row);
         }
-        CashChart = SimulatorInsightService.BuildCashChart(
-            result.Baseline,
-            result.Scenario);
+        _lastBaselineProjection = result.Baseline;
+        _lastScenarioProjection = result.Scenario;
+        SelectedChartIndex = -1;
+        RefreshCashChart();
         FriendlySummary = string.Join(Environment.NewLine,
             projectionSummary.NarrativeInsights);
         var transition = result.Scenario.FirstOrDefault(x =>

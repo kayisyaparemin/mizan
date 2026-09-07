@@ -189,9 +189,25 @@
                         <Label Text="{Binding CashChartCaption}"
                                Style="{StaticResource MutedText}"
                                FontSize="12" />
+                        <FlexLayout Wrap="Wrap" Direction="Row" BindableLayout.ItemsSource="{Binding ChartRanges}">
+                            <BindableLayout.ItemTemplate>
+                                <DataTemplate>
+                                    <Button Text="{Binding Label}"
+                                            FontSize="12"
+                                            Padding="12,4"
+                                            Margin="0,0,6,4"
+                                            HeightRequest="34"
+                                            Style="{StaticResource SecondaryButton}"
+                                            Command="{Binding Source={x:Reference PageRoot}, Path=BindingContext.SetChartRangeCommand}"
+                                            CommandParameter="{Binding Value}" />
+                                </DataTemplate>
+                            </BindableLayout.ItemTemplate>
+                        </FlexLayout>
                         <GraphicsView x:Name="CashChartView"
                                       Drawable="{StaticResource CashChartDrawable}"
-                                      HeightRequest="200" />
+                                      HeightRequest="200"
+                                      StartInteraction="OnCashChartTouchStart"
+                                      EndInteraction="OnCashChartTouchEnd" />
                         <FlexLayout Wrap="Wrap" Direction="Row">
                             <Border Padding="9,4" Margin="0,0,6,3"
                                     BackgroundColor="{StaticResource ProjectionSurface}">
@@ -315,96 +331,93 @@
                     </VerticalStackLayout>
                 </Border>
 
-                <Label Text="12 Dönem Finansal Görünüm" Style="{StaticResource SectionTitle}" />
-                <VerticalStackLayout BindableLayout.ItemsSource="{Binding Results}" Spacing="8">
-                    <BindableLayout.ItemTemplate>
-                        <DataTemplate>
-                            <Border Padding="14">
-                                <Border.GestureRecognizers>
-                                    <TapGestureRecognizer
-                                        Command="{Binding Source={x:Reference PageRoot}, Path=BindingContext.OpenPeriodDetailCommand}"
-                                        CommandParameter="{Binding .}" />
-                                </Border.GestureRecognizers>
-                                <VerticalStackLayout Spacing="9">
-                                    <Label Text="{Binding Period}"
-                                           FontFamily="OpenSansSemibold"
-                                           FontSize="17" />
-                                    <Label Text="{Binding Assignment}"
-                                           Style="{StaticResource MutedText}" />
-                                    <Grid ColumnDefinitions="*,Auto"
-                                          RowDefinitions="Auto,Auto,Auto,Auto"
-                                          RowSpacing="6">
-                                        <Label Text="Dönem gelirleri" Style="{StaticResource MutedText}" />
-                                        <Label Grid.Column="1" Text="{Binding IncomeText}" />
-                                        <Label Grid.Row="1" Text="Bu dönem gereken" Style="{StaticResource MutedText}" />
-                                        <Label Grid.Row="1"
-                                               Grid.Column="1"
-                                               Text="{Binding NeedText}"
-                                               FontFamily="OpenSansSemibold" />
-                                        <Label Grid.Row="2" Text="{Binding CoverageLabel}" Style="{StaticResource MutedText}" />
-                                        <Label Grid.Row="2"
-                                               Grid.Column="1"
-                                               Text="{Binding CoverageAmountText}"
-                                               FontFamily="OpenSansSemibold" />
-                                        <Label Grid.Row="3" Text="Dönem sonu durumu" Style="{StaticResource MutedText}" />
-                                        <Label Grid.Row="3"
-                                               Grid.Column="1"
-                                               Text="{Binding EndingText}"
-                                               FontFamily="OpenSansSemibold"
-                                               TextColor="{StaticResource PositiveText}">
-                                            <Label.Triggers>
-                                                <DataTrigger TargetType="Label"
-                                                             Binding="{Binding EndingIsNegative}"
-                                                             Value="True">
-                                                    <Setter Property="TextColor" Value="{StaticResource Error}" />
-                                                </DataTrigger>
-                                            </Label.Triggers>
-                                        </Label>
-                                    </Grid>
-                                    <FlexLayout Wrap="Wrap" Direction="Row">
-                                        <Border Padding="9,4"
-                                                Margin="0,0,6,3"
-                                                IsVisible="{Binding HasPrimaryInsight}"
-                                                BackgroundColor="{StaticResource WarningSurface}">
-                                            <Label Text="{Binding PrimaryInsight}"
-                                                   FontSize="11"
-                                                   TextColor="{StaticResource WarningText}" />
-                                        </Border>
-                                        <Border Padding="9,4"
-                                                Margin="0,0,6,3"
-                                                IsVisible="{Binding HasSecondaryInsight}"
-                                                BackgroundColor="{StaticResource ProjectionSurface}">
-                                            <Label Text="{Binding SecondaryInsight}"
-                                                   FontSize="11"
-                                                   TextColor="{StaticResource ProjectionText}" />
-                                        </Border>
-                                    </FlexLayout>
-                                    <Border Padding="9,4"
-                                            HorizontalOptions="Start"
-                                            IsVisible="{Binding Projection.HasUndeterminedCardPayment}"
-                                            BackgroundColor="{StaticResource InterestSurface}">
-                                        <Label Text="Kart ödeme planı bekliyor"
-                                               FontSize="11"
-                                               TextColor="{StaticResource InterestText}" />
-                                    </Border>
-                                    <Grid ColumnDefinitions="*,Auto">
-                                        <Label Text="Bu dönemde ne olacak?"
-                                               Style="{StaticResource MutedText}" />
-                                        <HorizontalStackLayout Grid.Column="1" Spacing="7">
-                                            <Label Text="Detayı Gör"
-                                                   FontFamily="OpenSansSemibold"
-                                                   TextColor="{StaticResource ProjectionText}" />
-                                            <Label Text="›"
-                                                   FontSize="21"
-                                                   VerticalTextAlignment="Center"
-                                                   TextColor="{StaticResource ProjectionText}" />
-                                        </HorizontalStackLayout>
-                                    </Grid>
-                                </VerticalStackLayout>
+
+                <Label Text="Seçili Dönem" Style="{StaticResource SectionTitle}" />
+                <Border Padding="14"
+                        IsVisible="{Binding HasSelectedPeriod}"
+                        BindingContext="{Binding SelectedPeriod}">
+                    <Border.GestureRecognizers>
+                        <TapGestureRecognizer
+                            Command="{Binding Source={x:Reference PageRoot}, Path=BindingContext.OpenPeriodDetailCommand}"
+                            CommandParameter="{Binding .}" />
+                    </Border.GestureRecognizers>
+                    <VerticalStackLayout Spacing="9">
+                        <Label Text="{Binding Period}"
+                               FontFamily="OpenSansSemibold"
+                               FontSize="17" />
+                        <Label Text="{Binding Assignment}"
+                               Style="{StaticResource MutedText}" />
+                        <Grid ColumnDefinitions="*,Auto"
+                              RowDefinitions="Auto,Auto,Auto,Auto"
+                              RowSpacing="6">
+                            <Label Text="Dönem gelirleri" Style="{StaticResource MutedText}" />
+                            <Label Grid.Column="1" Text="{Binding IncomeText}" />
+                            <Label Grid.Row="1" Text="Bu dönem gereken" Style="{StaticResource MutedText}" />
+                            <Label Grid.Row="1"
+                                   Grid.Column="1"
+                                   Text="{Binding NeedText}"
+                                   FontFamily="OpenSansSemibold" />
+                            <Label Grid.Row="2" Text="{Binding CoverageLabel}" Style="{StaticResource MutedText}" />
+                            <Label Grid.Row="2"
+                                   Grid.Column="1"
+                                   Text="{Binding CoverageAmountText}"
+                                   FontFamily="OpenSansSemibold" />
+                            <Label Grid.Row="3" Text="Dönem sonu durumu" Style="{StaticResource MutedText}" />
+                            <Label Grid.Row="3"
+                                   Grid.Column="1"
+                                   Text="{Binding EndingText}"
+                                   FontFamily="OpenSansSemibold"
+                                   TextColor="{StaticResource PositiveText}">
+                                <Label.Triggers>
+                                    <DataTrigger TargetType="Label"
+                                                 Binding="{Binding EndingIsNegative}"
+                                                 Value="True">
+                                        <Setter Property="TextColor" Value="{StaticResource Error}" />
+                                    </DataTrigger>
+                                </Label.Triggers>
+                            </Label>
+                        </Grid>
+                        <FlexLayout Wrap="Wrap" Direction="Row">
+                            <Border Padding="9,4"
+                                    Margin="0,0,6,3"
+                                    IsVisible="{Binding HasPrimaryInsight}"
+                                    BackgroundColor="{StaticResource WarningSurface}">
+                                <Label Text="{Binding PrimaryInsight}"
+                                       FontSize="11"
+                                       TextColor="{StaticResource WarningText}" />
                             </Border>
-                        </DataTemplate>
-                    </BindableLayout.ItemTemplate>
-                </VerticalStackLayout>
+                            <Border Padding="9,4"
+                                    Margin="0,0,6,3"
+                                    IsVisible="{Binding HasSecondaryInsight}"
+                                    BackgroundColor="{StaticResource ProjectionSurface}">
+                                <Label Text="{Binding SecondaryInsight}"
+                                       FontSize="11"
+                                       TextColor="{StaticResource ProjectionText}" />
+                            </Border>
+                        </FlexLayout>
+                        <Border Padding="9,4"
+                                HorizontalOptions="Start"
+                                IsVisible="{Binding Projection.HasUndeterminedCardPayment}"
+                                BackgroundColor="{StaticResource InterestSurface}">
+                            <Label Text="Kart ödeme planı bekliyor"
+                                   FontSize="11"
+                                   TextColor="{StaticResource InterestText}" />
+                        </Border>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <Label Text="Bu dönemde ne olacak?"
+                                   Style="{StaticResource MutedText}" />
+                            <HorizontalStackLayout Grid.Column="1" Spacing="7">
+                                <Label Text="Detayı Gör"
+                                       FontFamily="OpenSansSemibold"
+                                       TextColor="{StaticResource ProjectionText}" />
+                                <Label Text="›"
+                                       FontSize="21"
+                                       VerticalTextAlignment="Center"
+                                       TextColor="{StaticResource ProjectionText}" />
+                            </HorizontalStackLayout>
+                        </Grid>
+                    </VerticalStackLayout>
+                </Border>
             </VerticalStackLayout>
         </VerticalStackLayout>
     </ScrollView>

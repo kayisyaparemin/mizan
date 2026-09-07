@@ -201,20 +201,20 @@ jobs:
           cat > release-notes.md <<NOTES
           # Mizan $version
 
-          Bu sürüm kart ödeme kararını, kararın verildiği yere taşır.
+          Simülatör artık 12 dönemi liste yerine grafikle gösteriyor.
 
           ### Yenilikler
 
-          - Dönem Detayı'ndaki her kart satırında artık "Tamamını öde" ve
-            "Asgari öde" butonları var. Basıldığı anda karar plana yazılıyor ve
-            dönem yeniden hesaplanıyor; Finansal Yapı'ya gidip simülatöre geri
-            dönmeye gerek kalmıyor.
-          - Karar doğru yere yazılıyor: kesilmiş ekstrenin kararı ekstre ödeme
-            planına gidiyor ve effective-dated tercih geçmişine ekleniyor,
-            ileride kesilecek ekstreler için o vadeye özel plan oluşturuluyor.
-          - Butonlar yalnızca gerçek plan görüntülenirken çıkıyor. Simülasyon
-            sonucundaki dönem detayında görünmüyorlar, çünkü orası geçici bir
-            hesaptır.
+          - **Nakit Seyri grafiği.** Dönem sonu nakit, sıfırın altı ve üstü
+            birlikte çizilen bir eksende. Eğrinin sıfırı kestiği ay açığın
+            kapandığı aydır ve grafiğin taşıdığı asıl bilgi odur. İki çizgi:
+            şimdiki durum ve denenen plan.
+          - **Aralık seçimi:** 3 Ay / 6 Ay / 9 Ay / 1 Yıl. Hesap değişmez,
+            yalnızca görünen pencere daralır; ölçek pencereye göre yeniden kurulur.
+          - **Grafikten ay seçme.** Grafiğe dokun, en yakın döneme kancalanır;
+            o dönemin geliri, ihtiyacı ve dönem sonu hemen altında açılır.
+          - 12 dönemin alt alta listelenmesi kaldırıldı. Ayrıntılı inceleme için
+            "Detayı Gör" yerinde duruyor.
           NOTES
 
       - name: Upload signed APK artifact

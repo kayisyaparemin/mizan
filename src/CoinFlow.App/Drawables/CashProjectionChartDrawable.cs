@@ -33,6 +33,32 @@ public sealed class CashProjectionChartDrawable : IDrawable
     public SimulatorChartSeries Series { get; set; } =
         SimulatorChartSeries.Empty;
 
+    /// <summary>Seçili dönemin indeksi; -1 ise seçim yok.</summary>
+    public int SelectedIndex { get; set; } = -1;
+
+    /// <summary>
+    /// Dokunulan x koordinatını en yakın döneme kancalar. Telefonda 12 noktadan
+    /// birine tam basmak zor; kullanıcı grafiğin herhangi bir yerine basabilsin.
+    /// </summary>
+    public int IndexAt(float x, float width)
+    {
+        var count = Series.Points.Count;
+        if (count == 0)
+        {
+            return -1;
+        }
+
+        if (count == 1)
+        {
+            return 0;
+        }
+
+        var plotWidth = Math.Max(1f, width - LeftPadding - RightPadding);
+        var ratio = (x - LeftPadding) / plotWidth;
+        var index = (int)Math.Round(ratio * (count - 1));
+        return Math.Clamp(index, 0, count - 1);
+    }
+
     public void Draw(ICanvas canvas, RectF rect)
     {
         if (!Series.HasData)
@@ -65,7 +91,35 @@ public sealed class CashProjectionChartDrawable : IDrawable
             DrawLine(canvas, plot, minimum, maximum, ScenarioColor, 3f, false);
         }
 
+        DrawSelection(canvas, plot, minimum, maximum);
         DrawMonthLabels(canvas, plot, rect);
+    }
+
+    private void DrawSelection(
+        ICanvas canvas,
+        RectF plot,
+        float minimum,
+        float maximum)
+    {
+        if (SelectedIndex < 0 || SelectedIndex >= Series.Points.Count)
+        {
+            return;
+        }
+
+        var point = Series.Points[SelectedIndex];
+        var x = IndexToX(SelectedIndex, plot, Series.Points.Count);
+        canvas.StrokeColor = ZeroLineColor.WithAlpha(0.45f);
+        canvas.StrokeSize = 1f;
+        canvas.StrokeDashPattern = [4f, 3f];
+        canvas.DrawLine(x, plot.Y, x, plot.Bottom);
+        canvas.StrokeDashPattern = null;
+
+        var value = Series.HasScenario ? point.Scenario : point.Baseline;
+        var y = ValueToY(value, plot, minimum, maximum);
+        canvas.FillColor = Colors.White;
+        canvas.FillCircle(x, y, 6f);
+        canvas.FillColor = ScenarioColor;
+        canvas.FillCircle(x, y, 4f);
     }
 
     /// <summary>

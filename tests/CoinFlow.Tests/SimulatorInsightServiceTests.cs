@@ -102,6 +102,65 @@ public sealed class SimulatorInsightServiceTests
     }
 
     [Fact]
+    public void CashChart_Range_ZoomsWithoutChangingTheVisibleValues()
+    {
+        var periods = new[]
+        {
+            Row(new DateOnly(2026, 9, 10), opening: 0m, income: 0m, ending: -80_000m),
+            Row(new DateOnly(2026, 10, 10), opening: 0m, income: 0m, ending: -20_000m),
+            Row(new DateOnly(2026, 11, 10), opening: 0m, income: 0m, ending: 15_000m),
+            Row(new DateOnly(2026, 12, 10), opening: 0m, income: 0m, ending: 500_000m)
+        };
+
+        var full = SimulatorInsightService.BuildCashChart(periods);
+        var zoomed = SimulatorInsightService.BuildCashChart(periods, take: 2);
+
+        Assert.Equal(4, full.Points.Count);
+        Assert.Equal(2, zoomed.Points.Count);
+        // Görünen noktalar aynı kalır; yalnızca ölçek pencereye daralır.
+        Assert.Equal(full.Points[0].Baseline, zoomed.Points[0].Baseline);
+        Assert.Equal(full.Points[1].Baseline, zoomed.Points[1].Baseline);
+        Assert.Equal(500_000m, full.Maximum);
+        Assert.Equal(0m, zoomed.Maximum);
+        Assert.Equal(-80_000m, zoomed.Minimum);
+    }
+
+    [Fact]
+    public void CashChart_WindowedSeries_CanHideARecoveryTheFullSeriesHas()
+    {
+        // Başlığın pencereden değil tam seriden okunması gerektiğinin sebebi:
+        // 3 aya daraltınca açık kapanmıyormuş gibi görünüyor, oysa plan Kasım'da
+        // artıya geçiyor.
+        var periods = new[]
+        {
+            Row(new DateOnly(2026, 9, 10), opening: 0m, income: 0m, ending: -80_000m),
+            Row(new DateOnly(2026, 10, 10), opening: 0m, income: 0m, ending: -40_000m),
+            Row(new DateOnly(2026, 11, 10), opening: 0m, income: 0m, ending: 25_000m)
+        };
+
+        var windowed = SimulatorInsightService.BuildCashChart(periods, take: 2);
+        var full = SimulatorInsightService.BuildCashChart(periods);
+
+        Assert.Null(windowed.FirstNonNegativePoint);
+        Assert.Equal(
+            new DateOnly(2026, 11, 10),
+            full.FirstNonNegativePoint!.PeriodStart);
+    }
+
+    [Fact]
+    public void CashChart_RangeLargerThanData_ReturnsEverything()
+    {
+        var periods = new[]
+        {
+            Row(new DateOnly(2026, 9, 10), opening: 0m, income: 0m, ending: 10_000m)
+        };
+
+        var series = SimulatorInsightService.BuildCashChart(periods, take: 12);
+
+        Assert.Single(series.Points);
+    }
+
+    [Fact]
     public void CashChart_WithoutPeriods_IsEmpty()
     {
         var series = SimulatorInsightService.BuildCashChart([]);

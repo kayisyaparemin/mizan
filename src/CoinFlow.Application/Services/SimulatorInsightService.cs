@@ -389,9 +389,15 @@ public sealed class SimulatorInsightService
     /// içerir: sıfır çizgisi grafiğin taşıdığı asıl bilgidir, ikisi de aynı
     /// yönde kalsa bile kaybolmamalı. Senaryo verilmezse tek çizgi çizilir.
     /// </summary>
+    /// <param name="take">
+    /// Görünür dönem sayısı. Ufku kısaltmak hesabı değiştirmez — ilk N dönem
+    /// her ufukta aynıdır — bu yüzden aralık seçimi saf bir yakınlaştırmadır.
+    /// Ölçek yalnızca görünen pencereye göre kurulur.
+    /// </param>
     public static SimulatorChartSeries BuildCashChart(
         IReadOnlyList<SalaryPeriodProjection> baseline,
-        IReadOnlyList<SalaryPeriodProjection>? scenario = null)
+        IReadOnlyList<SalaryPeriodProjection>? scenario = null,
+        int? take = null)
     {
         if (baseline.Count == 0)
         {
@@ -402,6 +408,10 @@ public sealed class SimulatorInsightService
         var count = hasScenario
             ? Math.Min(baseline.Count, scenario!.Count)
             : baseline.Count;
+        if (take is > 0)
+        {
+            count = Math.Min(count, take.Value);
+        }
         var points = new List<SimulatorChartPoint>(count);
         for (var index = 0; index < count; index++)
         {
