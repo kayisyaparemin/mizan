@@ -75,10 +75,12 @@ public partial class FutureMonthsViewModel(
             HasProjection = Periods.Count > 0;
             HasNoProjection = !HasProjection;
             var interest = ProjectionInterestSummary.From(rows);
-            TotalCreditCardInterest = Money(interest.CreditCardInterest);
+            // Ana Sayfa ile aynı sebep: üç satır alt alta duruyor, tam sayıya
+            // yuvarlanınca toplam gözle tutmuyor.
+            TotalCreditCardInterest = Money(interest.CreditCardInterest, 2);
             TotalDeficitInterest = Money(
-                interest.DeficitFinancingInterest);
-            TotalInterestCost = Money(interest.TotalInterestCost);
+                interest.DeficitFinancingInterest, 2);
+            TotalInterestCost = Money(interest.TotalInterestCost, 2);
             HasInterestSummary = interest.TotalInterestCost > 0m;
             HasTargetResult = false;
             EmptyStateMessage = plan.Salaries.Count == 0

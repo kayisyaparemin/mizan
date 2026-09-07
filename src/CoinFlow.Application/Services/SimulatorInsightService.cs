@@ -384,60 +384,6 @@ public sealed class SimulatorInsightService
         return rows;
     }
 
-    /// <summary>
-    /// Dönem sonu nakit eğrisini çizim için hazırlar. Ölçek her zaman sıfırı
-    /// içerir: sıfır çizgisi grafiğin taşıdığı asıl bilgidir, ikisi de aynı
-    /// yönde kalsa bile kaybolmamalı. Senaryo verilmezse tek çizgi çizilir.
-    /// </summary>
-    /// <param name="take">
-    /// Görünür dönem sayısı. Ufku kısaltmak hesabı değiştirmez — ilk N dönem
-    /// her ufukta aynıdır — bu yüzden aralık seçimi saf bir yakınlaştırmadır.
-    /// Ölçek yalnızca görünen pencereye göre kurulur.
-    /// </param>
-    public static SimulatorChartSeries BuildCashChart(
-        IReadOnlyList<SalaryPeriodProjection> baseline,
-        IReadOnlyList<SalaryPeriodProjection>? scenario = null,
-        int? take = null)
-    {
-        if (baseline.Count == 0)
-        {
-            return SimulatorChartSeries.Empty;
-        }
-
-        var hasScenario = scenario is { Count: > 0 };
-        var count = hasScenario
-            ? Math.Min(baseline.Count, scenario!.Count)
-            : baseline.Count;
-        if (take is > 0)
-        {
-            count = Math.Min(count, take.Value);
-        }
-        var points = new List<SimulatorChartPoint>(count);
-        for (var index = 0; index < count; index++)
-        {
-            var current = baseline[index];
-            points.Add(new SimulatorChartPoint(
-                current.PeriodStart,
-                current.PeriodStart.ToString("MMM", TurkishCulture),
-                current.EndingProjectedSavings,
-                hasScenario
-                    ? scenario![index].EndingProjectedSavings
-                    : current.EndingProjectedSavings));
-        }
-
-        var values = points
-            .SelectMany(x => hasScenario
-                ? new[] { x.Baseline, x.Scenario }
-                : [x.Baseline])
-            .Append(0m)
-            .ToArray();
-        return new SimulatorChartSeries(
-            points,
-            values.Min(),
-            values.Max(),
-            hasScenario);
-    }
-
     private static SimulatorInterestRow InterestRow(
         string label,
         decimal baseline,

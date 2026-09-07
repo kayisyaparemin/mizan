@@ -64,12 +64,12 @@ Kullanıcı öneriyi gerçek finansal durumuyla düzeltebilir; fark `Reconciliat
 
 Sol üstteki native Shell hamburger menüsü altı kök bölüm içerir; bottom TabBar yoktur:
 
-1. **Ana Sayfa:** Güncel durum, bu dönem, yaklaşan ödemeler ve 12 dönemlik görünümü modüler özetlerle gösterir.
+1. **Ana Sayfa:** En üstte mevcut tutar — düzenlenebilir, ve güncellemek çapayı da bugüne taşır. Altında bu dönemin tek cümlelik durum özeti, yaklaşan ödemeler, 12 dönemlik görünüm (kart / açık faizi kırılımıyla) ve kısa yollar. Dönem kırılımı burada tekrarlanmaz; Dönem Detayı'na bağlantı verilir.
 2. **12 Dönem:** Compact dönem kartları 12 dönemi hızlı taratır. Karta dokununca ortak full-screen **Dönem Detayı** açılır; summary, finansal akış, açık, zorunlu kırılımı, faiz ve her exact ödeme ayrı görsel satırda gösterilir.
-3. **Simülatör:** Nakit alışveriş, tek çekim/taksitli kart, kart ekstresini tam kapatma, finansman, nakit borç, ileri tarihli tek/tekrarlı ödeme, gelecek gelir, gelir ve gelir kullanım düzeni değişimi senaryoları; baseline ve scenario faiz yükünü karşılaştırır. Dönem kartı aynı Dönem Detayı sayfasını baseline/senaryo/delta modu ile kullanır.
+3. **Simülatör:** Koşullar switch ile açılıp kapanır; kapalı koşul hesaba girmez ve 12 dönemlik liste anında yeniden hesaplanır. Hiçbiri açık değilken liste baz projeksiyonu gösterir. Nakit alışveriş, tek çekim/taksitli kart, kart ekstresini tam kapatma, finansman, nakit borç, ileri tarihli tek/tekrarlı ödeme, gelecek gelir, gelir ve gelir kullanım düzeni değişimi senaryoları; baseline ve scenario faiz yükünü karşılaştırır. Dönem kartı aynı Dönem Detayı sayfasını baseline/senaryo/delta modu ile kullanır.
 4. **Finansal Yapı:** Gelirler, kredi kartları, krediler, düzenli ödemeler ve tek seferlik/geçici ödemeler yönetimi.
 5. **Geçmiş:** Kapanmış dönemlerde Original Plan, varsa Son Plan, Gerçek, kategori farkları, ödeme durumları ve yeni güncel durum.
-6. **Ayarlar:** Dönem günü, bütçe, kart carry/açık faiz varsayımları, read-only düzen geçmişi ve development araçları.
+6. **Ayarlar:** Dönem günü, yaşam bütçesi, kart carry/açık faiz varsayımları, read-only düzen geçmişi ve development araçları. Mevcut tutar burada değil, Ana Sayfa'dadır; iki yerde düzenlenebilmesi hangisinin çapayı ilerlettiğini belirsizleştiriyordu.
 
 Simülatörde **Simülasyon Yap** yalnız bellekte hypothetical bir plan üretir. **Planı Uygula** açık onaydan sonra scenario türünü canonical finans kaydına dönüştürür; aynı application kimliği ikinci kez yükümlülük oluşturmaz. Uygulanan kayıt Finansal Yapı içindeki doğru bölümde veya seçili kart kontrolünde hemen açılabilir ve sonraki simulator baseline hesabına normal gerçek veri olarak girer.
 

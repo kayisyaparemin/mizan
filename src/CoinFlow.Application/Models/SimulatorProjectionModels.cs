@@ -18,40 +18,6 @@ public sealed record SimulatorProjectionSummary(
     public bool HasKeyMetrics => KeyMetrics.Count > 0;
 }
 
-/// <summary>
-/// Grafikteki tek bir dönem. Nakit işaretli bir sayıdır ve
-/// <c>UpcomingPeriod</c> modunda gerçek banka bakiyesine eşittir; bu yüzden
-/// sıfırın altı ve üstü birlikte çizilir.
-/// </summary>
-public sealed record SimulatorChartPoint(
-    DateOnly PeriodStart,
-    string Label,
-    decimal Baseline,
-    decimal Scenario);
-
-public sealed record SimulatorChartSeries(
-    IReadOnlyList<SimulatorChartPoint> Points,
-    decimal Minimum,
-    decimal Maximum,
-    bool HasScenario)
-{
-    public static SimulatorChartSeries Empty { get; } =
-        new([], 0m, 0m, false);
-
-    public bool HasData => Points.Count > 0;
-
-    /// <summary>
-    /// Çizgi sıfırı kesiyorsa açık kapanıyor demektir; grafiğin taşıdığı asıl
-    /// bilgi bu.
-    /// </summary>
-    public bool CrossesZero => Minimum < 0m && Maximum > 0m;
-
-    /// <summary>Açığın kapandığı ilk dönem; hiç kapanmıyorsa null.</summary>
-    public SimulatorChartPoint? FirstNonNegativePoint => Points
-        .FirstOrDefault(x =>
-            (HasScenario ? x.Scenario : x.Baseline) >= 0m);
-}
-
 // Faiz karşılaştırma tablosunun tek satırı. Motor kart faizi ile finansman
 // açığı faizini ayrı tutar (I8); sunumda da ayrı kalmaları gerekiyor, çünkü
 // bir senaryo birini düşürürken diğerini yükseltebilir.

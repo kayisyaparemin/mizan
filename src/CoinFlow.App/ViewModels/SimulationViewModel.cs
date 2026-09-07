@@ -54,14 +54,6 @@ public partial class SimulationViewModel(
         new("Asgari öde", CreditCardPaymentType.Minimum)
     ];
 
-    public IReadOnlyList<SelectionOption<int>> ChartRanges { get; } =
-    [
-        new("3 Ay", 3),
-        new("6 Ay", 6),
-        new("9 Ay", 9),
-        new("1 Yıl", 12)
-    ];
-
     public IReadOnlyList<SelectionOption<bool>> CardPaymentScopes { get; } =
     [
         new("Yalnızca bu ekstre", false),
@@ -71,7 +63,6 @@ public partial class SimulationViewModel(
     private IReadOnlyList<SimulationRequest> _lastRequests = [];
     private IReadOnlyList<SalaryPeriodProjection> _lastScenarioProjection = [];
     private IReadOnlyList<SalaryPeriodProjection> _lastBaselineProjection = [];
-    private SimulatorChartSeries _fullCashChart = SimulatorChartSeries.Empty;
     private Guid? _editingConditionId;
     private readonly SemaphoreSlim _applyLock = new(1, 1);
     private readonly SemaphoreSlim _calculationLock = new(1, 1);
@@ -79,17 +70,6 @@ public partial class SimulationViewModel(
     private static readonly TimeSpan LiveRecalculationDelay =
         TimeSpan.FromMilliseconds(200);
 
-    /// <summary>Kayıtlı yaşam gideri; slider'ın dönebileceği gerçek değer.</summary>
-    private decimal _planLivingBudget;
-    /// <summary>Ekrandaki sonucun hesaplandığı yaşam gideri.</summary>
-    private decimal _lastLivingBudget;
-    private bool _suppressLivingBudgetRecalculation;
-
-    /// <summary>
-    /// Slider sürekli bir kadran; ham değeri 500'e yuvarlıyoruz ki etiket
-    /// zıplamasın ve aynı rakam için tekrar tekrar hesap yapılmasın.
-    /// </summary>
-    private const decimal LivingBudgetStep = 500m;
     private bool _preserveOnNextAppearance;
     private DateOnly? _projectionAnchorDate;
 
@@ -169,16 +149,6 @@ public partial class SimulationViewModel(
     [ObservableProperty] private string applyButtonText = "Planı Uygula";
     [ObservableProperty] private string applyConfirmationText =
         "Bu plan gerçek finans planına eklenecek.";
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasCashChart))]
-    [NotifyPropertyChangedFor(nameof(HasScenarioLine))]
-    [NotifyPropertyChangedFor(nameof(CashChartCaption))]
-    private SimulatorChartSeries cashChart = SimulatorChartSeries.Empty;
-    [ObservableProperty] private int chartRange = 12;
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasSelectedPeriod))]
-    private SimulatorPeriodView? selectedPeriod;
-    [ObservableProperty] private int selectedChartIndex = -1;
     [ObservableProperty] private string targetAmount = string.Empty;
     [ObservableProperty] private string targetResult = string.Empty;
     [ObservableProperty] private bool hasTargetResult;
@@ -193,163 +163,6 @@ public partial class SimulationViewModel(
     [NotifyPropertyChangedFor(nameof(HasScenarioResults))]
     [NotifyPropertyChangedFor(nameof(CanApplyPlan))]
     private bool isBaselineOnly;
-
-    /// <summary>
-    /// Kullanıcının yönetebildiği tek sürekli parametre. Bir "koşul" değil —
-    /// kredi çekmek ayrık bir karardır, yaşam gideri ise bir kadran; koşul
-    /// listesine karışırsa switch'lerin anlamını bulandırır.
-    /// </summary>
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(LivingBudgetText))]
-    [NotifyPropertyChangedFor(nameof(IsLivingBudgetChanged))]
-    [NotifyPropertyChangedFor(nameof(LivingBudgetComparisonText))]
-    private double livingBudget;
-
-    [ObservableProperty] private double livingBudgetMaximum = 60_000d;
-
-    public bool HasCashChart => CashChart.HasData;
-    public bool HasSelectedPeriod => SelectedPeriod is not null;
-
-    /// <summary>Grafikte iki çizgi var mı; efsane buna göre gösterilir.</summary>
-    public bool HasScenarioLine => CashChart.HasScenario;
-
-    /// <summary>Hesaba giren değer; slider'ın ham konumu değil.</summary>
-    private decimal EffectiveLivingBudget =>
-        Math.Round((decimal)LivingBudget / LivingBudgetStep) * LivingBudgetStep;
-
-    public string LivingBudgetText => Money(EffectiveLivingBudget);
-
-    public bool IsLivingBudgetChanged =>
-        EffectiveLivingBudget != _planLivingBudget;
-
-    public string LivingBudgetComparisonText => IsLivingBudgetChanged
-        ? $"Kayıtlı değer {Money(_planLivingBudget)} · bu deneme kaydedilmez"
-        : "Kayıtlı yaşam giderin";
-
-    partial void OnLivingBudgetChanged(double value)
-    {
-        if (_suppressLivingBudgetRecalculation)
-        {
-            return;
-        }
-
-        QueueLiveRecalculation();
-    }
-
-    /// <summary>
-    /// Slider kalıcı bir ayar değiştirmiyor; kullanıcının gerçek rakama geri
-    /// dönebilmesi şart, yoksa denemekten çekinir.
-    /// </summary>
-    [RelayCommand]
-    private void ResetLivingBudget()
-    {
-        if (!IsLivingBudgetChanged)
-        {
-            return;
-        }
-
-        LivingBudget = (double)_planLivingBudget;
-    }
-
-    private void SetLivingBudgetFromPlan(decimal planLivingBudget)
-    {
-        _planLivingBudget = planLivingBudget;
-        // Kayıtlı değer ölçeğin ortasına düşsün ki hem artırmak hem azaltmak
-        // aynı kadar yer bulsun. Sıfır bütçede ölçek çökmesin diye taban var.
-        LivingBudgetMaximum = (double)Math.Max(
-            planLivingBudget * 2m,
-            10_000m);
-        _suppressLivingBudgetRecalculation = true;
-        LivingBudget = (double)planLivingBudget;
-        _suppressLivingBudgetRecalculation = false;
-        OnPropertyChanged(nameof(LivingBudgetText));
-        OnPropertyChanged(nameof(IsLivingBudgetChanged));
-        OnPropertyChanged(nameof(LivingBudgetComparisonText));
-    }
-
-    /// <summary>
-    /// Aralık yalnızca yakınlaştırmadır: hesap 12 dönem için bir kez yapılır,
-    /// seçim görünen pencereyi değiştirir. Ufku kısaltmak ilk dönemlerin
-    /// rakamlarını değiştirmediği için bu güvenli.
-    /// </summary>
-    [RelayCommand]
-    private void SetChartRange(int range)
-    {
-        if (range <= 0 || ChartRange == range)
-        {
-            return;
-        }
-
-        ChartRange = range;
-        RefreshCashChart();
-    }
-
-    [RelayCommand]
-    private void SelectChartIndex(int index)
-    {
-        if (index < 0 || index >= CashChart.Points.Count)
-        {
-            return;
-        }
-
-        SelectedChartIndex = index;
-        SelectedPeriod = index < Results.Count ? Results[index] : null;
-    }
-
-    private void RefreshCashChart()
-    {
-        if (_lastBaselineProjection.Count == 0)
-        {
-            _fullCashChart = SimulatorChartSeries.Empty;
-            CashChart = SimulatorChartSeries.Empty;
-            SelectedChartIndex = -1;
-            SelectedPeriod = null;
-            return;
-        }
-
-        // Tam seri başlık için saklanır: açığın kapandığı ay planın gerçeğidir,
-        // görünen pencereye göre değişmez.
-        _fullCashChart = SimulatorInsightService.BuildCashChart(
-            _lastBaselineProjection,
-            _lastScenarioProjection);
-        CashChart = SimulatorInsightService.BuildCashChart(
-            _lastBaselineProjection,
-            _lastScenarioProjection,
-            ChartRange);
-        // Pencere daralınca seçim dışarıda kalabilir; son döneme çekiyoruz.
-        var index = SelectedChartIndex < 0
-            ? CashChart.Points.Count - 1
-            : Math.Min(SelectedChartIndex, CashChart.Points.Count - 1);
-        SelectChartIndex(index);
-    }
-
-    /// <summary>
-    /// Grafiğin taşıdığı asıl bilgi, eğrinin sıfırı kestiği ay. Bu, planın
-    /// bütününe ait bir gerçektir; yakınlaştırma onu değiştirmemeli. Bu yüzden
-    /// başlık pencereden değil, tam seriden okunur — 3 aya daraltınca "12 dönem
-    /// içinde kapanmıyor" yazıp üstteki anlatıyı yalanlıyordu.
-    /// </summary>
-    public string CashChartCaption
-    {
-        get
-        {
-            if (!_fullCashChart.HasData)
-            {
-                return string.Empty;
-            }
-
-            if (_fullCashChart.FirstNonNegativePoint is { } recovery)
-            {
-                return _fullCashChart.Points[0] == recovery
-                    ? "Dönem sonu nakit · ilk dönemden itibaren artıda"
-                    : "Dönem sonu nakit · açık " +
-                      recovery.PeriodStart.ToString("MMMM yyyy", TurkishCulture) +
-                      " döneminde kapanıyor";
-            }
-
-            return $"Dönem sonu nakit · açık {_fullCashChart.Points.Count} dönem içinde kapanmıyor";
-        }
-    }
 
     public bool HasDraftConditions => DraftConditions.Count > 0;
     public bool HasNoDraftConditions => IsPlanAvailable && !HasDraftConditions;
@@ -409,9 +222,6 @@ public partial class SimulationViewModel(
                               plan.PaymentAssignmentStrategies.Count > 0 &&
                               plan.Settings.ProjectionAnchorDate != default;
             IsPlanUnavailable = !IsPlanAvailable;
-            // Slider kalıcı değil: sayfaya her dönüşte kayıtlı değere döner.
-            // Sonuçlar zaten bayatlatıldığı için ekran kendini yalanlamaz.
-            SetLivingBudgetFromPlan(plan.Settings.MonthlyLivingBudget);
             if (HasResults)
             {
                 MarkResultsStale();
@@ -676,10 +486,7 @@ public partial class SimulationViewModel(
         NarrativeInsights.Clear();
         SummaryMetrics.Clear();
         InterestComparison.Clear();
-        CashChart = SimulatorChartSeries.Empty;
         _lastBaselineProjection = [];
-        SelectedChartIndex = -1;
-        SelectedPeriod = null;
         HasResults = false;
         IsResultStale = false;
         IsBaselineOnly = false;
@@ -745,19 +552,16 @@ public partial class SimulationViewModel(
                 return;
             }
 
-            var livingBudget = EffectiveLivingBudget;
             var result = await service.SimulateAsync(
                 requests,
-                monthlyLivingBudgetOverride: livingBudget,
                 cancellationToken: cancellationToken);
             _lastRequests = requests;
-            _lastLivingBudget = livingBudget;
             IsBaselineOnly = false;
             IsPlanApplied = false;
             ApplyButtonText = "Planı Uygula";
             LastApplyResult = null;
             ApplyConfirmationText =
-                BuildApplyConfirmation(requests) + LivingBudgetApplyNote();
+                BuildApplyConfirmation(requests);
             _lastScenarioProjection = result.Scenario;
             _lastBaselineProjection = result.Baseline;
             Populate(result);
@@ -801,9 +605,7 @@ public partial class SimulationViewModel(
     private async Task PopulateBaselineOnlyAsync(
         CancellationToken cancellationToken)
     {
-        var livingBudget = EffectiveLivingBudget;
         var baseline = await service.GetFuturePeriodsAsync(
-            monthlyLivingBudgetOverride: livingBudget,
             cancellationToken: cancellationToken);
         if (baseline.Count == 0)
         {
@@ -811,7 +613,6 @@ public partial class SimulationViewModel(
             return;
         }
 
-        _lastLivingBudget = livingBudget;
         _lastRequests = [];
         _lastBaselineProjection = baseline;
         _lastScenarioProjection = [];
@@ -885,10 +686,7 @@ public partial class SimulationViewModel(
             NarrativeInsights.Clear();
             SummaryMetrics.Clear();
             InterestComparison.Clear();
-            CashChart = SimulatorChartSeries.Empty;
             _lastBaselineProjection = [];
-            SelectedChartIndex = -1;
-            SelectedPeriod = null;
             HasResults = false;
             IsResultStale = false;
             IsBaselineOnly = false;
@@ -971,16 +769,6 @@ public partial class SimulationViewModel(
         return
             $"Bu simülasyon planındaki {requests.Count} koşul gerçek finans planına birlikte eklenecek.\n\n{preview}\n\nHer şey tek seferde kaydedilir; bir koşul kaydedilemezse hiçbir değişiklik yapılmaz.";
     }
-
-    /// <summary>
-    /// Slider kaydedilmiyor. Sonucu kaydırılmış bir yaşam gideriyle görüp planı
-    /// uygulayan kişi gerçekte başka bir eğri elde eder; onay ekranı bunu
-    /// söylemek zorunda, yoksa ekran kendini yalanlar.
-    /// </summary>
-    private string LivingBudgetApplyNote() =>
-        _lastLivingBudget == _planLivingBudget
-            ? string.Empty
-            : $"\n\nBu sonuç {Money(_lastLivingBudget)} aylık yaşam gideriyle hesaplandı. Slider kaydedilmez; kayıtlı yaşam giderin {Money(_planLivingBudget)} olarak kalır.";
 
     private string BuildApplyConfirmation(SimulationRequest request)
     {
@@ -1385,9 +1173,6 @@ public partial class SimulationViewModel(
             Results.Add(row);
         }
 
-        // Grafik en sona bırakılır: seçili dönemi Results'tan okuyor, liste
-        // dolmadan çağrılırsa "Seçili Dönem" bir önceki hesabın satırında kalır.
-        RefreshCashChart();
     }
 
     /// <summary>
@@ -1429,7 +1214,6 @@ public partial class SimulationViewModel(
             Results.Add(row);
         }
 
-        RefreshCashChart();
     }
 
     private static string PeriodTitle(DateOnly salaryDate) =>

@@ -201,25 +201,41 @@ jobs:
           cat > release-notes.md <<NOTES
           # Mizan $version
 
-          Devraldığın kart borcunun faizi artık hesaba giriyor. Ekstresini
-          tamamen ödeyenlerde bu faiz hiç görünmüyordu.
+          Grafik gitti, liste geri geldi. Mevcut tutar artık Ana Sayfa'da, en
+          üstte.
 
-          ### Düzeltme
+          ### Simülatör
 
-          - **Devreden kart borcunun faizi işlenmiyordu.** Faiz yalnızca
-            ödemeden *sonra kalan* tutara uygulanıyordu; ekstreye *giren*
-            devreden bakiyenin faizi hiç eklenmiyordu. Asgari ödeyende bir
-            dönem gecikiyor, ekstresini tamamen ödeyende tamamen kayboluyordu:
-            model "hiç faiz yok" derken banka taşınan bakiyeye faiz
-            işletiyordu.
-            Artık faiz, bakiyenin girdiği ekstrede bir kez işleniyor ve ekstre
-            tutarına ekleniyor. Ekstresini tamamen ödeyen de devraldığı borcun
-            faizini görüyor; borç kapandıktan sonra faiz üremiyor. Bankanın
-            kestiği gerçek ekstre nihai tutardır, üzerine faiz eklenmez.
+          - **12 dönem yeniden alt alta listeleniyor.** Nakit Seyri grafiği
+            kaldırıldı; aylar aşağı doğru uzayan kartlar hâlinde geri geldi.
+            Aylık yaşam gideri kadranı da grafikle birlikte gitti.
+          - **Koşul aç/kapa switch'leri duruyor** — kapattığın koşul hesaba
+            girmiyor, liste anında yeniden hesaplanıyor, "Planı Uygula" yalnız
+            açık olanları kaydediyor. Hepsi kapalıyken liste bugünkü planının
+            kendi seyrini gösteriyor.
 
-          Dönem Detayı'ndaki "Faiz Yükü" bölümünde artık *Devreden kart borcu
-          faizi* satırını göreceksin. 12 dönem faiz toplamların ve dönem sonu
-          rakamların bu yüzden değişir — önceki sürüm eksik hesaplıyordu.
+          ### Ana Sayfa
+
+          - **Mevcut tutar en üstte, yerinde düzenlenebilir.** İleriye dönük
+            parametreler bir kez girildikten sonra planı değiştiren tek şey
+            bugünkü bakiyen; uygulamayı açınca ilk işin o. Güncellediğinde
+            plan bugünden itibaren yeniden kuruluyor: rakam ve tarih tek bir
+            cümle, ayrılamıyorlar. Ayarlar'daki mevcut tutar alanı kaldırıldı.
+          - **Aynı bilgi bir kez.** Dönem sonu rakamı üç ayrı yerde birden
+            duruyordu: uyarı kutusu, durum özeti ve "Bu dönem nasıl oluşuyor"
+            tablosu. Yalnız durum özeti kaldı; kırılımın tamamı zaten daha
+            ayrıntılı olduğu Dönem Detayı'na bir dokunuş uzakta.
+          - **12 dönem faizi kırılımlı.** Kredi kartı faizi ile finansman
+            açığı (KMH) faizi ayrı satırlarda, altında toplam. İkisi ters
+            yönde hareket edebiliyor — kartı erken kapatmak kart faizini
+            düşürürken KMH faizini yükseltebiliyor — ve tek toplam bunu
+            gizliyordu.
+          - Yaklaşan ödemeler ve kısa yollar aynen duruyor.
+
+          ### 12 Dönem
+
+          - Liste artık kendi kutusunda kaymıyor; sayfanın tamamı tek yüzey
+            olarak kayıyor.
           NOTES
 
       - name: Upload signed APK artifact

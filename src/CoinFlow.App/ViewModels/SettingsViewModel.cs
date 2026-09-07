@@ -12,7 +12,10 @@ public partial class SettingsViewModel(
     CoinFlowService service,
     IUserFeedbackService feedback) : ViewModelBase
 {
+    // Mevcut tutar ve çapa artık Ana Sayfa'dan güncelleniyor; burada yalnız
+    // olduğu gibi geri yazılabilsin diye tutuluyorlar.
     private DateOnly _projectionAnchorDate;
+    private decimal _projectionStartingSavings;
     private PaymentAssignmentStrategy? _pendingStrategy;
     private bool _settingsLoaded;
     private bool _isUpdatingSettingsForm;
@@ -29,10 +32,8 @@ public partial class SettingsViewModel(
 
     [ObservableProperty] private string salaryDay = "10";
     [ObservableProperty] private string monthlyLivingBudget = "0";
-    [ObservableProperty] private string projectionStartingSavings = "0";
     [ObservableProperty] private string creditCardCarryInterestRate = "5";
     [ObservableProperty] private string deficitFinancingInterestRate = "5";
-    [ObservableProperty] private string projectionAnchorText = "—";
     [ObservableProperty] private string currentStrategyText = "Henüz seçilmedi";
     [ObservableProperty] private string currentStrategySinceText = string.Empty;
     [ObservableProperty] private string pendingStrategyText = string.Empty;
@@ -57,9 +58,6 @@ public partial class SettingsViewModel(
         RefreshSettingsDirtyState();
 
     partial void OnMonthlyLivingBudgetChanged(string value) =>
-        RefreshSettingsDirtyState();
-
-    partial void OnProjectionStartingSavingsChanged(string value) =>
         RefreshSettingsDirtyState();
 
     partial void OnCreditCardCarryInterestRateChanged(string value) =>
@@ -345,9 +343,7 @@ public partial class SettingsViewModel(
             MonthlyLivingBudget = ParseMoney(
                 MonthlyLivingBudget,
                 "Aylık tahmini yaşam bütçesi"),
-            ProjectionStartingSavings = ParseMoney(
-                ProjectionStartingSavings,
-                "Mevcut tutar"),
+            ProjectionStartingSavings = _projectionStartingSavings,
             ProjectionAnchorDate = _projectionAnchorDate,
             CreditCardCarryInterestRate = ParseRate(
                 CreditCardCarryInterestRate,
@@ -365,18 +361,13 @@ public partial class SettingsViewModel(
         SalaryDay = settings.SalaryDay.ToString(TurkishCulture);
         MonthlyLivingBudget = settings.MonthlyLivingBudget
             .ToString("N2", TurkishCulture);
-        ProjectionStartingSavings = settings.ProjectionStartingSavings
-            .ToString("N2", TurkishCulture);
+        _projectionStartingSavings = settings.ProjectionStartingSavings;
         CreditCardCarryInterestRate =
             (settings.CreditCardCarryInterestRate * 100m)
             .ToString("N2", TurkishCulture);
         DeficitFinancingInterestRate =
             (settings.DeficitFinancingInterestRate * 100m)
             .ToString("N2", TurkishCulture);
-        ProjectionAnchorText = settings.ProjectionAnchorDate == default
-            ? "İlk gelir kaydıyla oluşturulacak"
-            : settings.ProjectionAnchorDate.ToString(
-                "dd MMMM yyyy", TurkishCulture);
         _isUpdatingSettingsForm = false;
 
         _savedSettingsSnapshot = CaptureSettingsSnapshot();
@@ -422,19 +413,17 @@ public partial class SettingsViewModel(
     private sealed record SettingsFormSnapshot(
         string SalaryDay,
         string MonthlyLivingBudget,
-        string ProjectionStartingSavings,
         string CreditCardCarryInterestRate,
         string DeficitFinancingInterestRate)
     {
         public static SettingsFormSnapshot Empty { get; } =
-            new(string.Empty, string.Empty, string.Empty, string.Empty, string.Empty);
+            new(string.Empty, string.Empty, string.Empty, string.Empty);
     }
 
     private SettingsFormSnapshot CaptureSettingsSnapshot() =>
         new(
             SalaryDay.Trim(),
             MonthlyLivingBudget.Trim(),
-            ProjectionStartingSavings.Trim(),
             CreditCardCarryInterestRate.Trim(),
             DeficitFinancingInterestRate.Trim());
 }

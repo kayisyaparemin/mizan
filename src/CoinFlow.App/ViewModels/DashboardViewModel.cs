@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CoinFlow.App.Services;
@@ -64,6 +65,9 @@ public partial class DashboardViewModel(
     [ObservableProperty] private string pendingReviewMessage = string.Empty;
     [ObservableProperty] private bool shouldShowOnboarding;
 
+    /// <summary>Dönem detayına açılabilmek için tutulan mevcut dönem.</summary>
+    private SalaryPeriodProjection? _currentPeriod;
+
     // PRIMARY: ekranı açar açmaz görülmesi gereken tek rakam ve tek cümle.
     [ObservableProperty] private string headlineAmount = "—";
     [ObservableProperty] private string headlineCaption = string.Empty;
@@ -80,6 +84,85 @@ public partial class DashboardViewModel(
     /// </summary>
     public ObservableCollection<DashboardAlert> Alerts { get; } = [];
     [ObservableProperty] private bool hasAlerts;
+
+    /// <summary>
+    /// Mevcut tutarın düzenlendiği yer burası: ileriye dönük parametreler
+    /// girildikten sonra planı değiştiren tek şey t anındaki bakiye, ve
+    /// uygulamaya gelen kişi işe onu güncelleyerek başlar.
+    /// Kaydetmek yalnız rakamı değiştirmez, çapayı da bugüne taşır — ikisi
+    /// tek bir cümledir: "bugün şu kadar param var".
+    /// </summary>
+    [ObservableProperty] private string currentBalanceInput = string.Empty;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanSaveCurrentBalance))]
+    private bool isSavingCurrentBalance;
+
+    public bool CanSaveCurrentBalance => !IsSavingCurrentBalance;
+
+    [RelayCommand]
+    private async Task SaveCurrentBalanceAsync()
+    {
+        if (IsSavingCurrentBalance)
+        {
+            return;
+        }
+
+        try
+        {
+            IsSavingCurrentBalance = true;
+            SetStatus(string.Empty);
+            var amount = ParseMoney(CurrentBalanceInput);
+            await service.RefreshCurrentFinancialStateAsync(
+                amount,
+                "Mevcut tutar ana sayfadan güncellendi");
+        }
+        catch (Exception exception)
+        {
+            SetStatus(UserFacingMessages.FromException(
+                exception,
+                "Mevcut tutar kaydedilemedi."));
+            return;
+        }
+        finally
+        {
+            IsSavingCurrentBalance = false;
+        }
+
+        await LoadAsync();
+    }
+
+    /// <summary>
+    /// "Bu dönem nasıl oluşuyor" tablosu ana sayfadan kalktı; aynı kırılım
+    /// Dönem Detayı'nda zaten var ve orada daha ayrıntılı.
+    /// </summary>
+    [RelayCommand]
+    private Task OpenCurrentPeriodDetailAsync() =>
+        _currentPeriod is null
+            ? Task.CompletedTask
+            : Shell.Current.GoToAsync(
+                AppShell.PeriodDetailRoute,
+                new ShellNavigationQueryParameters
+                {
+                    [SalaryPeriodDetailViewModel.DetailQueryKey] =
+                        new SalaryPeriodDetailRequest(_currentPeriod)
+                });
+
+    private static decimal ParseMoney(string value)
+    {
+        var text = (value ?? string.Empty).Trim();
+        if (text.Length == 0 ||
+            !decimal.TryParse(
+                text,
+                NumberStyles.Number,
+                TurkishCulture,
+                out var amount))
+        {
+            throw new InvalidOperationException(
+                "Mevcut tutar geçerli bir sayı olmalıdır.");
+        }
+
+        return amount;
+    }
 
     [RelayCommand]
     private void ToggleCalculationDetails() =>
@@ -105,6 +188,7 @@ public partial class DashboardViewModel(
             {
                 HasFinancialPlan = false;
                 IsEmptyState = true;
+                _currentPeriod = null;
                 HasPendingReview = false;
                 HasPreFirstSalaryPayments = false;
                 HasUpcomingPayments = false;
@@ -136,6 +220,7 @@ public partial class DashboardViewModel(
                 var plan = await service.GetFinancialPlanAsync();
                 HasFinancialPlan = false;
                 IsEmptyState = true;
+                _currentPeriod = null;
                 HasPreFirstSalaryPayments = false;
                 HasUpcomingPayments = false;
                 HasNoUpcomingPayments = true;
@@ -161,6 +246,7 @@ public partial class DashboardViewModel(
             HasFinancialPlan = true;
             IsEmptyState = false;
             var current = dashboard.CurrentPeriod;
+            _currentPeriod = current;
 
             CurrentSnapshotDate = dashboard.ProjectionAnchorDate == default
                 ? "Henüz güncellenmedi"
@@ -169,6 +255,10 @@ public partial class DashboardViewModel(
                     TurkishCulture);
             PlanningStartingState = Money(
                 dashboard.ProjectionStartingSavings);
+            // Kullanıcı üzerine yazacak: para birimi eki ve binlik ayracı
+            // olmadan, düzenlenebilir ham rakam.
+            CurrentBalanceInput = dashboard.ProjectionStartingSavings
+                .ToString("0.##", TurkishCulture);
             CurrentPeriodText =
                 $"{current.PeriodStart.ToString("dd MMMM yyyy", TurkishCulture)} Dönemi";
             AssignmentModeText = current.PaymentAssignmentMode ==
@@ -195,12 +285,15 @@ public partial class DashboardViewModel(
             EndingSavings = Money(current.EndingProjectedSavings);
             TwelveMonthSavings = Money(
                 dashboard.TwelvePeriodEndingProjectedSavings);
+            // Kırılım kuruşuyla gösterilir: üç satır alt alta duruyor ve
+            // tam sayıya yuvarlanınca toplam gözle tutmuyor (10.328 + 12.650
+            // = 22.978 ama motor 22.977 diyor). Ekran kendini yalanlamamalı.
             TwelveMonthInterest = Money(
-                dashboard.TwelvePeriodTotalInterest);
+                dashboard.TwelvePeriodTotalInterest, 2);
             TwelveMonthCardInterest = Money(
-                dashboard.TwelvePeriodCreditCardInterest);
+                dashboard.TwelvePeriodCreditCardInterest, 2);
             TwelveMonthDeficitInterest = Money(
-                dashboard.TwelvePeriodDeficitFinancingInterest);
+                dashboard.TwelvePeriodDeficitFinancingInterest, 2);
             HasTwelveMonthInterest =
                 dashboard.TwelvePeriodTotalInterest > 0m;
             TightestPeriod = PeriodText(dashboard.TightestPeriod.Period);
@@ -356,15 +449,9 @@ public partial class DashboardViewModel(
                 OpenCommitmentsCommand));
         }
 
-        if (current.EndingProjectedSavings < 0m)
-        {
-            Alerts.Add(new DashboardAlert(
-                DashboardAlertLevel.Attention,
-                "Bu dönem açık veriyor",
-                $"Dönem sonunda {Money(Math.Abs(current.EndingProjectedSavings))} açık oluşuyor. Simülatörde bir ödemeyi ertelemeyi veya kart ödemeni değiştirmeyi deneyebilirsin.",
-                "Simülatörü aç",
-                OpenSimulationCommand));
-        }
+        // Dönem açığı uyarısı burada değil: aynı cümleyi ana sayfadaki durum
+        // özeti zaten söylüyordu ve rakam üç yerde birden duruyordu. Uyarı
+        // listesi yalnız başka yerde görünmeyen, aksiyon bekleyen şeyler için.
 
         if (dashboard.PendingStrategy is { } pending)
         {

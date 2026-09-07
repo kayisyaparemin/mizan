@@ -79,11 +79,11 @@ public sealed class SimulatorConditionToggleSourceTests
     {
         var page = SimulationPageSource();
 
-        // Senaryo yokken faiz karşılaştırması ve "Planı Uygula" anlamsız,
-        // iki çizgilik efsane ise yanlış.
+        // Senaryo yokken faiz karşılaştırması ve "Planı Uygula" anlamsız;
+        // liste ise baz projeksiyonu göstermeye devam eder.
         Assert.Contains("IsVisible=\"{Binding HasScenarioResults}\"", page);
-        Assert.Contains("IsVisible=\"{Binding HasScenarioLine}\"", page);
         Assert.Contains("IsVisible=\"{Binding IsBaselineOnly}\"", page);
+        Assert.Contains("BindableLayout.ItemsSource=\"{Binding Results}\"", page);
     }
 
     [Fact]
