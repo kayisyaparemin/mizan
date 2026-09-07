@@ -170,6 +170,31 @@ public sealed class SimulatorInsightServiceTests
     }
 
     [Fact]
+    public void CashChart_WithoutScenario_DrawsTheBaselineOnTheScenarioTrack()
+    {
+        // Hiçbir koşul açık değilken simülatör tek çizgi çiziyor. Çizim
+        // tarafı (CashProjectionChartDrawable) HasScenario false iken
+        // point.Scenario'yu okuduğu için senaryosuz seride bu alan baz
+        // değeri taşımalı; taşımazsa grafik sıfır çizgisine yapışır.
+        var series = SimulatorInsightService.BuildCashChart(
+        [
+            Row(new DateOnly(2026, 9, 10), opening: 0m, income: 0m, ending: -80_000m),
+            Row(new DateOnly(2026, 10, 10), opening: 0m, income: 0m, ending: 25_000m)
+        ]);
+
+        Assert.False(series.HasScenario);
+        Assert.All(series.Points, point =>
+            Assert.Equal(point.Baseline, point.Scenario));
+        Assert.Equal(-80_000m, series.Minimum);
+        Assert.Equal(25_000m, series.Maximum);
+        // Açığın kapandığı ay senaryosuz modda da okunabilmeli: başlık bu
+        // moda da bakıyor.
+        Assert.Equal(
+            new DateOnly(2026, 10, 10),
+            series.FirstNonNegativePoint!.PeriodStart);
+    }
+
+    [Fact]
     public void InterestComparison_CountsFinancingCostAsInterest()
     {
         // 150.000 çekip 180.000 ödüyorsan aradaki 30.000 faizdir. Tabloya

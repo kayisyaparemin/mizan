@@ -201,20 +201,32 @@ jobs:
           cat > release-notes.md <<NOTES
           # Mizan $version
 
-          Simülatör artık 12 dönemi liste yerine grafikle gösteriyor.
+          Simülatör grafiği artık canlı: koşulları açıp kapatabiliyor, yaşam
+          giderini kaydırabiliyorsun. Eğri anında yeniden çiziliyor.
 
           ### Yenilikler
 
-          - **Nakit Seyri grafiği.** Dönem sonu nakit, sıfırın altı ve üstü
-            birlikte çizilen bir eksende. Eğrinin sıfırı kestiği ay açığın
-            kapandığı aydır ve grafiğin taşıdığı asıl bilgi odur. İki çizgi:
-            şimdiki durum ve denenen plan.
-          - **Aralık seçimi:** 3 Ay / 6 Ay / 9 Ay / 1 Yıl. Hesap değişmez,
-            yalnızca görünen pencere daralır; ölçek pencereye göre yeniden kurulur.
-          - **Grafikten ay seçme.** Grafiğe dokun, en yakın döneme kancalanır;
-            o dönemin geliri, ihtiyacı ve dönem sonu hemen altında açılır.
-          - 12 dönemin alt alta listelenmesi kaldırıldı. Ayrıntılı inceleme için
-            "Detayı Gör" yerinde duruyor.
+          - **Koşul aç/kapa.** Simülasyon planındaki her koşulun bir switch'i
+            var. Kapattığın koşul hesaba girmez, grafik anında değişir ve
+            "Planı Uygula" yalnızca açık koşulları kaydeder; kapalı olanlar
+            listede bekler.
+            Ekranda her an tek bir gerçek kombinasyon vardır — koşulların
+            etkileri toplanmadığı için "şunu tek başına dene" ancak böyle
+            dürüst cevap verir.
+          - **Hepsi kapalıyken baz çizgi.** Hiçbir koşul açık değilse grafik
+            bugünkü planının kendi seyrini tek çizgide gösterir: hiçbirini
+            uygulamazsan ne olacağı. Karşılaştırmaya dayanan bölümler gizlenir.
+          - **Aylık yaşam gideri kadranı.** Grafiğin altındaki slider'ı
+            oynattığın anda eğri ve "açığın kapandığı ay" kayar; kendi eşiğini
+            görürsün. Hem şimdiki durum hem denenen plan aynı harcama
+            seviyesini varsayar, karşılaştırma bozulmaz.
+            Bu bir deneme: kayıtlı yaşam giderin değişmez, tek dokunuşla geri
+            dönersin ve plan uygularsan onay ekranı bunu ayrıca söyler.
+
+          ### Düzeltme
+
+          - İkinci simülasyondan sonra "Seçili Dönem" kartı bir önceki hesabın
+            rakamlarında kalabiliyordu.
           NOTES
 
       - name: Upload signed APK artifact

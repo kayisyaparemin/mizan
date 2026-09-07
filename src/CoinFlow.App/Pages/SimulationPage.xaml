@@ -113,8 +113,12 @@
                                 <Border Padding="12"
                                         BackgroundColor="{StaticResource ProjectionSurface}">
                                     <VerticalStackLayout Spacing="7">
-                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
-                                            <VerticalStackLayout Spacing="3">
+                                        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
+                                            <Switch IsToggled="{Binding IsEnabled, Mode=TwoWay}"
+                                                    VerticalOptions="Start" />
+                                            <VerticalStackLayout Grid.Column="1"
+                                                                 Spacing="3"
+                                                                 Opacity="{Binding RowOpacity}">
                                                 <Label Text="{Binding DateText}"
                                                        FontFamily="OpenSansSemibold" />
                                                 <Label Text="{Binding SummaryText}"
@@ -122,8 +126,12 @@
                                                 <Label Text="{Binding TypeText}"
                                                        FontSize="12"
                                                        TextColor="{StaticResource ProjectionText}" />
+                                                <Label Text="Bu koşul hesaba girmiyor"
+                                                       IsVisible="{Binding IsDisabled}"
+                                                       FontSize="12"
+                                                       TextColor="{StaticResource Muted}" />
                                             </VerticalStackLayout>
-                                            <HorizontalStackLayout Grid.Column="1"
+                                            <HorizontalStackLayout Grid.Column="2"
                                                                    Spacing="6"
                                                                    VerticalOptions="Center">
                                                 <Button Text="Düzenle"
@@ -168,6 +176,16 @@
             </Border>
 
             <VerticalStackLayout IsVisible="{Binding HasCurrentResults}" Spacing="14">
+                <Border IsVisible="{Binding IsBaselineOnly}"
+                        BackgroundColor="{StaticResource WarningSurface}">
+                    <VerticalStackLayout Spacing="8">
+                        <Label Text="Hiçbir koşul açık değil."
+                               Style="{StaticResource SectionTitle}" />
+                        <Label Text="Aşağıdakiler bugünkü planının kendi seyri — hiçbirini uygulamazsan ne olacağı. Karşılaştırma için en az bir koşul aç."
+                               TextColor="{StaticResource WarningText}" />
+                    </VerticalStackLayout>
+                </Border>
+
                 <Border BackgroundColor="{StaticResource SoftSky}">
                     <VerticalStackLayout Spacing="10">
                         <Label Text="2 · SONUÇ NE OLUYOR?" Style="{StaticResource Eyebrow}" />
@@ -208,7 +226,11 @@
                                       HeightRequest="200"
                                       StartInteraction="OnCashChartTouchStart"
                                       EndInteraction="OnCashChartTouchEnd" />
-                        <FlexLayout Wrap="Wrap" Direction="Row">
+                        <!-- Tek çizgi varken efsane yanıltıcı: kalan çizgi
+                             senaryo rengiyle çiziliyor, "Şimdiki durum" rozeti
+                             ise soluk. Senaryosuz modda ikisi de gizlenir. -->
+                        <FlexLayout Wrap="Wrap" Direction="Row"
+                                    IsVisible="{Binding HasScenarioLine}">
                             <Border Padding="9,4" Margin="0,0,6,3"
                                     BackgroundColor="{StaticResource ProjectionSurface}">
                                 <Label Text="Bu planla"
@@ -222,6 +244,40 @@
                                        TextColor="{StaticResource Muted}" />
                             </Border>
                         </FlexLayout>
+
+                        <!-- Kullanıcının yönetebildiği tek sürekli parametre.
+                             Grafiğin hemen altında duruyor: oynatınca eğri ve
+                             üstteki "açık ne zaman kapanıyor" başlığı canlı
+                             kayıyor, ödül bu. -->
+                        <BoxView HeightRequest="1"
+                                 Margin="0,4,0,0"
+                                 Color="{StaticResource Line}" />
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                            <Label Text="Aylık yaşam gideri"
+                                   Style="{StaticResource MutedText}"
+                                   VerticalOptions="Center" />
+                            <Label Grid.Column="1"
+                                   Text="{Binding LivingBudgetText}"
+                                   FontFamily="OpenSansSemibold"
+                                   TextColor="{StaticResource ProjectionText}" />
+                        </Grid>
+                        <Slider Minimum="0"
+                                Maximum="{Binding LivingBudgetMaximum}"
+                                Value="{Binding LivingBudget, Mode=TwoWay}" />
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                            <Label Text="{Binding LivingBudgetComparisonText}"
+                                   Style="{StaticResource MutedText}"
+                                   FontSize="12"
+                                   VerticalOptions="Center" />
+                            <Button Grid.Column="1"
+                                    Text="Kayıtlıya dön"
+                                    FontSize="12"
+                                    Padding="12,4"
+                                    HeightRequest="34"
+                                    IsVisible="{Binding IsLivingBudgetChanged}"
+                                    Command="{Binding ResetLivingBudgetCommand}"
+                                    Style="{StaticResource SecondaryButton}" />
+                        </Grid>
                     </VerticalStackLayout>
                 </Border>
 
@@ -280,12 +336,13 @@
                         </VerticalStackLayout>
                         <Button Text="{Binding ApplyButtonText}"
                                 IsEnabled="{Binding CanApplyPlan}"
+                                IsVisible="{Binding HasScenarioResults}"
                                 Clicked="OnApplyPlanClicked"
                                 Style="{StaticResource SecondaryButton}" />
                     </VerticalStackLayout>
                 </Border>
 
-                <Border>
+                <Border IsVisible="{Binding HasScenarioResults}">
                     <VerticalStackLayout Spacing="11">
                         <Label Text="Faiz Karşılaştırması"
                                Style="{StaticResource SectionTitle}" />

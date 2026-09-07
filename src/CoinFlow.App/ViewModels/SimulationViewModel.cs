@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CoinFlow.App.Models;
@@ -73,6 +74,22 @@ public partial class SimulationViewModel(
     private SimulatorChartSeries _fullCashChart = SimulatorChartSeries.Empty;
     private Guid? _editingConditionId;
     private readonly SemaphoreSlim _applyLock = new(1, 1);
+    private readonly SemaphoreSlim _calculationLock = new(1, 1);
+    private CancellationTokenSource? _liveRecalculation;
+    private static readonly TimeSpan LiveRecalculationDelay =
+        TimeSpan.FromMilliseconds(200);
+
+    /// <summary>Kayıtlı yaşam gideri; slider'ın dönebileceği gerçek değer.</summary>
+    private decimal _planLivingBudget;
+    /// <summary>Ekrandaki sonucun hesaplandığı yaşam gideri.</summary>
+    private decimal _lastLivingBudget;
+    private bool _suppressLivingBudgetRecalculation;
+
+    /// <summary>
+    /// Slider sürekli bir kadran; ham değeri 500'e yuvarlıyoruz ki etiket
+    /// zıplamasın ve aynı rakam için tekrar tekrar hesap yapılmasın.
+    /// </summary>
+    private const decimal LivingBudgetStep = 500m;
     private bool _preserveOnNextAppearance;
     private DateOnly? _projectionAnchorDate;
 
@@ -102,11 +119,13 @@ public partial class SimulationViewModel(
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanApplyPlan))]
     [NotifyPropertyChangedFor(nameof(HasCurrentResults))]
+    [NotifyPropertyChangedFor(nameof(HasScenarioResults))]
     [NotifyPropertyChangedFor(nameof(HasStaleResult))]
     private bool hasResults;
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanApplyPlan))]
     [NotifyPropertyChangedFor(nameof(HasCurrentResults))]
+    [NotifyPropertyChangedFor(nameof(HasScenarioResults))]
     [NotifyPropertyChangedFor(nameof(HasStaleResult))]
     [NotifyPropertyChangedFor(nameof(RunSimulationButtonText))]
     private bool isResultStale;
@@ -152,6 +171,7 @@ public partial class SimulationViewModel(
         "Bu plan gerçek finans planına eklenecek.";
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasCashChart))]
+    [NotifyPropertyChangedFor(nameof(HasScenarioLine))]
     [NotifyPropertyChangedFor(nameof(CashChartCaption))]
     private SimulatorChartSeries cashChart = SimulatorChartSeries.Empty;
     [ObservableProperty] private int chartRange = 12;
@@ -163,8 +183,89 @@ public partial class SimulationViewModel(
     [ObservableProperty] private string targetResult = string.Empty;
     [ObservableProperty] private bool hasTargetResult;
 
+    /// <summary>
+    /// Hiçbir koşul açık değilken sonuçlar tek bir baz çizgiden ibarettir:
+    /// "hiçbirini uygulamazsam" hâli. Karşılaştırmaya dayanan bölümler
+    /// (faiz tablosu, dönem sonu farkı, senaryo maliyeti, Planı Uygula)
+    /// senaryo yokken anlamsız olduğu için gizlenir.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasScenarioResults))]
+    [NotifyPropertyChangedFor(nameof(CanApplyPlan))]
+    private bool isBaselineOnly;
+
+    /// <summary>
+    /// Kullanıcının yönetebildiği tek sürekli parametre. Bir "koşul" değil —
+    /// kredi çekmek ayrık bir karardır, yaşam gideri ise bir kadran; koşul
+    /// listesine karışırsa switch'lerin anlamını bulandırır.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(LivingBudgetText))]
+    [NotifyPropertyChangedFor(nameof(IsLivingBudgetChanged))]
+    [NotifyPropertyChangedFor(nameof(LivingBudgetComparisonText))]
+    private double livingBudget;
+
+    [ObservableProperty] private double livingBudgetMaximum = 60_000d;
+
     public bool HasCashChart => CashChart.HasData;
     public bool HasSelectedPeriod => SelectedPeriod is not null;
+
+    /// <summary>Grafikte iki çizgi var mı; efsane buna göre gösterilir.</summary>
+    public bool HasScenarioLine => CashChart.HasScenario;
+
+    /// <summary>Hesaba giren değer; slider'ın ham konumu değil.</summary>
+    private decimal EffectiveLivingBudget =>
+        Math.Round((decimal)LivingBudget / LivingBudgetStep) * LivingBudgetStep;
+
+    public string LivingBudgetText => Money(EffectiveLivingBudget);
+
+    public bool IsLivingBudgetChanged =>
+        EffectiveLivingBudget != _planLivingBudget;
+
+    public string LivingBudgetComparisonText => IsLivingBudgetChanged
+        ? $"Kayıtlı değer {Money(_planLivingBudget)} · bu deneme kaydedilmez"
+        : "Kayıtlı yaşam giderin";
+
+    partial void OnLivingBudgetChanged(double value)
+    {
+        if (_suppressLivingBudgetRecalculation)
+        {
+            return;
+        }
+
+        QueueLiveRecalculation();
+    }
+
+    /// <summary>
+    /// Slider kalıcı bir ayar değiştirmiyor; kullanıcının gerçek rakama geri
+    /// dönebilmesi şart, yoksa denemekten çekinir.
+    /// </summary>
+    [RelayCommand]
+    private void ResetLivingBudget()
+    {
+        if (!IsLivingBudgetChanged)
+        {
+            return;
+        }
+
+        LivingBudget = (double)_planLivingBudget;
+    }
+
+    private void SetLivingBudgetFromPlan(decimal planLivingBudget)
+    {
+        _planLivingBudget = planLivingBudget;
+        // Kayıtlı değer ölçeğin ortasına düşsün ki hem artırmak hem azaltmak
+        // aynı kadar yer bulsun. Sıfır bütçede ölçek çökmesin diye taban var.
+        LivingBudgetMaximum = (double)Math.Max(
+            planLivingBudget * 2m,
+            10_000m);
+        _suppressLivingBudgetRecalculation = true;
+        LivingBudget = (double)planLivingBudget;
+        _suppressLivingBudgetRecalculation = false;
+        OnPropertyChanged(nameof(LivingBudgetText));
+        OnPropertyChanged(nameof(IsLivingBudgetChanged));
+        OnPropertyChanged(nameof(LivingBudgetComparisonText));
+    }
 
     /// <summary>
     /// Aralık yalnızca yakınlaştırmadır: hesap 12 dönem için bir kez yapılır,
@@ -255,16 +356,42 @@ public partial class SimulationViewModel(
     public bool HasMultipleDraftConditions => DraftConditions.Count > 1;
     public bool CanRunSimulation => IsPlanAvailable && HasDraftConditions;
     public bool IsEditingCondition => _editingConditionId is not null;
-    public string DraftConditionCountText =>
-        $"{DraftConditions.Count} koşul";
+
+    /// <summary>
+    /// Kapalı koşul da listede durduğu için yalnızca toplamı yazmak yanıltıcı;
+    /// kaçının hesaba girdiği de görünmeli.
+    /// </summary>
+    public string DraftConditionCountText
+    {
+        get
+        {
+            var enabled = EnabledConditions().Count;
+            return enabled == DraftConditions.Count
+                ? $"{DraftConditions.Count} koşul"
+                : $"{DraftConditions.Count} koşul · {enabled} açık";
+        }
+    }
+
     public string AddConditionButtonText =>
         IsEditingCondition ? "Düzenlemeyi Kaydet" : "Koşul Ekle";
     public string RunSimulationButtonText =>
         IsResultStale ? "Simülasyonu Güncelle" : "Simülasyonu Yap";
     public bool HasCurrentResults => HasResults && !IsResultStale;
+    public bool HasScenarioResults => HasCurrentResults && !IsBaselineOnly;
     public bool HasStaleResult => HasResults && IsResultStale;
     public bool CanApplyPlan =>
-        HasCurrentResults && !IsApplyingPlan && !IsPlanApplied;
+        HasCurrentResults && !IsBaselineOnly && !IsApplyingPlan && !IsPlanApplied;
+
+    /// <summary>
+    /// Hesaba ve "Planı Uygula"ya yalnızca açık koşullar girer; bu iki yolun
+    /// aynı listeyi görmesi şart, yoksa uygulanan plan ekranda gösterilenden
+    /// farklı olur.
+    /// </summary>
+    private IReadOnlyList<SimulationDraftConditionView> EnabledConditions() =>
+        DraftConditions.Where(x => x.IsEnabled).ToArray();
+
+    private IReadOnlyList<SimulationRequest> EnabledRequests() =>
+        EnabledConditions().Select(x => x.Request).ToArray();
 
     public SimulationApplyResult? LastApplyResult { get; private set; }
 
@@ -282,6 +409,9 @@ public partial class SimulationViewModel(
                               plan.PaymentAssignmentStrategies.Count > 0 &&
                               plan.Settings.ProjectionAnchorDate != default;
             IsPlanUnavailable = !IsPlanAvailable;
+            // Slider kalıcı değil: sayfaya her dönüşte kayıtlı değere döner.
+            // Sonuçlar zaten bayatlatıldığı için ekran kendini yalanlamaz.
+            SetLivingBudgetFromPlan(plan.Settings.MonthlyLivingBudget);
             if (HasResults)
             {
                 MarkResultsStale();
@@ -302,6 +432,7 @@ public partial class SimulationViewModel(
                 NotifyDraftChanged();
                 Results.Clear();
                 ClearTargetResult();
+                IsBaselineOnly = false;
                 _lastScenarioProjection = [];
                 return;
             }
@@ -463,7 +594,6 @@ public partial class SimulationViewModel(
             SetStatus(string.Empty);
             var request = BuildRequest();
             SimulationCalculator.Validate(request, _projectionAnchorDate);
-            var condition = CreateConditionView(request);
             if (_editingConditionId is Guid editingId)
             {
                 var index = DraftConditions
@@ -475,12 +605,16 @@ public partial class SimulationViewModel(
                         "Düzenlenecek koşul bulunamadı.");
                 }
 
-                DraftConditions[index] = condition;
+                // Düzenleme koşulun içeriğini değiştirir, hesaba girip
+                // girmediğini değil; kapalı bir koşul düzenlenince kapalı kalır.
+                DraftConditions[index] = CreateConditionView(
+                    request,
+                    DraftConditions[index].IsEnabled);
                 _editingConditionId = null;
             }
             else
             {
-                DraftConditions.Add(condition);
+                DraftConditions.Add(CreateConditionView(request));
             }
 
             ResetConditionForm();
@@ -523,7 +657,13 @@ public partial class SimulationViewModel(
             OnPropertyChanged(nameof(AddConditionButtonText));
         }
 
-        MarkResultsStale();
+        // Kapalı koşul zaten hesaba girmiyordu; silinmesi sonucu bayatlatmaz.
+        // "Plan değişti" demek burada ekranın kendini yalanlaması olurdu.
+        if (condition.IsEnabled)
+        {
+            MarkResultsStale();
+        }
+
         NotifyDraftChanged();
     }
 
@@ -542,6 +682,7 @@ public partial class SimulationViewModel(
         SelectedPeriod = null;
         HasResults = false;
         IsResultStale = false;
+        IsBaselineOnly = false;
         ResetApplyState(clearRequest: true);
         _lastScenarioProjection = [];
         ClearTargetResult();
@@ -562,6 +703,34 @@ public partial class SimulationViewModel(
         try
         {
             IsBusy = true;
+            await RunCalculationAsync(showErrorDialog: true);
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    /// <summary>
+    /// Hesabın tek gövdesi. Switch'ler canlı yeniden hesap tetiklediği için
+    /// aynı anda iki hesap çalışmamalı; semafor sırayı korur, iptal edilen
+    /// bekleyen istek sıraya girmeden düşer.
+    /// </summary>
+    private async Task RunCalculationAsync(
+        bool showErrorDialog,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            await _calculationLock.WaitAsync(cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+
+        try
+        {
             SetStatus(string.Empty);
             if (DraftConditions.Count == 0)
             {
@@ -569,19 +738,36 @@ public partial class SimulationViewModel(
                 return;
             }
 
-            var requests = DraftConditions.Select(x => x.Request).ToArray();
-            var result = await service.SimulateAsync(requests);
+            var requests = EnabledRequests();
+            if (requests.Count == 0)
+            {
+                await PopulateBaselineOnlyAsync(cancellationToken);
+                return;
+            }
+
+            var livingBudget = EffectiveLivingBudget;
+            var result = await service.SimulateAsync(
+                requests,
+                monthlyLivingBudgetOverride: livingBudget,
+                cancellationToken: cancellationToken);
             _lastRequests = requests;
+            _lastLivingBudget = livingBudget;
+            IsBaselineOnly = false;
             IsPlanApplied = false;
             ApplyButtonText = "Planı Uygula";
             LastApplyResult = null;
-            ApplyConfirmationText = BuildApplyConfirmation(requests);
+            ApplyConfirmationText =
+                BuildApplyConfirmation(requests) + LivingBudgetApplyNote();
             _lastScenarioProjection = result.Scenario;
             _lastBaselineProjection = result.Baseline;
             Populate(result);
             HasResults = true;
             IsResultStale = false;
             RefreshTargetResultAfterSimulation();
+        }
+        catch (OperationCanceledException)
+        {
+            // Sonraki toggle bu hesabı geçersiz kıldı; yenisi zaten geliyor.
         }
         catch (Exception exception)
         {
@@ -593,14 +779,48 @@ public partial class SimulationViewModel(
                 exception,
                 "Simülasyon hesaplanırken bir sorun oluştu. Tekrar deneyebilirsin.");
             SetStatus(message);
-            await feedback.ShowErrorAsync(
-                message,
-                title: "Hesaplanamadı");
+            if (showErrorDialog)
+            {
+                await feedback.ShowErrorAsync(
+                    message,
+                    title: "Hesaplanamadı");
+            }
         }
         finally
         {
-            IsBusy = false;
+            _calculationLock.Release();
         }
+    }
+
+    /// <summary>
+    /// Tüm koşullar kapalıyken gösterilen hâl: senaryo yok, yalnızca bugünkü
+    /// planın 12 dönemi. <c>SimulateAsync</c> bu yoldan çağrılamaz —
+    /// <c>SimulationCalculator.Validate</c> boş koşul listesini reddediyor —
+    /// bu yüzden baz projeksiyon doğrudan alınır.
+    /// </summary>
+    private async Task PopulateBaselineOnlyAsync(
+        CancellationToken cancellationToken)
+    {
+        var livingBudget = EffectiveLivingBudget;
+        var baseline = await service.GetFuturePeriodsAsync(
+            monthlyLivingBudgetOverride: livingBudget,
+            cancellationToken: cancellationToken);
+        if (baseline.Count == 0)
+        {
+            SetStatus("Baz projeksiyon hesaplanamadı.");
+            return;
+        }
+
+        _lastLivingBudget = livingBudget;
+        _lastRequests = [];
+        _lastBaselineProjection = baseline;
+        _lastScenarioProjection = [];
+        IsBaselineOnly = true;
+        ResetApplyState(clearRequest: false);
+        PopulateBaseline(baseline);
+        HasResults = true;
+        IsResultStale = false;
+        RefreshTargetResultAfterSimulation();
     }
 
     [RelayCommand]
@@ -653,7 +873,14 @@ public partial class SimulationViewModel(
             LastApplyResult = result;
             IsPlanApplied = true;
             ApplyButtonText = "Plan Uygulandı";
-            DraftConditions.Clear();
+            // Yalnızca kaydedilen koşullar listeden düşer. Kapalı koşulu
+            // kullanıcı bilerek dışarıda bıraktı; sessizce silmek veri kaybı
+            // gibi hissettirir, kenarda tutup üzerine yeni plan kurabilmeli.
+            foreach (var applied in EnabledConditions())
+            {
+                DraftConditions.Remove(applied);
+            }
+
             Results.Clear();
             NarrativeInsights.Clear();
             SummaryMetrics.Clear();
@@ -664,6 +891,7 @@ public partial class SimulationViewModel(
             SelectedPeriod = null;
             HasResults = false;
             IsResultStale = false;
+            IsBaselineOnly = false;
             _lastRequests = [];
             _lastScenarioProjection = [];
             ClearTargetResult();
@@ -737,10 +965,22 @@ public partial class SimulationViewModel(
 
         var preview = string.Join(
             Environment.NewLine,
-            DraftConditions.Take(6).Select(x => $"• {x.DateText} — {x.SummaryText}"));
+            EnabledConditions()
+                .Take(6)
+                .Select(x => $"• {x.DateText} — {x.SummaryText}"));
         return
             $"Bu simülasyon planındaki {requests.Count} koşul gerçek finans planına birlikte eklenecek.\n\n{preview}\n\nHer şey tek seferde kaydedilir; bir koşul kaydedilemezse hiçbir değişiklik yapılmaz.";
     }
+
+    /// <summary>
+    /// Slider kaydedilmiyor. Sonucu kaydırılmış bir yaşam gideriyle görüp planı
+    /// uygulayan kişi gerçekte başka bir eğri elde eder; onay ekranı bunu
+    /// söylemek zorunda, yoksa ekran kendini yalanlar.
+    /// </summary>
+    private string LivingBudgetApplyNote() =>
+        _lastLivingBudget == _planLivingBudget
+            ? string.Empty
+            : $"\n\nBu sonuç {Money(_lastLivingBudget)} aylık yaşam gideriyle hesaplandı. Slider kaydedilmez; kayıtlı yaşam giderin {Money(_planLivingBudget)} olarak kalır.";
 
     private string BuildApplyConfirmation(SimulationRequest request)
     {
@@ -792,14 +1032,19 @@ public partial class SimulationViewModel(
 
     private void UpdateTargetResult(decimal target)
     {
-        if (!HasCurrentResults || _lastScenarioProjection.Count == 0)
+        // Hiçbir koşul açık değilken senaryo yoktur; hedef sorusunun cevabı
+        // bu durumda bugünkü planın kendi seyrinden okunur.
+        var projection = _lastScenarioProjection.Count > 0
+            ? _lastScenarioProjection
+            : _lastBaselineProjection;
+        if (!HasCurrentResults || projection.Count == 0)
         {
             throw new InvalidOperationException(
                 "Önce simülasyonu hesaplamalısın.");
         }
 
         var result = service.FindTargetReachability(
-            _lastScenarioProjection,
+            projection,
             target);
         TargetResult = result switch
         {
@@ -820,17 +1065,84 @@ public partial class SimulationViewModel(
     }
 
     private SimulationDraftConditionView CreateConditionView(
-        SimulationRequest request)
+        SimulationRequest request,
+        bool isEnabled = true)
     {
         var date = request.Type == SimulationScenarioType.PaymentStrategyChange
             ? request.EffectiveSalaryDate ?? request.StartDate
             : request.StartDate;
-        return new SimulationDraftConditionView(
+        var condition = new SimulationDraftConditionView(
             request.ScenarioId,
             request,
             date.ToString("MMMM yyyy", TurkishCulture),
             ConditionTypeText(request.Type),
-            ConditionSummaryText(request));
+            ConditionSummaryText(request))
+        {
+            IsEnabled = isEnabled
+        };
+        // Abonelik burada kurulur: koşulu üreten tek yer burası. Listeden
+        // düşen koşulun aboneliği kendisiyle birlikte gider — bağ koşuldan
+        // ViewModel'e doğrudur, ters yönde referans tutmaz.
+        condition.PropertyChanged += OnDraftConditionPropertyChanged;
+        return condition;
+    }
+
+    /// <summary>
+    /// Switch değişince kullanıcı "Simülasyonu Güncelle"ye basmamalı; sonuç
+    /// bayat değil taze olmalı. Hızlı arka arkaya toggle'da bekleyen istek
+    /// iptal edilir, yalnızca sonuncusu hesaplanır.
+    /// </summary>
+    private void OnDraftConditionPropertyChanged(
+        object? sender,
+        PropertyChangedEventArgs eventArgs)
+    {
+        if (eventArgs.PropertyName is not
+            nameof(SimulationDraftConditionView.IsEnabled))
+        {
+            return;
+        }
+
+        OnPropertyChanged(nameof(DraftConditionCountText));
+        QueueLiveRecalculation();
+    }
+
+    /// <summary>
+    /// Canlı hesap hattının tek girişi: koşul switch'leri ve yaşam gideri
+    /// slider'ı buradan geçer. Bekleyen istek iptal edilir, yalnızca sonuncusu
+    /// hesaplanır.
+    /// </summary>
+    private void QueueLiveRecalculation()
+    {
+        if (!HasResults)
+        {
+            // Kullanıcı henüz hiç hesaplamadı; kontroller tek başına sonuç
+            // üretmez, "Simülasyonu Yap" ilk adımdır.
+            return;
+        }
+
+        // Dispose çağrılmıyor: iptal edilen token hâlâ süren bir hesabın
+        // içinde (SimulateAsync, semafor beklemesi) yaşıyor olabilir; kaynağı
+        // altından çekmek ObjectDisposedException'a açık kapı bırakır.
+        _liveRecalculation?.Cancel();
+        var source = new CancellationTokenSource();
+        _liveRecalculation = source;
+        _ = RecalculateLiveAsync(source.Token);
+    }
+
+    private async Task RecalculateLiveAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await Task.Delay(LiveRecalculationDelay, cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+
+        await RunCalculationAsync(
+            showErrorDialog: false,
+            cancellationToken: cancellationToken);
     }
 
     private string ConditionSummaryText(SimulationRequest request)
@@ -1039,8 +1351,6 @@ public partial class SimulationViewModel(
         }
         _lastBaselineProjection = result.Baseline;
         _lastScenarioProjection = result.Scenario;
-        SelectedChartIndex = -1;
-        RefreshCashChart();
         FriendlySummary = string.Join(Environment.NewLine,
             projectionSummary.NarrativeInsights);
         var transition = result.Scenario.FirstOrDefault(x =>
@@ -1074,6 +1384,52 @@ public partial class SimulationViewModel(
         {
             Results.Add(row);
         }
+
+        // Grafik en sona bırakılır: seçili dönemi Results'tan okuyor, liste
+        // dolmadan çağrılırsa "Seçili Dönem" bir önceki hesabın satırında kalır.
+        RefreshCashChart();
+    }
+
+    /// <summary>
+    /// Senaryosuz sunum. Yalnızca grafiği, anlatıyı, öne çıkanları ve dönem
+    /// listesini doldurur; karşılaştırmalı alanlar
+    /// (<see cref="HasScenarioResults"/> ile gizlenenler) dokunulmadan bırakılır.
+    /// </summary>
+    private void PopulateBaseline(
+        IReadOnlyList<SalaryPeriodProjection> baseline)
+    {
+        var projectionSummary = simulatorInsightService.Build(baseline);
+        AssignmentModeText = AssignmentModeLabel(
+            baseline[0].PaymentAssignmentMode);
+        InterestComparison.Clear();
+        HasMonthlyBurden = false;
+        MonthlyBurden = string.Empty;
+        HasFinancingCost = false;
+        FinancingCost = string.Empty;
+        HasStrategyTransitionSummary = false;
+        StrategyTransitionSummary = string.Empty;
+        FriendlySummary = string.Join(Environment.NewLine,
+            projectionSummary.NarrativeInsights);
+
+        NarrativeInsights.Clear();
+        foreach (var insight in projectionSummary.NarrativeInsights)
+        {
+            NarrativeInsights.Add(insight);
+        }
+
+        SummaryMetrics.Clear();
+        foreach (var metric in projectionSummary.KeyMetrics)
+        {
+            SummaryMetrics.Add(metric);
+        }
+
+        Results.Clear();
+        foreach (var row in projectionSummary.Periods)
+        {
+            Results.Add(row);
+        }
+
+        RefreshCashChart();
     }
 
     private static string PeriodTitle(DateOnly salaryDate) =>

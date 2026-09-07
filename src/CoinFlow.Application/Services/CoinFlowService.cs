@@ -217,6 +217,7 @@ public sealed class CoinFlowService(
         GetFuturePeriodsAsync(
             DateOnly? asOf = null,
             int periodCount = 12,
+            decimal? monthlyLivingBudgetOverride = null,
             CancellationToken cancellationToken = default)
     {
         var date = asOf ?? clock.Today;
@@ -227,7 +228,9 @@ public sealed class CoinFlowService(
         }
 
         return projectionService.BuildFuturePeriods(
-            query.Plan,
+            ApplyLivingBudgetOverride(
+                query.Plan,
+                monthlyLivingBudgetOverride),
             date,
             periodCount,
             query.Boundary?.FirstUnrealizedSalaryDate);
@@ -240,11 +243,12 @@ public sealed class CoinFlowService(
         await SimulateAsync(
             [request],
             asOf,
-            cancellationToken);
+            cancellationToken: cancellationToken);
 
     public async Task<SimulationResult> SimulateAsync(
         IReadOnlyList<SimulationRequest> requests,
         DateOnly? asOf = null,
+        decimal? monthlyLivingBudgetOverride = null,
         CancellationToken cancellationToken = default)
     {
         var date = asOf ?? clock.Today;
@@ -255,12 +259,36 @@ public sealed class CoinFlowService(
                 "Simülasyon yapabilmek için önce gelirini ve gelir kullanım düzenini oluştur.");
         }
 
+        // Override tek plana uygulanır; baz çizgi de senaryo da aynı plandan
+        // türediği için iki çizgi aynı harcama seviyesini varsayar ve
+        // karşılaştırma dürüst kalır.
         return simulationCalculator.Calculate(
-            query.Plan,
+            ApplyLivingBudgetOverride(
+                query.Plan,
+                monthlyLivingBudgetOverride),
             date,
             requests,
             firstSalaryDate: query.Boundary?.FirstUnrealizedSalaryDate);
     }
+
+    /// <summary>
+    /// Yaşam gideri simülatörde canlı olarak değiştirilebiliyor. Değer plan
+    /// nesnesinin kopyasına yazılır; <c>UserSettings</c> ve veritabanı
+    /// dokunulmadan kalır — bu bir deneme, kayıtlı bir karar değil.
+    /// </summary>
+    private static FinancialPlan ApplyLivingBudgetOverride(
+        FinancialPlan plan,
+        decimal? monthlyLivingBudget) =>
+        monthlyLivingBudget is not { } budget ||
+        budget == plan.Settings.MonthlyLivingBudget
+            ? plan
+            : plan with
+            {
+                Settings = plan.Settings with
+                {
+                    MonthlyLivingBudget = budget
+                }
+            };
 
     public async Task<SalaryPeriodProjection?> FindTargetPeriodAsync(
         decimal targetAmount,
@@ -270,7 +298,7 @@ public sealed class CoinFlowService(
         var periods = await GetFuturePeriodsAsync(
             asOf,
             12,
-            cancellationToken);
+            cancellationToken: cancellationToken);
         return targetAmountCalculator.FindFirstReached(periods, targetAmount);
     }
 
@@ -282,7 +310,7 @@ public sealed class CoinFlowService(
         var periods = await GetFuturePeriodsAsync(
             asOf,
             12,
-            cancellationToken);
+            cancellationToken: cancellationToken);
         return FindTargetReachability(periods, targetAmount);
     }
 

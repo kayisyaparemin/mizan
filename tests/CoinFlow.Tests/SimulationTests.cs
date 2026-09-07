@@ -64,6 +64,20 @@ public sealed class SimulationTests
     }
 
     [Fact]
+    public void Validate_WithoutAnyCondition_IsRejected()
+    {
+        // Koşul switch'leri hepsi kapalı bırakılabildiği için bu dal artık
+        // ekrandan tetiklenebiliyor. Motor koşulsuz simülasyonu reddetmeye
+        // devam eder; simülatör bu durumda SimulateAsync'i hiç çağırmayıp
+        // baz projeksiyonu tek başına gösterir.
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => SimulationCalculator.Validate(
+                Array.Empty<SimulationRequest>()));
+
+        Assert.Contains("en az bir koşul", exception.Message);
+    }
+
+    [Fact]
     public void InterestFree120000OverNinePayments_IsExactAndBaselineUnchanged()
     {
         var plan = TestFactory.CanonicalPlan();
@@ -486,6 +500,77 @@ public sealed class SimulationTests
             result.Scenario.Single(x =>
                 x.PeriodStart == new DateOnly(2027, 1, 10))
                 .SalaryIncome);
+    }
+
+    [Fact]
+    public async Task LivingBudgetOverride_MovesBothLines_AndIsNeverPersisted()
+    {
+        await WithStore(async store =>
+        {
+            var service = TestFactory.Service(store);
+            var saved = (await service.GetFinancialPlanAsync())
+                .Settings.MonthlyLivingBudget;
+            Assert.True(saved > 0m);
+
+            var request = new SimulationRequest(
+                SimulationScenarioType.CashPurchase,
+                "Tadilat",
+                120_000m,
+                new DateOnly(2027, 3, 15));
+            var atSaved = await service.SimulateAsync([request]);
+            var cheaper = await service.SimulateAsync(
+                [request],
+                monthlyLivingBudgetOverride: saved - 10_000m);
+
+            // Yaşam gideri bir plan koşulu değil, kullanıcı hakkında bir
+            // gerçek: iki çizgi de aynı harcama seviyesini varsaymalı, yoksa
+            // karşılaştırma yalan söyler.
+            Assert.True(
+                cheaper.Baseline[^1].EndingProjectedSavings >
+                atSaved.Baseline[^1].EndingProjectedSavings);
+            Assert.True(
+                cheaper.Scenario[^1].EndingProjectedSavings >
+                atSaved.Scenario[^1].EndingProjectedSavings);
+
+            // Senaryonun baza göre farkı override'dan etkilenmemeli: kaydırılan
+            // şey ortak zemin, planın etkisi değil.
+            Assert.Equal(
+                atSaved.Scenario[^1].EndingProjectedSavings -
+                atSaved.Baseline[^1].EndingProjectedSavings,
+                cheaper.Scenario[^1].EndingProjectedSavings -
+                cheaper.Baseline[^1].EndingProjectedSavings);
+
+            var baselineOnly = await service.GetFuturePeriodsAsync(
+                monthlyLivingBudgetOverride: saved - 10_000m);
+            Assert.Equal(
+                cheaper.Baseline[^1].EndingProjectedSavings,
+                baselineOnly[^1].EndingProjectedSavings);
+
+            // Slider bir deneme, kayıtlı bir karar değil (I13).
+            Assert.Equal(
+                saved,
+                (await service.GetFinancialPlanAsync())
+                    .Settings.MonthlyLivingBudget);
+        });
+    }
+
+    [Fact]
+    public async Task LivingBudgetOverride_WhenOmitted_KeepsTheSavedValue()
+    {
+        await WithStore(async store =>
+        {
+            var service = TestFactory.Service(store);
+            var saved = (await service.GetFinancialPlanAsync())
+                .Settings.MonthlyLivingBudget;
+
+            var withoutOverride = await service.GetFuturePeriodsAsync();
+            var withSameValue = await service.GetFuturePeriodsAsync(
+                monthlyLivingBudgetOverride: saved);
+
+            Assert.Equal(
+                withoutOverride[^1].EndingProjectedSavings,
+                withSameValue[^1].EndingProjectedSavings);
+        });
     }
 
     [Fact]
