@@ -124,7 +124,8 @@ public sealed class CreditCardSettlementLifecycleTests
 
     /// <summary>
     /// B — kısmi ödeme: kalan principal projection'da görünür.
-    /// 100.804,94 - 50.000 = 50.804,94 kalan, üzerine %5 carry faizi.
+    /// 100.804,94 - 50.000 = 50.804,94 kalan devreder; %5 carry faizi
+    /// kapitalize edilmez, bir sonraki ekstrede satır olarak işlenir.
     /// </summary>
     [Fact]
     public async Task PartialPayment_CarriesOnlyRemainderIntoNextProjection()
@@ -138,8 +139,12 @@ public sealed class CreditCardSettlementLifecycleTests
             MidpointRounding.AwayFromZero);
         var expectedCarry = expectedPrincipal + expectedInterest;
 
-        Assert.Equal(expectedCarry, result.CarriedBalance);
-        Assert.Equal(expectedCarry, result.NextStatementOpeningCarry);
+        Assert.Equal(expectedPrincipal, result.CarriedBalance);
+        Assert.Equal(expectedPrincipal, result.NextStatementOpeningCarry);
+        Assert.Equal(expectedInterest, result.NextCarryInterest);
+        Assert.Equal(
+            expectedCarry + KnownFutureCharge,
+            result.NextStatementBalance);
         // Ödenmiş tutar tekrar borç olarak taşınmamalı.
         Assert.True(result.CarriedBalance < StatementAmount);
     }

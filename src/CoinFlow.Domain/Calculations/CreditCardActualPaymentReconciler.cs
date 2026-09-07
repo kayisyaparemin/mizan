@@ -34,12 +34,6 @@ public sealed class CreditCardActualPaymentReconciler(
         var remainingPrincipal = Math.Max(
             0m,
             statementBalance - actualPayment);
-        var carryInterest = remainingPrincipal > 0m
-            ? decimal.Round(
-                remainingPrincipal * carryInterestRate,
-                2,
-                MidpointRounding.AwayFromZero)
-            : 0m;
         // statement.StatementCloseDate is the exact close Project() used for
         // the cycle being settled (identical to CurrentStatement.StatementDate
         // when an actual statement is present). Charges posted on or before it
@@ -52,7 +46,9 @@ public sealed class CreditCardActualPaymentReconciler(
 
         return card with
         {
-            CarriedBalance = remainingPrincipal + carryInterest,
+            // Yalnızca kalan anapara devreder. Faizi bir sonraki ekstre
+            // işler; burada kapitalize edilirse aynı faiz iki kez sayılır.
+            CarriedBalance = remainingPrincipal,
             UnbilledSpending = 0m,
             BalanceAsOfDate = statement.StatementCloseDate.AddDays(1),
             Charges = remainingCharges,

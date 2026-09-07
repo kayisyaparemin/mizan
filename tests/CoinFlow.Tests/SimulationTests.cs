@@ -140,15 +140,15 @@ public sealed class SimulationTests
         Assert.True(
             result.ScenarioInterest.TotalInterestCost >
             result.BaselineInterest.TotalInterestCost);
-        Assert.Equal(7_101.67m,
+        Assert.Equal(10_116.26m,
             result.BaselineInterest.TotalInterestCost);
-        Assert.Equal(7_101.67m,
+        Assert.Equal(10_116.26m,
             result.ScenarioInterest.CreditCardInterest);
-        Assert.Equal(2_916.82m,
+        Assert.Equal(2_974.40m,
             result.ScenarioInterest.DeficitFinancingInterest);
-        Assert.Equal(10_018.49m,
+        Assert.Equal(13_090.66m,
             result.ScenarioInterest.TotalInterestCost);
-        Assert.Equal(2_916.82m, result.AdditionalInterestCost);
+        Assert.Equal(2_974.40m, result.AdditionalInterestCost);
         Assert.All(
             result.Rows.Where(x =>
                 x.Scenario.PeriodStart > impacted.Scenario.PeriodStart),
@@ -415,15 +415,15 @@ public sealed class SimulationTests
         Assert.True(
             result.ScenarioInterest.CreditCardInterest <
             result.BaselineInterest.CreditCardInterest);
-        Assert.Equal(7_101.67m,
+        Assert.Equal(10_116.26m,
             result.BaselineInterest.TotalInterestCost);
-        Assert.Equal(3_648.05m,
+        Assert.Equal(6_647.69m,
             result.ScenarioInterest.CreditCardInterest);
-        Assert.Equal(566.01m,
+        Assert.Equal(624.17m,
             result.ScenarioInterest.DeficitFinancingInterest);
-        Assert.Equal(4_214.06m,
+        Assert.Equal(7_271.86m,
             result.ScenarioInterest.TotalInterestCost);
-        Assert.Equal(2_887.61m, result.InterestSaving);
+        Assert.Equal(2_844.40m, result.InterestSaving);
         Assert.Empty(card.PaymentPlans);
         var scenarioCard = Assert.Single(
             new SimulationCalculator(_projection, _installments)
@@ -460,9 +460,18 @@ public sealed class SimulationTests
                     ScenarioId: Guid.NewGuid()),
                 periodCount: 4);
 
+        // Kapatma ekstresi devraldığı 58.947,46 bakiyenin faizini son bir
+        // kez öder; kapatmak faizden kaçmak değil, faizi bitirmektir.
+        var payoffStatement = Assert.Single(result.Scenario
+            .SelectMany(x => x.CardPaymentStatuses)
+            .Where(x => x.PaymentDueDate == payoffDate));
+        Assert.Equal(2_947.37m, payoffStatement.CarryInterest);
+        Assert.Equal(0m, payoffStatement.CarriedPrincipalAfterPayment);
+        Assert.Equal(0m, payoffStatement.NextCarriedBalance);
+
         var postPayoffStatements = result.Scenario
             .SelectMany(x => x.CardPaymentStatuses)
-            .Where(x => x.PaymentDueDate >= payoffDate)
+            .Where(x => x.PaymentDueDate > payoffDate)
             .ToArray();
         Assert.NotEmpty(postPayoffStatements);
         Assert.All(postPayoffStatements, status =>
@@ -471,7 +480,9 @@ public sealed class SimulationTests
             Assert.Equal(0m, status.CarryInterest);
             Assert.Equal(0m, status.NextCarriedBalance);
         });
-        Assert.Equal(0m, result.ScenarioInterest.CreditCardInterest);
+        Assert.Equal(
+            2_947.37m,
+            result.ScenarioInterest.CreditCardInterest);
         Assert.True(
             result.ScenarioInterest.CreditCardInterest <
             result.BaselineInterest.CreditCardInterest);

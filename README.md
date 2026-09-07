@@ -31,7 +31,7 @@ Dönem Sonu Tahmini Durum = Faiz Öncesi Dönem Sonu Durumu - Finansman Açığ�
 
 Negatif dönem sonu tahmini durum, hesaplanan finansman açığı faiziyle birlikte sonraki maaş dönemine aynen `OpeningProjectedSavings` olarak taşınır. UI bunu **devreden finansman açığı** olarak gösterir. Bu değer yeni kredi, kart borcu veya zorunlu ödeme değildir; yalnız kümülatif planlama başlangıç durumudur ve dönem sonu hesabında ikinci kez çıkarılmaz.
 
-Kart ekstresinde ödenmeyen principal için aylık planlama faizi hesaplanır ve yalnız bir sonraki ekstre opening carry bakiyesine eklenir. Kart faizi mevcut maaş döneminin zorunlu ödemesine tekrar yazılmaz. Kart carry faizi ile genel finansman açığı faizi iki ayrı state ve summary olarak tutulur; ikisi de varsayılan `%5,00`, `decimal` ve iki hane `AwayFromZero` yuvarlama kullanır.
+Devreden kart borcuna aylık planlama faizi, o bakiyenin girdiği ekstrede bir kez işlenir ve ekstre tutarına eklenir; ödeme sonrası kalan principal faizsiz devreder, faizi bir sonraki ekstrede işlenir. Bu nedenle ekstresini tamamen ödeyen kullanıcı da devraldığı borcun faizini öder. Bankanın kestiği gerçek ekstre nihai tutardır, üzerine faiz eklenmez. Kart faizi ayrı bir kalem olarak mevcut maaş döneminin zorunlu ödemesine tekrar yazılmaz; nakit etkisi ekstre ödemesinin içindedir. Kart carry faizi ile genel finansman açığı faizi iki ayrı state ve summary olarak tutulur; ikisi de varsayılan `%5,00`, `decimal` ve iki hane `AwayFromZero` yuvarlama kullanır.
 
 Maaş, tek seferlik gelir, kredi, kart harcaması, kart vadesi, geçici ödeme ve büyük giderlerin tamamı exact date ile ilgili maaş dönemine yerleşir. Ayın 29/30/31'i için takvim sonu kırpma kuralı merkezi olarak uygulanır.
 

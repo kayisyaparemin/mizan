@@ -20,6 +20,8 @@ public sealed record CreditCardStatementProjection(
     decimal? MinimumPayment,
     decimal? Payment,
     decimal? CarriedAfterPayment,
+    // Bu ekstreye giren devreden bakiyeye işlenen faiz. `StatementBalance`
+    // içinde yer alır, ayrı bir nakit çıkışı değildir (I9).
     decimal CarryInterest,
     decimal? NextCarriedBalance,
     decimal AppliedInterestRate,
@@ -78,9 +80,15 @@ public sealed class CreditCardStatementCalculator
                 newCharges += card.UnbilledSpending;
             }
 
+            // Devreden bakiyenin faizi, o bakiyenin *girdiği* ekstreye eklenir
+            // (gerçek banka davranışı). Kesilmiş ekstrede banka faizi zaten
+            // işlemiştir; `StatementAmount` nihai tutardır, üzerine eklenmez.
+            var carryInterest = !isActualStatement && carried is > 0m
+                ? RoundMoney(carried.Value * carryInterestRate)
+                : 0m;
             decimal? statementBalance = carried is null
                 ? null
-                : carried.Value + newCharges;
+                : carried.Value + carryInterest + newCharges;
             decimal? minimumPayment = isActualStatement
                 ? actualStatement!.MinimumPaymentAmount
                 : statementBalance is null
@@ -101,12 +109,9 @@ public sealed class CreditCardStatementCalculator
             decimal? carriedAfterPayment = statementBalance is null || decision.Payment is null
                 ? null
                 : Math.Max(0m, statementBalance.Value - decision.Payment.Value);
-            var carryInterest = carriedAfterPayment is > 0m
-                ? RoundMoney(carriedAfterPayment.Value * carryInterestRate)
-                : 0m;
-            decimal? nextCarriedBalance = carriedAfterPayment is null
-                ? null
-                : carriedAfterPayment.Value + carryInterest;
+            // Faiz artık dönem sonunda kapitalize edilmiyor; kalan anapara
+            // olduğu gibi devreder, faizi bir sonraki ekstrede işlenir.
+            decimal? nextCarriedBalance = carriedAfterPayment;
 
             result.Add(new CreditCardStatementProjection(
                 closeDate,

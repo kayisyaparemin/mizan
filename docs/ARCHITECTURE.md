@@ -63,7 +63,7 @@ Bağımlılık yönü `App → Application → Domain`; `Infrastructure → Appl
 
 Kart başına gerçek ödeme stratejisi (`AskEachStatement`, asgari, tam ekstre, sabit) ile yalnız projection için kullanılabilen fallback ayrıdır. Exact due-date override varsa stratejinin önüne geçer. Sabit tutar ekstre borcunu aşamaz; asgarinin altındaysa asgariye yükseltilir. Belirsiz ödeme planı tutar uydurmaz ve açıkça işaretlenir.
 
-Ödeme sonrası kalan principal sıfıra kırpılır, yapılandırılabilir aylık `CreditCardCarryInterestRate` ile faizlenir ve `NextCarriedBalance` olarak sonraki statement'a taşınır. Tam ödemede faiz sıfırdır. Bu faiz aynı dönemin mandatory outflow'una eklenmez; nakit etkisi sonraki ekstre ödeme gününde normal kart yükümlülüğü olarak ortaya çıkar. `CarryInterest` ve `DeficitFinancingInterest` ayrı state'lerdir.
+Faiz, bir bakiyenin devrettiği anda değil, devrettiği bakiyenin girdiği ekstrede işlenir: `CarryInterest` = açılış carry bakiyesi × yapılandırılabilir aylık `CreditCardCarryInterestRate`, ve `StatementBalance` bu faizi içerir. Ödeme sonrası kalan principal sıfıra kırpılır ve faizsiz olarak `NextCarriedBalance` olur; faizi bir sonraki ekstre işler. Böylece faiz tek bir yerde, tek bir kez hesaplanır ve ekstresini tamamen ödeyen kullanıcı da devraldığı borcun faizini öder. Bankanın kestiği gerçek ekstre (`CurrentStatement`) nihai tutardır; faiz zaten içinde olduğu için üzerine eklenmez. Faiz aynı dönemin mandatory outflow'una ayrı kalem olarak yazılmaz; nakit etkisi ekstre ödemesinin içindedir (I9). `CarryInterest` ve `DeficitFinancingInterest` ayrı state'lerdir.
 
 ## Simülatör
 
@@ -93,7 +93,7 @@ New Current FinancialSnapshot + New Frozen Plan
 - `PeriodReviewService`, due kontrolü, actual doğrulaması ve idempotent finalization orkestrasyonunu yapar.
 - `ProjectionBoundaryResolver`, latest current snapshot'ın bir `PeriodActual.ResultFinancialSnapshotId` sonucu olup olmadığını history'den anlık çözer. Actual-generated snapshot için closed checkpoint `PeriodActual.PeriodEnd`, first unrealized salary ise salary calendar'da strictly sonraki maaştır.
 - `FinancialStateReconciliationService`, başlangıç durumu semantiğini değiştirmeden dönem sonu önerisini hesaplar.
-- `CreditCardActualPaymentReconciler`, actual kart ödemesini exact due-date statement ile eşler; kalan principal ve carry faizini canonical karta bir kez uygular.
+- `CreditCardActualPaymentReconciler`, actual kart ödemesini exact due-date statement ile eşler; canonical karta yalnız kalan principal'i yazar. Faizi kapitalize etmez — onu bir sonraki ekstre işler, aksi halde aynı faiz iki kez sayılır.
 - `FinancialInstrumentReconciliationService`, ödenen kredi/taksitleri ilerletir; ödenmeyen veya kaçırılmış yükümlülükleri yeni anchor'a taşıyarak gelecek plandan kaybolmalarını engeller.
 - `PlanActualComparisonCalculator` ve `HistoryQueryService` yalnız frozen tarihsel veriyi okur. Gelecek ayar değişiklikleri eski planı yeniden hesaplamaz.
 

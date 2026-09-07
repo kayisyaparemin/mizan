@@ -201,32 +201,25 @@ jobs:
           cat > release-notes.md <<NOTES
           # Mizan $version
 
-          Simülatör grafiği artık canlı: koşulları açıp kapatabiliyor, yaşam
-          giderini kaydırabiliyorsun. Eğri anında yeniden çiziliyor.
-
-          ### Yenilikler
-
-          - **Koşul aç/kapa.** Simülasyon planındaki her koşulun bir switch'i
-            var. Kapattığın koşul hesaba girmez, grafik anında değişir ve
-            "Planı Uygula" yalnızca açık koşulları kaydeder; kapalı olanlar
-            listede bekler.
-            Ekranda her an tek bir gerçek kombinasyon vardır — koşulların
-            etkileri toplanmadığı için "şunu tek başına dene" ancak böyle
-            dürüst cevap verir.
-          - **Hepsi kapalıyken baz çizgi.** Hiçbir koşul açık değilse grafik
-            bugünkü planının kendi seyrini tek çizgide gösterir: hiçbirini
-            uygulamazsan ne olacağı. Karşılaştırmaya dayanan bölümler gizlenir.
-          - **Aylık yaşam gideri kadranı.** Grafiğin altındaki slider'ı
-            oynattığın anda eğri ve "açığın kapandığı ay" kayar; kendi eşiğini
-            görürsün. Hem şimdiki durum hem denenen plan aynı harcama
-            seviyesini varsayar, karşılaştırma bozulmaz.
-            Bu bir deneme: kayıtlı yaşam giderin değişmez, tek dokunuşla geri
-            dönersin ve plan uygularsan onay ekranı bunu ayrıca söyler.
+          Devraldığın kart borcunun faizi artık hesaba giriyor. Ekstresini
+          tamamen ödeyenlerde bu faiz hiç görünmüyordu.
 
           ### Düzeltme
 
-          - İkinci simülasyondan sonra "Seçili Dönem" kartı bir önceki hesabın
-            rakamlarında kalabiliyordu.
+          - **Devreden kart borcunun faizi işlenmiyordu.** Faiz yalnızca
+            ödemeden *sonra kalan* tutara uygulanıyordu; ekstreye *giren*
+            devreden bakiyenin faizi hiç eklenmiyordu. Asgari ödeyende bir
+            dönem gecikiyor, ekstresini tamamen ödeyende tamamen kayboluyordu:
+            model "hiç faiz yok" derken banka taşınan bakiyeye faiz
+            işletiyordu.
+            Artık faiz, bakiyenin girdiği ekstrede bir kez işleniyor ve ekstre
+            tutarına ekleniyor. Ekstresini tamamen ödeyen de devraldığı borcun
+            faizini görüyor; borç kapandıktan sonra faiz üremiyor. Bankanın
+            kestiği gerçek ekstre nihai tutardır, üzerine faiz eklenmez.
+
+          Dönem Detayı'ndaki "Faiz Yükü" bölümünde artık *Devreden kart borcu
+          faizi* satırını göreceksin. 12 dönem faiz toplamların ve dönem sonu
+          rakamların bu yüzden değişir — önceki sürüm eksik hesaplıyordu.
           NOTES
 
       - name: Upload signed APK artifact

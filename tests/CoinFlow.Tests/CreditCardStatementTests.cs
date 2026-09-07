@@ -90,12 +90,13 @@ public sealed class CreditCardStatementTests
             },
             1));
 
-        Assert.Equal(94_000m, statement.StatementBalance);
-        Assert.Equal(37_600m, statement.MinimumPayment);
-        Assert.Equal(37_600m, statement.Payment);
-        Assert.Equal(56_400m, statement.CarriedAfterPayment);
-        Assert.Equal(2_820m, statement.CarryInterest);
-        Assert.Equal(59_220m, statement.NextCarriedBalance);
+        // 35.000 devreden + %5 faizi + 59.000 harcama.
+        Assert.Equal(1_750m, statement.CarryInterest);
+        Assert.Equal(95_750m, statement.StatementBalance);
+        Assert.Equal(38_300m, statement.MinimumPayment);
+        Assert.Equal(38_300m, statement.Payment);
+        Assert.Equal(57_450m, statement.CarriedAfterPayment);
+        Assert.Equal(57_450m, statement.NextCarriedBalance);
     }
 
     [Fact]
@@ -110,7 +111,8 @@ public sealed class CreditCardStatementTests
             },
             1));
 
-        Assert.Equal(4.01m, statement.MinimumPayment);
+        // 10,0125 + 0,50 faiz = 10,5125; %40 = 4,205 → 4,21.
+        Assert.Equal(4.21m, statement.MinimumPayment);
     }
 
     [Fact]
@@ -124,10 +126,37 @@ public sealed class CreditCardStatementTests
             },
             1));
 
-        Assert.Equal(94_000m, statement.Payment);
+        // Tamamını ödeyen de devreden bakiyenin faizini öder: ekstre
+        // 94.000 değil 98.700 kesilir.
+        Assert.Equal(4_700m, statement.CarryInterest);
+        Assert.Equal(98_700m, statement.StatementBalance);
+        Assert.Equal(98_700m, statement.Payment);
         Assert.Equal(0m, statement.CarriedAfterPayment);
-        Assert.Equal(0m, statement.CarryInterest);
         Assert.Equal(0m, statement.NextCarriedBalance);
+    }
+
+    [Fact]
+    public void FullPaymentEveryStatement_ChargesInterestWhileCarryExists()
+    {
+        // BULGU-KART-FAIZI: tamamını ödeyen kullanıcıda devreden borcun
+        // faizi hiç görünmüyordu. Faiz bir kez, girdiği ekstrede işlenir.
+        var statements = _calculator.Project(
+            Card() with
+            {
+                CarriedBalance = 60_000m,
+                UnbilledSpending = 17_900m,
+                PaymentStrategy = CreditCardPaymentStrategy.FullStatement
+            },
+            2,
+            carryInterestRate: 0.05m);
+
+        Assert.Equal(3_000m, statements[0].CarryInterest);
+        Assert.Equal(80_900m, statements[0].StatementBalance);
+        Assert.Equal(80_900m, statements[0].Payment);
+        Assert.Equal(0m, statements[0].NextCarriedBalance);
+        // Borç kapandıktan sonra faiz üremez.
+        Assert.Equal(0m, statements[1].CarryInterest);
+        Assert.Equal(0m, statements[1].StatementBalance);
     }
 
     [Fact]
@@ -142,10 +171,10 @@ public sealed class CreditCardStatementTests
             1,
             carryInterestRate: 0.05m));
 
-        Assert.Equal(100_000m, statement.StatementBalance);
-        Assert.Equal(40_000m, statement.Payment);
-        Assert.Equal(60_000m, statement.CarriedAfterPayment);
-        Assert.Equal(3_000m, statement.CarryInterest);
+        Assert.Equal(5_000m, statement.CarryInterest);
+        Assert.Equal(105_000m, statement.StatementBalance);
+        Assert.Equal(42_000m, statement.Payment);
+        Assert.Equal(63_000m, statement.CarriedAfterPayment);
         Assert.Equal(63_000m, statement.NextCarriedBalance);
         Assert.Equal(0.05m, statement.AppliedInterestRate);
     }
@@ -163,10 +192,12 @@ public sealed class CreditCardStatementTests
             carryInterestRate: 0.05m);
 
         Assert.Equal(63_000m, statements[0].NextCarriedBalance);
-        Assert.Equal(63_000m, statements[1].StatementBalance);
-        Assert.Equal(25_200m, statements[1].Payment);
-        Assert.Equal(37_800m, statements[1].CarriedAfterPayment);
-        Assert.Equal(1_890m, statements[1].CarryInterest);
+        // İkinci ekstrenin faizi, birincinin faizini de içeren 63.000
+        // üzerinden işler: bileşik etki korunur.
+        Assert.Equal(3_150m, statements[1].CarryInterest);
+        Assert.Equal(66_150m, statements[1].StatementBalance);
+        Assert.Equal(26_460m, statements[1].Payment);
+        Assert.Equal(39_690m, statements[1].CarriedAfterPayment);
         Assert.Equal(39_690m, statements[1].NextCarriedBalance);
     }
 
@@ -198,7 +229,7 @@ public sealed class CreditCardStatementTests
 
     [Theory]
     [InlineData(50000, 50000)]
-    [InlineData(20000, 37600)]
+    [InlineData(20000, 38300)]
     public void FixedAmount_NeverFallsBelowMinimum(
         double fixedAmount,
         double expectedPayment)
@@ -255,7 +286,7 @@ public sealed class CreditCardStatementTests
         var statement = Assert.Single(
             _calculator.Project(card, 1, useProjectionFallback: true));
 
-        Assert.Equal(37_600m, statement.Payment);
+        Assert.Equal(39_480m, statement.Payment);
         Assert.Equal(
             CreditCardPaymentResolution.ProjectionFallback,
             statement.PaymentResolution);
@@ -291,29 +322,29 @@ public sealed class CreditCardStatementTests
             statements[0],
             new DateOnly(2026, 8, 25),
             new DateOnly(2026, 9, 5),
-            96_485.68m,
-            38_594.27m,
-            57_891.41m,
-            2_894.57m,
-            60_785.98m);
+            98_245.77m,
+            39_298.31m,
+            58_947.46m,
+            1_760.09m,
+            58_947.46m);
         AssertStatement(
             statements[1],
             new DateOnly(2026, 9, 25),
             new DateOnly(2026, 10, 5),
-            60_785.98m,
-            24_314.39m,
-            36_471.59m,
-            1_823.58m,
-            38_295.17m);
+            61_894.83m,
+            24_757.93m,
+            37_136.90m,
+            2_947.37m,
+            37_136.90m);
         AssertStatement(
             statements[2],
             new DateOnly(2026, 10, 25),
             new DateOnly(2026, 11, 5),
-            53_833.53m,
-            21_533.41m,
-            32_300.12m,
-            1_615.01m,
-            33_915.13m);
+            54_532.11m,
+            21_812.84m,
+            32_719.27m,
+            1_856.85m,
+            32_719.27m);
     }
 
     [Fact]

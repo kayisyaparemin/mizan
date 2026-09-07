@@ -48,10 +48,12 @@ public sealed class CreditCardStatementSettlementTests
 
         Assert.Null(settled.CurrentStatement);
         Assert.Null(settled.CurrentStatementPaymentPlan);
-        // Remaining principal 5,000 + 5% carry interest = 5,250.
-        Assert.Equal(5_250m, settled.CarriedBalance);
+        // Only the remaining principal carries; its interest is charged by
+        // the next statement, not capitalised at settlement.
+        Assert.Equal(5_000m, settled.CarriedBalance);
 
         var next = Assert.Single(_calculator.Project(settled, 1));
+        Assert.Equal(250m, next.CarryInterest);
         Assert.Equal(5_250m, next.StatementBalance);
     }
 
