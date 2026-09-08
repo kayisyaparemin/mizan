@@ -155,6 +155,73 @@
                                 IsVisible="{Binding HasMultipleDraftConditions}"
                                 Style="{StaticResource SecondaryButton}" />
                     </Grid>
+
+                    <!-- Ekrandaki taslak uygulama kapanınca kayboluyordu.
+                         Kaydetmek finansal kayıtlara dokunmaz; yalnız koşul
+                         listesini adıyla saklar, açık/kapalı durumlarıyla. -->
+                    <BoxView HeightRequest="1"
+                             Color="{StaticResource Line}"
+                             Margin="0,4"
+                             IsVisible="{Binding HasDraftConditions}" />
+                    <Label Text="Bu planı sakla"
+                           Style="{StaticResource FieldLabel}"
+                           IsVisible="{Binding HasDraftConditions}" />
+                    <Grid ColumnDefinitions="*,Auto"
+                          ColumnSpacing="8"
+                          IsVisible="{Binding HasDraftConditions}">
+                        <Entry Text="{Binding DraftName}"
+                               Placeholder="Plan adı (örn. Beyaz eşya denemesi)" />
+                        <Button Grid.Column="1"
+                                Text="Geçici Plan Oluştur"
+                                Command="{Binding SaveDraftCommand}"
+                                Style="{StaticResource SecondaryButton}" />
+                    </Grid>
+                </VerticalStackLayout>
+            </Border>
+
+            <Border IsVisible="{Binding HasSavedDrafts}">
+                <VerticalStackLayout Spacing="10">
+                    <Label Text="Geçici Planların" Style="{StaticResource SectionTitle}" />
+                    <Label Text="Kaydettiğin denemeler burada durur. Yüklediğinde ekrandaki planın yerine geçer; finansal kayıtların etkilenmez."
+                           Style="{StaticResource MutedText}"
+                           FontSize="12" />
+                    <VerticalStackLayout BindableLayout.ItemsSource="{Binding SavedDrafts}"
+                                         Spacing="10">
+                        <BindableLayout.ItemTemplate>
+                            <DataTemplate>
+                                <Border Padding="12"
+                                        BackgroundColor="{StaticResource ProjectionSurface}">
+                                    <Grid ColumnDefinitions="*,Auto,Auto"
+                                          RowDefinitions="Auto,Auto"
+                                          ColumnSpacing="6"
+                                          RowSpacing="4">
+                                        <Label Text="{Binding Name}"
+                                               FontFamily="OpenSansSemibold"
+                                               VerticalTextAlignment="Center" />
+                                        <Label Grid.Row="1"
+                                               Text="{Binding SummaryText}"
+                                               Style="{StaticResource MutedText}"
+                                               FontSize="12" />
+                                        <Button Grid.Column="1"
+                                                Grid.RowSpan="2"
+                                                Text="Yükle"
+                                                Padding="12,4"
+                                                MinimumHeightRequest="40"
+                                                Command="{Binding Source={x:Reference PageRoot}, Path=BindingContext.LoadDraftCommand}"
+                                                CommandParameter="{Binding .}" />
+                                        <Button Grid.Column="2"
+                                                Grid.RowSpan="2"
+                                                Text="Sil"
+                                                Padding="12,4"
+                                                MinimumHeightRequest="40"
+                                                Style="{StaticResource SecondaryButton}"
+                                                Command="{Binding Source={x:Reference PageRoot}, Path=BindingContext.DeleteDraftCommand}"
+                                                CommandParameter="{Binding .}" />
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </BindableLayout.ItemTemplate>
+                    </VerticalStackLayout>
                 </VerticalStackLayout>
             </Border>
 

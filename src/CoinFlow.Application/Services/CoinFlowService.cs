@@ -319,6 +319,52 @@ public sealed class CoinFlowService(
         decimal targetAmount) =>
         targetAmountCalculator.FindFirstReachable(periods, targetAmount);
 
+    /// <summary>
+    /// Simülatördeki koşul listesini adlandırıp saklar. Uygulama kapansa da
+    /// kaybolmaz. Kaydetmek finansal kayıtlara dokunmaz — bu bir deneme.
+    /// </summary>
+    public async Task<SimulationDraft> SaveSimulationDraftAsync(
+        string name,
+        IReadOnlyList<SimulationDraftCondition> conditions,
+        Guid? draftId = null,
+        CancellationToken cancellationToken = default)
+    {
+        var trimmed = (name ?? string.Empty).Trim();
+        if (trimmed.Length == 0)
+        {
+            throw new InvalidOperationException(
+                "Geçici plana bir ad vermelisin.");
+        }
+
+        if (conditions.Count == 0)
+        {
+            throw new InvalidOperationException(
+                "Kaydedilecek en az bir koşul gerekiyor.");
+        }
+
+        var existing = draftId is { } id
+            ? (await store.GetSimulationDraftsAsync(cancellationToken))
+                .FirstOrDefault(x => x.Id == id)
+            : null;
+        var draft = new SimulationDraft(
+            existing?.Id ?? Guid.NewGuid(),
+            trimmed,
+            existing?.CreatedAt ?? clock.UtcNow,
+            clock.UtcNow,
+            conditions);
+        await store.UpsertSimulationDraftAsync(draft, cancellationToken);
+        return draft;
+    }
+
+    public Task<IReadOnlyList<SimulationDraft>> GetSimulationDraftsAsync(
+        CancellationToken cancellationToken = default) =>
+        store.GetSimulationDraftsAsync(cancellationToken);
+
+    public Task DeleteSimulationDraftAsync(
+        Guid id,
+        CancellationToken cancellationToken = default) =>
+        store.DeleteSimulationDraftAsync(id, cancellationToken);
+
     public async Task<SimulationApplyResult> ApplySimulationAsync(
         SimulationRequest request,
         bool confirmed,

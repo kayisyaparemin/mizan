@@ -10,7 +10,9 @@ namespace CoinFlow.Infrastructure.Persistence;
 public sealed class SqliteCoinFlowStore : ICoinFlowStore, IAsyncDisposable
 {
     private const string DateFormat = "yyyy-MM-dd";
-    private const int CurrentSchemaVersion = 11;
+    // v12: kaydedilmiş simülasyon taslakları. Yalnız iki yeni tablo ekler;
+    // mevcut tabloların hiçbirine dokunmaz, veri taşınması gerekmez.
+    private const int CurrentSchemaVersion = 12;
     private const int CurrentCardStatementModelVersion = 7;
     private const decimal DefaultPlanningInterestRate = 0.05m;
     private static readonly Guid LegacyInitialAssignmentStrategyId =
@@ -82,6 +84,8 @@ public sealed class SqliteCoinFlowStore : ICoinFlowStore, IAsyncDisposable
             await _database.CreateTableAsync<ActualPaymentRow>();
             await _database.CreateTableAsync<ActualFlowRow>();
             await _database.CreateTableAsync<ActualLivingBreakdownRow>();
+            await _database.CreateTableAsync<SimulationDraftRow>();
+            await _database.CreateTableAsync<SimulationDraftConditionRow>();
 
             await MigratePeriodPlanRevisionSchemaAsync();
             await MigrateLegacyCreditCardsAsync();
@@ -161,6 +165,8 @@ public sealed class SqliteCoinFlowStore : ICoinFlowStore, IAsyncDisposable
             connection.DeleteAll<SalaryRow>();
             connection.DeleteAll<LoanRow>();
             connection.DeleteAll<PaymentAssignmentStrategyRow>();
+            connection.DeleteAll<SimulationDraftConditionRow>();
+            connection.DeleteAll<SimulationDraftRow>();
             var settings = connection.Table<SettingsRow>().First();
             settings.SalaryDay = 10;
             settings.MonthlyLivingBudget = 0m;
@@ -555,6 +561,143 @@ public sealed class SqliteCoinFlowStore : ICoinFlowStore, IAsyncDisposable
             "DELETE FROM planned_large_expenses WHERE Id = ?",
             Key(id));
     }
+
+    public async Task<IReadOnlyList<SimulationDraft>> GetSimulationDraftsAsync(
+        CancellationToken cancellationToken = default)
+    {
+        await InitializeAsync(cancellationToken);
+        var drafts = await _database.Table<SimulationDraftRow>().ToListAsync();
+        var conditions = await _database
+            .Table<SimulationDraftConditionRow>()
+            .ToListAsync();
+        return drafts
+            .Select(row => new SimulationDraft(
+                ParseKey(row.Id),
+                row.Name,
+                ParseTimestamp(row.CreatedAt),
+                ParseTimestamp(row.UpdatedAt),
+                conditions
+                    .Where(x => x.DraftId == row.Id)
+                    .OrderBy(x => x.Position)
+                    .Select(FromRow)
+                    .ToArray()))
+            .OrderByDescending(x => x.UpdatedAt)
+            .ToArray();
+    }
+
+    public async Task UpsertSimulationDraftAsync(
+        SimulationDraft draft,
+        CancellationToken cancellationToken = default)
+    {
+        await InitializeAsync(cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        await _database.RunInTransactionAsync(connection =>
+        {
+            connection.InsertOrReplace(new SimulationDraftRow
+            {
+                Id = Key(draft.Id),
+                Name = draft.Name,
+                CreatedAt = Timestamp(draft.CreatedAt),
+                UpdatedAt = Timestamp(draft.UpdatedAt)
+            });
+            // Koşul listesi baştan yazılır: sıra da veri, tek tek upsert
+            // etmek silinen bir koşulu geride bırakırdı.
+            connection.Execute(
+                "DELETE FROM simulation_draft_conditions WHERE DraftId = ?",
+                Key(draft.Id));
+            for (var index = 0; index < draft.Conditions.Count; index++)
+            {
+                connection.Insert(ToRow(
+                    draft.Id,
+                    index,
+                    draft.Conditions[index]));
+            }
+        });
+    }
+
+    public async Task DeleteSimulationDraftAsync(
+        Guid id,
+        CancellationToken cancellationToken = default)
+    {
+        await InitializeAsync(cancellationToken);
+        await _database.ExecuteAsync(
+            "DELETE FROM simulation_draft_conditions WHERE DraftId = ?",
+            Key(id));
+        await _database.ExecuteAsync(
+            "DELETE FROM simulation_drafts WHERE Id = ?",
+            Key(id));
+    }
+
+    private static SimulationDraftConditionRow ToRow(
+        Guid draftId,
+        int position,
+        SimulationDraftCondition condition)
+    {
+        var request = condition.Request;
+        return new SimulationDraftConditionRow
+        {
+            Id = Key(request.ScenarioId),
+            DraftId = Key(draftId),
+            Position = position,
+            IsEnabled = condition.IsEnabled,
+            Type = (int)request.Type,
+            Name = request.Name,
+            Amount = request.Amount,
+            StartDate = FormatDate(request.StartDate),
+            PaymentCount = request.PaymentCount,
+            FirstPaymentDate = FormatNullableDate(request.FirstPaymentDate),
+            CreditCardId = request.CreditCardId is { } cardId
+                ? Key(cardId)
+                : null,
+            TotalRepaymentAmount = request.TotalRepaymentAmount,
+            NewPaymentAssignmentMode =
+                request.NewPaymentAssignmentMode is { } mode
+                    ? (int)mode
+                    : null,
+            EffectiveSalaryDate = FormatNullableDate(request.EffectiveSalaryDate),
+            CardPaymentType = request.CardPaymentType is { } cardPaymentType
+                ? (int)cardPaymentType
+                : null,
+            AppliesToAllStatements = request.AppliesToAllStatements
+        };
+    }
+
+    private static SimulationDraftCondition FromRow(
+        SimulationDraftConditionRow row) =>
+        new(
+            new SimulationRequest(
+                (SimulationScenarioType)row.Type,
+                row.Name,
+                row.Amount,
+                ParseDate(row.StartDate),
+                row.PaymentCount,
+                ParseNullableDate(row.FirstPaymentDate),
+                string.IsNullOrWhiteSpace(row.CreditCardId)
+                    ? null
+                    : ParseKey(row.CreditCardId),
+                row.TotalRepaymentAmount,
+                row.NewPaymentAssignmentMode is { } mode
+                    ? (PaymentAssignmentMode)mode
+                    : null,
+                ParseNullableDate(row.EffectiveSalaryDate),
+                ParseKey(row.Id),
+                row.CardPaymentType is { } cardPaymentType
+                    ? (CreditCardPaymentType)cardPaymentType
+                    : null,
+                row.AppliesToAllStatements),
+            row.IsEnabled);
+
+    private static string Timestamp(DateTimeOffset value) =>
+        value.ToString("O", CultureInfo.InvariantCulture);
+
+    private static DateTimeOffset ParseTimestamp(string value) =>
+        DateTimeOffset.TryParse(
+            value,
+            CultureInfo.InvariantCulture,
+            DateTimeStyles.RoundtripKind,
+            out var parsed)
+            ? parsed
+            : DateTimeOffset.MinValue;
 
     public async Task ApplySimulationBatchAsync(
         SimulationPersistenceBatch batch,

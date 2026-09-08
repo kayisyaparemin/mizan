@@ -201,37 +201,26 @@ jobs:
           cat > release-notes.md <<NOTES
           # Mizan $version
 
-          Kart sayfası artık zaman eksenine göre okunuyor. Hiçbir özellik
-          kalkmadı; kaosun sebebi olan sunum değişti.
+          Simülatörde kurduğun deneme artık uygulamayı kapatınca kaybolmuyor.
 
-          ### Kart sayfası
+          ### Geçici planlar
 
-          Beş ayrı "Asgari / Tamamı" seçicisi dört farklı şeyi aynı
-          kelimelerle söylüyordu. Aralarındaki tek fark kapsamdı — hangi
-          ekstreleri etkiledikleri — ve ekranda bunu söyleyen hiçbir şey
-          yoktu. Sayfa şimdi üç başlıkla okunuyor:
+          Simülasyon planını adlandırıp **Geçici Plan Oluştur** ile
+          saklayabiliyorsun. Kaydedilen planlar sayfanın altındaki
+          **Geçici Planların** listesinde durur; **Yükle** dediğinde
+          koşullar simülatöre geri gelir ve üzerine devam edersin.
 
-          - **ŞU AN** — kesilmiş ekstren ve onu nasıl ödeyeceğin.
-          - **SIRADAKİ** — henüz kesilmemiş ekstreler; istersen tek bir vade
-            için ayrı karar verebilirsin. Gelecek ekstreler listesi açık
-            duruyor, planın kendisi çünkü.
-          - **GENEL** — ayrı karar vermediğin ekstreler için varsayılanlar.
-            Nadiren değiştiği için varsayılan olarak kapalı; başlığa
-            dokununca açılıyor.
+          - Koşulların açık/kapalı durumu da kaydedilir. Bilerek kapattığın
+            bir koşul geri yüklendiğinde kapalı gelir.
+          - Yükleme ekrandaki planın **yerine geçer**; ekranda koşul varsa
+            önce sorulur. İki planın koşulları birbirine karışmaz.
+          - Aynı adla kaydedersen üzerine yazmayı sorar.
+          - Kaydetmek finansal kayıtlarına dokunmaz. Geçici plan bir deneme;
+            gerçek kayda dönüşmesi için yine **Planı Uygula** gerekiyor, ve
+            uygulamak kaydettiğin planı listeden silmez.
 
-          Genel bölümdeki iki ayar da artık ne olduğunu söylüyor:
-          *"Kartın varsayılan ödeme şekli"* ayrı karar vermediğin her ekstre
-          için geçerli; *"Karar vermediğin ekstrelerde varsayım"* ise bir
-          karar değil, sadece hesabın rakam uydurmaması için yaptığı kabul —
-          ekstre gelince yine sana soruluyor.
-
-          Gelecek ekstreler listesinde her satır kararın nereden geldiğini
-          söylüyor: **Bu vade için**, **Kartın varsayılanı**, ya da
-          **Karar yok · varsayım**. Üçü de "Asgari" ile bitiyordu, ayrımı
-          artık önek yapıyor.
-
-          Ödeme tercihi geçmişi ve gelecek kart hareketleri referans bilgi;
-          ikisi de açılır-kapanır bölümlere alındı.
+          Veritabanı şeması v12'ye çıktı: yalnız iki yeni tablo eklendi,
+          mevcut verinin hiçbirine dokunulmadı.
           NOTES
 
       - name: Upload signed APK artifact

@@ -222,6 +222,7 @@ public partial class SimulationViewModel(
                               plan.PaymentAssignmentStrategies.Count > 0 &&
                               plan.Settings.ProjectionAnchorDate != default;
             IsPlanUnavailable = !IsPlanAvailable;
+            await RefreshSavedDraftsAsync();
             if (HasResults)
             {
                 MarkResultsStale();
@@ -396,6 +397,175 @@ public partial class SimulationViewModel(
         SelectionOption<DateOnly>? value) =>
         _ = value;
 
+    /// <summary>
+    /// Kaydedilmiş geçici planlar. Uygulama kapanınca kaybolan tek şey
+    /// ekrandaki taslaktı; kullanıcı bir denemeyi adlandırıp saklayabiliyor
+    /// ve istediğinde simülatöre geri yükleyebiliyor.
+    /// </summary>
+    public ObservableCollection<SavedSimulationDraftView> SavedDrafts
+    { get; } = [];
+
+    [ObservableProperty] private string draftName = string.Empty;
+    [ObservableProperty] private bool hasSavedDrafts;
+
+    [RelayCommand]
+    private async Task SaveDraftAsync()
+    {
+        try
+        {
+            SetStatus(string.Empty);
+            if (DraftConditions.Count == 0)
+            {
+                SetStatus("Kaydedilecek koşul yok. Önce bir koşul ekle.");
+                return;
+            }
+
+            // Ad boşsa kullanıcıyı boş bir alana bakakalmakla bırakmayalım:
+            // ilk koşulun özeti zaten planın ne olduğunu söylüyor.
+            var name = string.IsNullOrWhiteSpace(DraftName)
+                ? DraftConditions[0].SummaryText
+                : DraftName.Trim();
+            var existing = SavedDrafts.FirstOrDefault(x =>
+                string.Equals(
+                    x.Name,
+                    name,
+                    StringComparison.CurrentCultureIgnoreCase));
+            if (existing is not null &&
+                !await feedback.ConfirmAsync(
+                    "Üzerine yazılsın mı?",
+                    $"\"{existing.Name}\" adında kayıtlı bir geçici plan var. Üzerine yazılsın mı?",
+                    "Üzerine Yaz",
+                    "Vazgeç"))
+            {
+                return;
+            }
+
+            // Açık/kapalı durumu da kaydedilir: bilerek kapatılmış bir koşul
+            // geri yüklendiğinde kapalı gelmeli.
+            await service.SaveSimulationDraftAsync(
+                name,
+                DraftConditions
+                    .Select(x => new SimulationDraftCondition(
+                        x.Request,
+                        x.IsEnabled))
+                    .ToArray(),
+                existing?.Id);
+            DraftName = string.Empty;
+            await RefreshSavedDraftsAsync();
+            SetStatus($"\"{name}\" geçici planı kaydedildi.");
+        }
+        catch (Exception exception)
+        {
+            SetStatus(UserFacingMessages.FromException(
+                exception,
+                "Geçici plan kaydedilemedi."));
+        }
+    }
+
+    /// <summary>
+    /// Kaydedilmiş plan ekrandakinin yerine geçer; ikisini birleştirmek
+    /// "hangi koşullar bu planındı" sorusunu cevapsız bırakırdı. Ekranda
+    /// koşul varsa önce onay istenir.
+    /// </summary>
+    [RelayCommand]
+    private async Task LoadDraftAsync(SavedSimulationDraftView? draft)
+    {
+        if (draft is null)
+        {
+            return;
+        }
+
+        try
+        {
+            if (DraftConditions.Count > 0 &&
+                !await feedback.ConfirmAsync(
+                    "Plan değiştirilsin mi?",
+                    $"Ekrandaki {DraftConditions.Count} koşul kaldırılıp \"{draft.Name}\" yüklenecek.",
+                    "Yükle",
+                    "Vazgeç"))
+            {
+                return;
+            }
+
+            DraftConditions.Clear();
+            foreach (var condition in draft.Conditions)
+            {
+                DraftConditions.Add(CreateConditionView(
+                    condition.Request,
+                    condition.IsEnabled));
+            }
+
+            _editingConditionId = null;
+            DraftName = draft.Name;
+            ClearResults();
+            NotifyDraftChanged();
+            OnPropertyChanged(nameof(IsEditingCondition));
+            OnPropertyChanged(nameof(AddConditionButtonText));
+            SetStatus(
+                $"\"{draft.Name}\" yüklendi. Sonucu görmek için Simülasyonu Yap.");
+        }
+        catch (Exception exception)
+        {
+            SetStatus(UserFacingMessages.FromException(exception));
+        }
+    }
+
+    [RelayCommand]
+    private async Task DeleteDraftAsync(SavedSimulationDraftView? draft)
+    {
+        if (draft is null)
+        {
+            return;
+        }
+
+        try
+        {
+            if (!await feedback.ConfirmAsync(
+                    "Geçici planı sil",
+                    $"\"{draft.Name}\" silinecek. Finansal kayıtların etkilenmez.",
+                    "Sil",
+                    "Vazgeç"))
+            {
+                return;
+            }
+
+            await service.DeleteSimulationDraftAsync(draft.Id);
+            await RefreshSavedDraftsAsync();
+            SetStatus($"\"{draft.Name}\" silindi.");
+        }
+        catch (Exception exception)
+        {
+            SetStatus(UserFacingMessages.FromException(exception));
+        }
+    }
+
+    private async Task RefreshSavedDraftsAsync()
+    {
+        var drafts = await service.GetSimulationDraftsAsync();
+        SavedDrafts.Clear();
+        foreach (var draft in drafts)
+        {
+            SavedDrafts.Add(new SavedSimulationDraftView(
+                draft.Id,
+                draft.Name,
+                SavedDraftSummary(draft),
+                draft.Conditions));
+        }
+
+        HasSavedDrafts = SavedDrafts.Count > 0;
+    }
+
+    private static string SavedDraftSummary(SimulationDraft draft)
+    {
+        var closed = draft.Conditions.Count - draft.EnabledConditionCount;
+        var closedText = closed > 0 ? $" · {closed} kapalı" : string.Empty;
+        // Kültür açıkça verilir: varsayılan kültürde ay adı İngilizce çıkıyor.
+        var updated = draft.UpdatedAt
+            .ToLocalTime()
+            .ToString("dd MMMM yyyy", TurkishCulture);
+        return $"{draft.Conditions.Count} koşul{closedText} · {updated}";
+    }
+
     [RelayCommand]
     private void AddCondition()
     {
@@ -482,6 +652,20 @@ public partial class SimulationViewModel(
     {
         DraftConditions.Clear();
         _editingConditionId = null;
+        ClearResults();
+        NotifyDraftChanged();
+        OnPropertyChanged(nameof(IsEditingCondition));
+        OnPropertyChanged(nameof(AddConditionButtonText));
+        SetStatus("Simülasyon planı temizlendi.");
+    }
+
+    /// <summary>
+    /// Ekrandaki sonucu ve ona bağlı her şeyi sıfırlar. Koşul listesine
+    /// dokunmaz: plan başka bir planla değiştirildiğinde koşullar yeniden
+    /// dolduruluyor, sonuç ise eski hesabın kalıntısı olurdu.
+    /// </summary>
+    private void ClearResults()
+    {
         Results.Clear();
         NarrativeInsights.Clear();
         SummaryMetrics.Clear();
@@ -493,10 +677,6 @@ public partial class SimulationViewModel(
         ResetApplyState(clearRequest: true);
         _lastScenarioProjection = [];
         ClearTargetResult();
-        NotifyDraftChanged();
-        OnPropertyChanged(nameof(IsEditingCondition));
-        OnPropertyChanged(nameof(AddConditionButtonText));
-        SetStatus("Simülasyon planı temizlendi.");
     }
 
     [RelayCommand]
