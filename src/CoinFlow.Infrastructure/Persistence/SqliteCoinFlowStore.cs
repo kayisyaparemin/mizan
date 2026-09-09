@@ -10,9 +10,10 @@ namespace CoinFlow.Infrastructure.Persistence;
 public sealed class SqliteCoinFlowStore : ICoinFlowStore, IAsyncDisposable
 {
     private const string DateFormat = "yyyy-MM-dd";
-    // v12: kaydedilmiş simülasyon taslakları. Yalnız iki yeni tablo ekler;
-    // mevcut tabloların hiçbirine dokunmaz, veri taşınması gerekmez.
-    private const int CurrentSchemaVersion = 12;
+    // v12: kaydedilmiş simülasyon taslakları.
+    // v13: açık dönemin gözlem defteri (I14/I15). Her ikisi de yalnız yeni
+    // tablo ekler; mevcut tabloların hiçbirine dokunmaz, veri taşınmaz.
+    private const int CurrentSchemaVersion = 13;
     private const int CurrentCardStatementModelVersion = 7;
     private const decimal DefaultPlanningInterestRate = 0.05m;
     private static readonly Guid LegacyInitialAssignmentStrategyId =
@@ -86,6 +87,9 @@ public sealed class SqliteCoinFlowStore : ICoinFlowStore, IAsyncDisposable
             await _database.CreateTableAsync<ActualLivingBreakdownRow>();
             await _database.CreateTableAsync<SimulationDraftRow>();
             await _database.CreateTableAsync<SimulationDraftConditionRow>();
+            await _database.CreateTableAsync<PeriodObservationRow>();
+            await _database.CreateTableAsync<PeriodObservationPaymentRow>();
+            await _database.CreateTableAsync<PeriodObservationFlowRow>();
 
             await MigratePeriodPlanRevisionSchemaAsync();
             await MigrateLegacyCreditCardsAsync();
@@ -167,6 +171,9 @@ public sealed class SqliteCoinFlowStore : ICoinFlowStore, IAsyncDisposable
             connection.DeleteAll<PaymentAssignmentStrategyRow>();
             connection.DeleteAll<SimulationDraftConditionRow>();
             connection.DeleteAll<SimulationDraftRow>();
+            connection.DeleteAll<PeriodObservationPaymentRow>();
+            connection.DeleteAll<PeriodObservationFlowRow>();
+            connection.DeleteAll<PeriodObservationRow>();
             var settings = connection.Table<SettingsRow>().First();
             settings.SalaryDay = 10;
             settings.MonthlyLivingBudget = 0m;
@@ -560,6 +567,158 @@ public sealed class SqliteCoinFlowStore : ICoinFlowStore, IAsyncDisposable
         await _database.ExecuteAsync(
             "DELETE FROM planned_large_expenses WHERE Id = ?",
             Key(id));
+    }
+
+    public async Task<PeriodObservation?> GetPeriodObservationAsync(
+        Guid periodPlanSnapshotId,
+        CancellationToken cancellationToken = default)
+    {
+        await InitializeAsync(cancellationToken);
+        var key = Key(periodPlanSnapshotId);
+        var row = await _database
+            .Table<PeriodObservationRow>()
+            .FirstOrDefaultAsync(x => x.PeriodPlanSnapshotId == key);
+        if (row is null)
+        {
+            return null;
+        }
+
+        var observationKey = row.Id;
+        var payments = await _database
+            .Table<PeriodObservationPaymentRow>()
+            .Where(x => x.PeriodObservationId == observationKey)
+            .ToListAsync();
+        var flows = await _database
+            .Table<PeriodObservationFlowRow>()
+            .Where(x => x.PeriodObservationId == observationKey)
+            .ToListAsync();
+        return new PeriodObservation
+        {
+            Id = ParseKey(row.Id),
+            PeriodPlanSnapshotId = ParseKey(row.PeriodPlanSnapshotId),
+            ObservedOn = ParseDate(row.ObservedOn),
+            ObservedBalance = row.ObservedBalance,
+            ObservedLivingSpend = row.ObservedLivingSpend,
+            Note = row.Note,
+            CreatedAtUtc = ParseTimestamp(row.CreatedAtUtc),
+            UpdatedAtUtc = ParseTimestamp(row.UpdatedAtUtc),
+            Payments = payments.Select(x => new PeriodObservationPayment
+            {
+                Id = ParseKey(x.Id),
+                PeriodObservationId = ParseKey(x.PeriodObservationId),
+                PeriodPlanPaymentLineId = ParseKey(x.PeriodPlanPaymentLineId),
+                Status = (ActualPaymentStatus)x.Status,
+                ActualAmount = x.ActualAmount,
+                ActualPaymentDate = ParseNullableDate(x.ActualPaymentDate),
+                Note = x.Note
+            }).ToArray(),
+            Flows = flows.Select(x => new PeriodObservationFlow
+            {
+                Id = ParseKey(x.Id),
+                PeriodObservationId = ParseKey(x.PeriodObservationId),
+                Type = (ActualFlowType)x.Type,
+                Name = x.Name,
+                Category = x.Category,
+                Date = ParseDate(x.Date),
+                Amount = x.Amount
+            }).ToArray()
+        };
+    }
+
+    public async Task UpsertPeriodObservationAsync(
+        PeriodObservation observation,
+        CancellationToken cancellationToken = default)
+    {
+        await InitializeAsync(cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        await _database.RunInTransactionAsync(connection =>
+        {
+            // Açık plan başına tek defter. Aynı plana ikinci bir gözlem satırı
+            // yazılırsa hangisinin geçerli olduğu belirsizleşir.
+            // Anahtarlar ifade ağacının dışında hesaplanır; sqlite-net
+            // Key(...) çağrısını SQL fonksiyonu sanıp sorguyu reddediyor.
+            var planKey = Key(observation.PeriodPlanSnapshotId);
+            var observationKey = Key(observation.Id);
+            var existing = connection
+                .Table<PeriodObservationRow>()
+                .FirstOrDefault(x => x.PeriodPlanSnapshotId == planKey);
+            if (existing is not null && existing.Id != observationKey)
+            {
+                connection.Execute(
+                    "DELETE FROM period_observation_payments WHERE PeriodObservationId = ?",
+                    existing.Id);
+                connection.Execute(
+                    "DELETE FROM period_observation_flows WHERE PeriodObservationId = ?",
+                    existing.Id);
+                connection.Execute(
+                    "DELETE FROM period_observations WHERE Id = ?",
+                    existing.Id);
+            }
+
+            connection.InsertOrReplace(new PeriodObservationRow
+            {
+                Id = observationKey,
+                PeriodPlanSnapshotId = planKey,
+                ObservedOn = FormatDate(observation.ObservedOn),
+                ObservedBalance = observation.ObservedBalance,
+                ObservedLivingSpend = observation.ObservedLivingSpend,
+                Note = observation.Note,
+                CreatedAtUtc = Timestamp(observation.CreatedAtUtc),
+                UpdatedAtUtc = Timestamp(observation.UpdatedAtUtc)
+            });
+            connection.Execute(
+                "DELETE FROM period_observation_payments WHERE PeriodObservationId = ?",
+                observationKey);
+            connection.Execute(
+                "DELETE FROM period_observation_flows WHERE PeriodObservationId = ?",
+                observationKey);
+            foreach (var payment in observation.Payments)
+            {
+                connection.Insert(new PeriodObservationPaymentRow
+                {
+                    Id = Key(payment.Id),
+                    PeriodObservationId = observationKey,
+                    PeriodPlanPaymentLineId = Key(payment.PeriodPlanPaymentLineId),
+                    Status = (int)payment.Status,
+                    ActualAmount = payment.ActualAmount,
+                    ActualPaymentDate = FormatNullableDate(payment.ActualPaymentDate),
+                    Note = payment.Note
+                });
+            }
+
+            foreach (var flow in observation.Flows)
+            {
+                connection.Insert(new PeriodObservationFlowRow
+                {
+                    Id = Key(flow.Id),
+                    PeriodObservationId = observationKey,
+                    Type = (int)flow.Type,
+                    Name = flow.Name,
+                    Category = flow.Category,
+                    Date = FormatDate(flow.Date),
+                    Amount = flow.Amount
+                });
+            }
+        });
+    }
+
+    public async Task DeletePeriodObservationAsync(
+        Guid periodPlanSnapshotId,
+        CancellationToken cancellationToken = default)
+    {
+        await InitializeAsync(cancellationToken);
+        var key = Key(periodPlanSnapshotId);
+        await _database.ExecuteAsync(
+            "DELETE FROM period_observation_payments WHERE PeriodObservationId IN " +
+            "(SELECT Id FROM period_observations WHERE PeriodPlanSnapshotId = ?)",
+            key);
+        await _database.ExecuteAsync(
+            "DELETE FROM period_observation_flows WHERE PeriodObservationId IN " +
+            "(SELECT Id FROM period_observations WHERE PeriodPlanSnapshotId = ?)",
+            key);
+        await _database.ExecuteAsync(
+            "DELETE FROM period_observations WHERE PeriodPlanSnapshotId = ?",
+            key);
     }
 
     public async Task<IReadOnlyList<SimulationDraft>> GetSimulationDraftsAsync(

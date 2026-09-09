@@ -18,6 +18,7 @@ public sealed class CoinFlowService(
     FinancialSnapshotService snapshotService,
     HistoricalPlanRevisionService historicalPlanRevisionService,
     PeriodReviewService reviewService,
+    PeriodProgressService periodProgressService,
     HistoryQueryService historyService)
 {
     public Task InitializeAsync(CancellationToken cancellationToken = default) =>
@@ -1111,6 +1112,50 @@ public sealed class CoinFlowService(
         CancellationToken cancellationToken = default) =>
         reviewService.GetContextAsync(planId, cancellationToken);
 
+    /// <summary>
+    /// Dönem boyunca girilen gözlem, checkpoint'te review taslağına dönüşür
+    /// (I15). Kullanıcı sıfırdan girmez; kendi girdiğini onaylar.
+    /// </summary>
+    /// <remarks>
+    /// Gözlem yoksa null döner ve review ekranı bugünkü gibi boş açılır.
+    /// </remarks>
+    public async Task<PeriodReviewDraft?> GetObservedReviewDraftAsync(
+        Guid periodPlanSnapshotId,
+        CancellationToken cancellationToken = default)
+    {
+        var observation = await store.GetPeriodObservationAsync(
+            periodPlanSnapshotId,
+            cancellationToken);
+        if (observation is null)
+        {
+            return null;
+        }
+
+        return new PeriodReviewDraft(
+            periodPlanSnapshotId,
+            observation.Payments
+                .Select(x => new ActualPaymentDraft(
+                    x.PeriodPlanPaymentLineId,
+                    x.Status,
+                    x.ActualAmount,
+                    x.ActualPaymentDate,
+                    x.Note))
+                .ToArray(),
+            observation.ObservedLivingSpend,
+            0m,
+            observation.Flows
+                .Select(x => new ActualFlowDraft(
+                    x.Type,
+                    x.Name,
+                    x.Category,
+                    x.Date,
+                    x.Amount))
+                .ToArray(),
+            [],
+            observation.ObservedBalance,
+            observation.Note);
+    }
+
     public Task<PeriodReviewPreview> PreviewPeriodReviewAsync(
         PeriodReviewDraft draft,
         CancellationToken cancellationToken = default) =>
@@ -1121,10 +1166,15 @@ public sealed class CoinFlowService(
         CancellationToken cancellationToken = default)
     {
         var plan = await GetFinancialPlanAsync(cancellationToken);
-        return await reviewService.FinalizeAsync(
+        var result = await reviewService.FinalizeAsync(
             plan,
             draft,
             cancellationToken);
+        // Defter PeriodActual'a dönüştü; iki kopya kalmaz (I15).
+        await store.DeletePeriodObservationAsync(
+            draft.PeriodPlanSnapshotId,
+            cancellationToken);
+        return result;
     }
 
     public Task<IReadOnlyList<HistoryPeriod>> GetHistoryPeriodsAsync(
@@ -1142,6 +1192,111 @@ public sealed class CoinFlowService(
         historyService.GetRecentSummaryAsync(
             periodCount,
             cancellationToken);
+
+    /// <summary>
+    /// Ana Sayfa'nın verisi: mevcut dönemin donmuş planı + gözlem defteri.
+    /// Projeksiyon motoru çalışmaz (I16).
+    /// </summary>
+    public Task<PeriodProgress?> GetPeriodProgressAsync(
+        CancellationToken cancellationToken = default) =>
+        periodProgressService.GetAsync(cancellationToken);
+
+    /// <summary>
+    /// "Bugün şu kadar param var." Dönem içi gözlem — snapshot zincirine
+    /// dokunmaz (I14), donmuş planı ve review checkpoint'ini değiştirmez.
+    /// </summary>
+    /// <remarks>
+    /// Bu metot bilinçli olarak <see cref="RefreshCurrentFinancialStateAsync"/>
+    /// çağırmaz. O bir checkpoint işlemidir; dönem içinde çağrılırsa açık
+    /// planın penceresi kısalır, orijinal plan yetim kalır ve plan/gerçek
+    /// karşılaştırması anlamsızlaşır. Ölçüldü, `PLAN-IZOLASYON.md`.
+    /// </remarks>
+    public async Task<PeriodObservation> ObserveCurrentBalanceAsync(
+        decimal balance,
+        CancellationToken cancellationToken = default)
+    {
+        var openPlan = await ResolveOpenPlanAsync(cancellationToken);
+        var existing = await store.GetPeriodObservationAsync(
+            openPlan.Id,
+            cancellationToken);
+        var now = clock.UtcNow;
+        var observation = (existing ?? new PeriodObservation
+            {
+                PeriodPlanSnapshotId = openPlan.Id,
+                CreatedAtUtc = now
+            }) with
+            {
+                ObservedOn = clock.Today,
+                ObservedBalance = balance,
+                UpdatedAtUtc = now
+            };
+        await store.UpsertPeriodObservationAsync(
+            observation,
+            cancellationToken);
+        return observation;
+    }
+
+    /// <summary>
+    /// Bir plan satırının gözlenen durumu: ödendi / farklı tutar / ödenmedi.
+    /// Checkpoint'te review'a olduğu gibi taşınır (I15).
+    /// </summary>
+    public async Task<PeriodObservation> ObservePaymentAsync(
+        Guid periodPlanPaymentLineId,
+        ActualPaymentStatus status,
+        decimal actualAmount,
+        DateOnly? actualPaymentDate = null,
+        string note = "",
+        CancellationToken cancellationToken = default)
+    {
+        var openPlan = await ResolveOpenPlanAsync(cancellationToken);
+        if (openPlan.PaymentLines.All(x => x.Id != periodPlanPaymentLineId))
+        {
+            throw new InvalidOperationException(
+                "Gözlenen ödeme satırı açık dönem planında bulunamadı.");
+        }
+
+        var now = clock.UtcNow;
+        var existing = await store.GetPeriodObservationAsync(
+            openPlan.Id,
+            cancellationToken);
+        var observation = existing ?? new PeriodObservation
+        {
+            PeriodPlanSnapshotId = openPlan.Id,
+            ObservedOn = clock.Today,
+            CreatedAtUtc = now
+        };
+        var payments = observation.Payments
+            .Where(x => x.PeriodPlanPaymentLineId != periodPlanPaymentLineId)
+            .Append(new PeriodObservationPayment
+            {
+                PeriodObservationId = observation.Id,
+                PeriodPlanPaymentLineId = periodPlanPaymentLineId,
+                Status = status,
+                ActualAmount = actualAmount,
+                ActualPaymentDate = actualPaymentDate ?? clock.Today,
+                Note = note.Trim()
+            })
+            .ToArray();
+        observation = observation with
+        {
+            Payments = payments,
+            ObservedOn = clock.Today,
+            UpdatedAtUtc = now
+        };
+        await store.UpsertPeriodObservationAsync(
+            observation,
+            cancellationToken);
+        return observation;
+    }
+
+    private async Task<PeriodPlanSnapshot> ResolveOpenPlanAsync(
+        CancellationToken cancellationToken)
+    {
+        var history = await store.GetFinancialHistoryAsync(cancellationToken);
+        return PeriodProgressService.ResolveOpenPlan(history) ??
+               throw new InvalidOperationException(
+                   "Gözlem kaydedebilmek için önce güncel bir dönem planı gerekir.");
+    }
 
     public async Task<FinancialSnapshot> RefreshCurrentFinancialStateAsync(
         decimal startingSavings,

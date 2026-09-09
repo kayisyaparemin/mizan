@@ -73,7 +73,23 @@ Faiz, bir bakiyenin devrettiği anda değil, devrettiği bakiyenin girdiği ekst
 
 Senaryoyu kaydetmek ayrı bir işlemdir. `CoinFlowService.ApplySimulationAsync` açık `confirmed=true` olmadan kalıcı değişiklik yapmaz. Her hesaplanan scenario kalıcı bir application kimliği taşır; entity ve child charge/taksit kimlikleri bundan deterministik üretilir. Böylece hızlı çift tıklama veya retry aynı canonical kaydı ikinci kez oluşturmaz. Apply switch'i nakit gideri `PlannedLargeExpense`, finansmanı `TemporaryPaymentPlan`, kart alışverişini seçili `CreditCard` aggregate'ının charge'ları, gelecek geliri `OneTimeIncome`, maaş ve ödeme düzeni değişikliklerini yeni effective-dated history kayıtları olarak persist eder. Maaş/strategy geçmişi apply sırasında overwrite edilmez.
 
-Mevcut tutar `CoinFlowService.RefreshCurrentFinancialStateAsync` ile güncellenir: tutar ve `ProjectionAnchorDate = clock.Today` tek bir snapshot olarak birlikte yazılır, ikisi ayrılamaz — "X tarihinde Y param vardı" tek cümledir. Her güncelleme geçmişe yeni bir `FinancialSnapshot` düşer; öncekinin üzerine yazılmaz (I5) ve geçmiş yeniden hesaplanmaz (I6).
+### Üç zaman dilimi
+
+Uygulamanın üç amacı vardır ve her biri tek bir ekrana ve tek bir veri kaynağına sahiptir (I16):
+
+| Zaman | Ekran | Kaynak |
+|---|---|---|
+| `t+1 … t+12` | 12 Dönem · Simülatör | `FinancialProjectionCalculator` |
+| `[t0, t1)` | Ana Sayfa | donmuş `PeriodPlanSnapshot` + `PeriodObservation` |
+| `< t0` | Geçmiş | `PeriodActual` + `PlanActualComparisonCalculator` |
+
+Zaman dilimleri arasında veri yalnız **checkpoint'te** akar: dönem açılışında projeksiyon donar (`FinancialSnapshotService.Build` → `Freeze`), dönem kapanışında gözlem `PeriodActual`'a dönüşür ve onaylanan dönem sonu yeni projeksiyonun çapası olur (`FinalizePeriodReviewAsync`). Dönem içinde snapshot zinciri **ilerlemez** (I14).
+
+`PeriodObservation`, açık dönemin gözlem defteridir (`period_observations` + payment/flow child tabloları, şema v13). Alanları `PeriodReviewDraft` ile birebir eşlenir; checkpoint'te `GetObservedReviewDraftAsync` ile review'ı doldurur ve finalization sırasında tüketilip silinir (I15). Böylece dönem içi gözlem ile dönem sonu gerçekleşmesi iki ayrı veri kümesi değildir — aynı defter, farklı zamanda okunur.
+
+`PeriodProgressService` Ana Sayfa'nın motorudur ve yeni bir hesap yapmaz: donmuş planı (varsa en güncel `PeriodPlanRevision` uygulanmış hâlini) gözlemle toplar. Dönem sonu tahmini `gözlenen bakiye − kalan planlı ödemeler − kalan yaşam gideri` ile türetilir; gözlenen bakiye yoksa `null` döner ve ekran gidişat bloğunu hiç göstermez.
+
+`RefreshCurrentFinancialStateAsync` yalnız checkpoint yolundan çağrılır (kurulum ve review finalization). Dönem içinde çağrılırsa açık planın penceresi kısalır, orijinal plan yetim kalır ve plan/gerçek karşılaştırması anlamsızlaşır — ölçülmüş bir bozulmadır, `PLAN-IZOLASYON.md`.
 
 Kart kontrol ekranındaki dört ödeme kararı ayrı kapsamlara sahiptir ve model tarafında da ayrıdır: `CurrentStatementPaymentPlan` (tek, kesilmiş ekstre), `CreditCardPaymentPlan` (tek, belirli bir vade), `PaymentStrategy` (tüm gelecek ekstreler), `ProjectionFallbackStrategy` (karar verilmemiş ekstrelerde hesaplama varsayımı — bir ödeme kararı değil). Sunum bu kapsamları zaman eksenine göre gruplar; `CreditCardPaymentResolution` hangi kapsamın geçerli olduğunu döndürdüğü için her satır kararın nereden geldiğini yazabilir.
 

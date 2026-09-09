@@ -1,4 +1,5 @@
 using CoinFlow.Domain.Calculations;
+using CoinFlow.Domain.Models;
 using CoinFlow.Infrastructure.Persistence;
 
 namespace CoinFlow.Tests;
@@ -142,6 +143,67 @@ public sealed class ProductContractInvariantTests
                         .Where(x => x.Type == ObligationType.CreditCard)
                         .Sum(x => x.Amount));
             }
+        });
+    }
+
+    /// <summary>
+    /// I14 — Snapshot zinciri yalnız checkpoint'te ilerler. Dönem içi gözlem
+    /// ne <c>FinancialSnapshot</c> ne de <c>PeriodPlanSnapshot</c> üretir.
+    /// </summary>
+    /// <remarks>
+    /// Bu invariant ölçülmüş bir bozulmadan doğdu: dönem içinde bakiye
+    /// güncellemek checkpoint'i öne çekiyor, donmuş planın penceresini
+    /// kısaltıyor ve orijinal planı yetim bırakıyordu.
+    /// </remarks>
+    [Fact]
+    public async Task I14_MidPeriodObservationDoesNotAdvanceTheSnapshotChain()
+    {
+        await WithSeededService(async service =>
+        {
+            var before = await service.GetPeriodProgressAsync();
+            Assert.NotNull(before);
+
+            await service.ObserveCurrentBalanceAsync(-12_345m);
+            var line = before!.RemainingLines.FirstOrDefault();
+            if (line is not null)
+            {
+                await service.ObservePaymentAsync(
+                    line.Id,
+                    ActualPaymentStatus.Paid,
+                    line.PlannedAmount ?? 0m);
+            }
+
+            var after = await service.GetPeriodProgressAsync();
+            Assert.NotNull(after);
+            Assert.Equal(before.PeriodPlanSnapshotId, after!.PeriodPlanSnapshotId);
+            Assert.Equal(before.PeriodStart, after.PeriodStart);
+            Assert.Equal(before.PeriodEnd, after.PeriodEnd);
+            Assert.Equal(
+                before.PlannedEndingSavings,
+                after.PlannedEndingSavings);
+        });
+    }
+
+    /// <summary>
+    /// I16 — Her ekran tek zaman dilimine sahiptir. Dönem içi gözlem gelecek
+    /// projeksiyonuna girmez; 12 Dönem checkpoint planını göstermeye devam eder.
+    /// </summary>
+    [Fact]
+    public async Task I16_ObservationDoesNotLeakIntoTheProjection()
+    {
+        await WithSeededService(async service =>
+        {
+            var before = await service.GetFuturePeriodsAsync(periodCount: 12);
+            var beforeEndings = before
+                .Select(x => x.EndingProjectedSavings)
+                .ToArray();
+
+            await service.ObserveCurrentBalanceAsync(-999_999m);
+
+            var after = await service.GetFuturePeriodsAsync(periodCount: 12);
+            Assert.Equal(
+                beforeEndings,
+                after.Select(x => x.EndingProjectedSavings));
         });
     }
 

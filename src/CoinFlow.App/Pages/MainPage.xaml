@@ -83,14 +83,26 @@
                 </VerticalStackLayout>
             </Border>
 
+            <!-- Ana Sayfa mevcut döneme aittir (I16). Gelecek 12 dönemin
+                 rakamları 12 Dönem ekranının, kapanmış dönemlerin rakamları
+                 Geçmiş'in; buradaki her sayı donmuş plandan veya gözlemden
+                 gelir. Aşağıdaki linkler bilerek rakamsızdır. -->
             <VerticalStackLayout IsVisible="{Binding HasFinancialPlan}"
                                  Spacing="14">
 
-                <!-- İlk iş: t anındaki bakiye. İleriye dönük parametreler bir
-                     kez girildikten sonra planı değiştiren tek şey bu; uygulamayı
-                     açan kişi işe onu güncelleyerek başlamalı. Güncellemek
-                     rakamla birlikte çapayı da bugüne taşır — "bugün şu kadar
-                     param var" tek bir cümledir, ikisi ayrılamaz. -->
+                <!-- Dönem başlığı ve ne kadarının geçtiği -->
+                <VerticalStackLayout Spacing="4">
+                    <Label Text="{Binding CurrentPeriodText}"
+                           Style="{StaticResource PageTitle}"
+                           FontSize="22" />
+                    <Label Text="{Binding PeriodElapsedText}"
+                           Style="{StaticResource MutedText}" />
+                    <ProgressBar Progress="{Binding PeriodElapsedRatio}"
+                                 ProgressColor="{StaticResource ProjectionText}" />
+                </VerticalStackLayout>
+
+                <!-- MEVCUT TUTAR — dönem içi gözlem. Snapshot zincirine
+                     dokunmaz (I14): plan da, geçmiş de değişmez. -->
                 <Border BackgroundColor="{StaticResource SoftSky}"
                         StrokeThickness="0">
                     <VerticalStackLayout Spacing="8">
@@ -101,176 +113,158 @@
                                    Keyboard="Numeric"
                                    controls:SignedNumericEntry.AllowNegative="True" />
                             <Button Grid.Column="1"
-                                    Text="Güncelle"
+                                    Text="Gözlemi Kaydet"
                                     Padding="16,10"
                                     MinimumHeightRequest="44"
                                     IsEnabled="{Binding CanSaveCurrentBalance}"
                                     Command="{Binding SaveCurrentBalanceCommand}" />
                         </Grid>
-                        <Label Text="{Binding CurrentSnapshotDate, StringFormat='Son güncelleme: {0}'}"
+                        <Label Text="{Binding LastObservationText}"
                                Style="{StaticResource MutedText}" />
-                        <Label Text="Güncellediğinde plan bugünden itibaren yeniden kurulur; bu tarihten önceki hareketler gelecek planına girmez."
+                        <Label Text="Bu bir gözlem: dönem planın ve geçmiş kaydın değişmez. Dönemi kapatırken kullanılacak."
                                Style="{StaticResource MutedText}" />
                     </VerticalStackLayout>
                 </Border>
 
-                <!-- ============ PRIMARY ============ -->
-                <Border BackgroundColor="{StaticResource HeroSurface}"
-                        StrokeThickness="0"
-                        Padding="20">
+                <!-- PLAN — dönem başında dondurulan taahhüt -->
+                <Border>
                     <VerticalStackLayout Spacing="6">
-                        <Label Text="{Binding CurrentPeriodText}"
-                               Style="{StaticResource Eyebrow}" />
-                        <Label Text="{Binding HeadlineAmount}"
-                               Style="{StaticResource PrimaryAmount}" />
-                        <Label Text="{Binding HeadlineCaption}"
-                               Style="{StaticResource PrimaryCaption}" />
-                        <BoxView HeightRequest="1"
-                                 Color="{StaticResource Line}"
-                                 Margin="0,6" />
-                        <Label Text="{Binding PeriodVerdict}"
-                               Style="{StaticResource AlertBody}" />
-                        <Label Text="{Binding CarryOverMessage}"
-                               IsVisible="{Binding HasCarryOverDeficit}"
-                               Style="{StaticResource MutedText}" />
+                        <Label Text="PLAN" Style="{StaticResource Eyebrow}" />
+                        <Label Text="{Binding PlanFrozenText}"
+                               Style="{StaticResource MutedText}"
+                               FontSize="12" />
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                            <Label Text="Dönem sonu"
+                                   Style="{StaticResource MutedText}"
+                                   VerticalTextAlignment="Center" />
+                            <Label Grid.Column="1"
+                                   Text="{Binding PlannedEndingText}"
+                                   Style="{StaticResource SecondaryAmount}" />
+                        </Grid>
                     </VerticalStackLayout>
                 </Border>
 
-                <!-- "Bu dönem nasıl oluşuyor" tablosu buradan kalktı: dönem
-                     sonu rakamını yukarıdaki özet zaten söylüyordu, kırılımın
-                     tamamı ise Dönem Detayı'nda daha ayrıntılı duruyor. -->
+                <!-- GİDİŞAT — yalnız gözlem varsa. Rakam uydurulmaz. -->
+                <Border IsVisible="{Binding HasObservation}"
+                        BackgroundColor="{StaticResource ProjectionSurface}">
+                    <VerticalStackLayout Spacing="6">
+                        <Label Text="GİDİŞAT" Style="{StaticResource Eyebrow}" />
+                        <Label Text="{Binding ObservationDateText}"
+                               Style="{StaticResource MutedText}"
+                               FontSize="12" />
+                        <Grid ColumnDefinitions="*,Auto"
+                              RowDefinitions="Auto,Auto,Auto"
+                              ColumnSpacing="12"
+                              RowSpacing="6">
+                            <Label Text="Şu an"
+                                   Style="{StaticResource MutedText}" />
+                            <Label Grid.Column="1"
+                                   Text="{Binding ObservedBalanceText}"
+                                   FontFamily="OpenSansSemibold" />
+                            <Label Grid.Row="1"
+                                   Text="Dönem sonu tahmini"
+                                   Style="{StaticResource MutedText}" />
+                            <Label Grid.Row="1"
+                                   Grid.Column="1"
+                                   Text="{Binding ProjectedEndingText}"
+                                   Style="{StaticResource SecondaryAmount}" />
+                            <Label Grid.Row="2"
+                                   Text="Plana göre fark"
+                                   FontFamily="OpenSansSemibold" />
+                            <Label Grid.Row="2"
+                                   Grid.Column="1"
+                                   Text="{Binding DeviationText}"
+                                   FontFamily="OpenSansSemibold"
+                                   TextColor="{StaticResource PositiveText}">
+                                <Label.Triggers>
+                                    <DataTrigger TargetType="Label"
+                                                 Binding="{Binding IsDeviationNegative}"
+                                                 Value="True">
+                                        <Setter Property="TextColor"
+                                                Value="{StaticResource DeficitText}" />
+                                    </DataTrigger>
+                                </Label.Triggers>
+                            </Label>
+                        </Grid>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- KALAN — bu dönemden geriye ne var. Bugünkü "Yaklaşan
+                     ödemeler" bölümünün yerini alır; ayrı liste tutulmaz. -->
+                <Border>
+                    <VerticalStackLayout Spacing="10">
+                        <Label Text="KALAN" Style="{StaticResource Eyebrow}" />
+                        <Label Text="{Binding RemainingWindowText}"
+                               Style="{StaticResource MutedText}"
+                               FontSize="12" />
+
+                        <Label Text="Bu dönemde planlı ödemen kalmadı."
+                               IsVisible="{Binding HasNoRemainingLines}"
+                               Style="{StaticResource EmptyStateBody}" />
+
+                        <VerticalStackLayout BindableLayout.ItemsSource="{Binding RemainingLines}"
+                                             IsVisible="{Binding HasRemainingLines}"
+                                             Spacing="9">
+                            <BindableLayout.ItemTemplate>
+                                <DataTemplate x:DataType="models:RemainingPaymentLine">
+                                    <Grid ColumnDefinitions="64,*,Auto"
+                                          RowDefinitions="Auto,Auto">
+                                        <Label Text="{Binding Date}"
+                                               FontFamily="OpenSansSemibold" />
+                                        <Label Grid.Column="1"
+                                               Text="{Binding Name}" />
+                                        <Label Grid.Column="2"
+                                               Text="{Binding Amount}"
+                                               FontFamily="OpenSansSemibold" />
+                                        <Label Grid.Row="1"
+                                               Grid.Column="1"
+                                               Grid.ColumnSpan="2"
+                                               Text="{Binding Detail}"
+                                               Style="{StaticResource MutedText}" />
+                                    </Grid>
+                                </DataTemplate>
+                            </BindableLayout.ItemTemplate>
+                        </VerticalStackLayout>
+
+                        <Grid ColumnDefinitions="*,Auto"
+                              IsVisible="{Binding HasRemainingLines}">
+                            <Label Text="Toplam"
+                                   FontFamily="OpenSansSemibold" />
+                            <Label Grid.Column="1"
+                                   Text="{Binding RemainingTotalText}"
+                                   FontFamily="OpenSansSemibold" />
+                        </Grid>
+                    </VerticalStackLayout>
+                </Border>
+
+                <Button Text="Bu dönemi kapat →"
+                        IsVisible="{Binding IsPeriodClosable}"
+                        Command="{Binding OpenPeriodReviewCommand}" />
+
                 <Button Text="Bu dönem nasıl oluşuyor →"
                         Style="{StaticResource LinkButton}"
                         Command="{Binding OpenCurrentPeriodDetailCommand}" />
 
-
-                <!-- ============ SECONDARY ============ -->
-
-                <!-- Yaklaşan ödemeler: her zaman görünür, tıklamaya gerek yok -->
-                <Border>
-                    <VerticalStackLayout Spacing="10">
-                        <Label Text="Yaklaşan ödemeler"
-                               Style="{StaticResource CardHeading}" />
-
-                        <VerticalStackLayout Spacing="4"
-                                             IsVisible="{Binding HasNoUpcomingPayments}">
-                            <Label Text="Yaklaşan planlı ödemen yok."
-                                   Style="{StaticResource EmptyStateBody}" />
-                        </VerticalStackLayout>
-
-                        <VerticalStackLayout BindableLayout.ItemsSource="{Binding PreFirstSalaryPayments}"
-                                             IsVisible="{Binding HasPreFirstSalaryPayments}"
-                                             Spacing="9">
-                            <BindableLayout.ItemTemplate>
-                                <DataTemplate x:DataType="models:UpcomingPaymentLine">
-                                    <Grid ColumnDefinitions="64,*,Auto" RowDefinitions="Auto,Auto">
-                                        <Label Text="{Binding Date}" FontFamily="OpenSansSemibold" />
-                                        <Label Grid.Column="1" Text="{Binding Name}" />
-                                        <Label Grid.Column="2" Text="{Binding Amount}" FontFamily="OpenSansSemibold" />
-                                        <Label Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2"
-                                               Text="{Binding Detail}" Style="{StaticResource MutedText}" />
-                                    </Grid>
-                                </DataTemplate>
-                            </BindableLayout.ItemTemplate>
-                        </VerticalStackLayout>
-
-                        <VerticalStackLayout BindableLayout.ItemsSource="{Binding UpcomingPayments}"
-                                             IsVisible="{Binding HasUpcomingPayments}"
-                                             Spacing="9">
-                            <BindableLayout.ItemTemplate>
-                                <DataTemplate x:DataType="models:UpcomingPaymentLine">
-                                    <Grid ColumnDefinitions="64,*,Auto" RowDefinitions="Auto,Auto">
-                                        <Label Text="{Binding Date}" FontFamily="OpenSansSemibold" />
-                                        <Label Grid.Column="1" Text="{Binding Name}" />
-                                        <Label Grid.Column="2" Text="{Binding Amount}" FontFamily="OpenSansSemibold" />
-                                        <Label Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2"
-                                               Text="{Binding Detail}" Style="{StaticResource MutedText}" />
-                                    </Grid>
-                                </DataTemplate>
-                            </BindableLayout.ItemTemplate>
-                        </VerticalStackLayout>
-
-                        <Button Text="Tüm yükümlülüklerim →"
-                                Style="{StaticResource LinkButton}"
-                                Command="{Binding OpenCommitmentsCommand}" />
-                    </VerticalStackLayout>
-                </Border>
-
-                <!-- 12 dönem görünümü -->
-                <Border BackgroundColor="{StaticResource SoftSky}">
-                    <VerticalStackLayout Spacing="8">
-                        <Label Text="Önümüzdeki 12 dönem"
-                               Style="{StaticResource CardHeading}" />
-                        <Label Text="{Binding TwelveMonthSavings}"
-                               Style="{StaticResource SecondaryAmount}" />
-                        <Label Text="{Binding TwelveMonthCaption}"
-                               Style="{StaticResource MutedText}" />
-                        <Label Text="{Binding TightestPeriod}"
-                               Style="{StaticResource MutedText}" />
-                        <VerticalStackLayout Spacing="6"
-                                             IsVisible="{Binding HasTwelveMonthInterest}">
-                            <BoxView HeightRequest="1" Color="{StaticResource Line}" Margin="0,4" />
-                            <Label Text="Bu planda ödeyeceğin tahmini faiz"
-                                   Style="{StaticResource MutedText}" />
-                            <!-- Kırılım tek toplama katlanmıyor: ikisi ters
-                                 yönde hareket edebiliyor (kartı erken kapatmak
-                                 kart faizini düşürürken KMH faizini yükseltir),
-                                 tek rakam bunu gizler. -->
-                            <Grid ColumnDefinitions="*,Auto"
-                                  RowDefinitions="Auto,Auto,Auto"
-                                  RowSpacing="5">
-                                <Label Text="Kredi kartı" Style="{StaticResource MutedText}" />
-                                <Label Grid.Column="1"
-                                       Text="{Binding TwelveMonthCardInterest}" />
-                                <Label Grid.Row="1" Text="Finansman açığı (KMH)"
-                                       Style="{StaticResource MutedText}" />
-                                <Label Grid.Row="1" Grid.Column="1"
-                                       Text="{Binding TwelveMonthDeficitInterest}" />
-                                <Label Grid.Row="2" Text="Toplam faiz yükü"
-                                       FontFamily="OpenSansSemibold" />
-                                <Label Grid.Row="2" Grid.Column="1"
-                                       Text="{Binding TwelveMonthInterest}"
-                                       FontFamily="OpenSansSemibold" />
-                            </Grid>
-                        </VerticalStackLayout>
-                        <Button Text="Dönem dönem incele →"
-                                Style="{StaticResource LinkButton}"
-                                Command="{Binding OpenFutureMonthsCommand}" />
-                    </VerticalStackLayout>
-                </Border>
-
-                <!-- Kısa yollar: sahte modül değil, gerçek bağlantılar -->
+                <!-- Diğer zaman dilimlerine geçişler. Rakam taşımazlar (I16):
+                     12 dönem sonu, faiz kırılımı ve geçmiş özeti buradan
+                     kalktı; her biri kendi ekranının verisi. -->
                 <Border>
                     <VerticalStackLayout Spacing="12">
-                        <VerticalStackLayout Spacing="2">
-                            <Label Text="Finansal yapın"
-                                   Style="{StaticResource CardHeading}" />
-                            <Label Text="{Binding StructureSummary}"
-                                   Style="{StaticResource MutedText}" />
-                            <Button Text="Gelir ve ödemelerini yönet →"
-                                    Style="{StaticResource LinkButton}"
-                                    Command="{Binding OpenCommitmentsCommand}" />
-                        </VerticalStackLayout>
+                        <Button Text="Önümüzdeki 12 dönem →"
+                                Style="{StaticResource LinkButton}"
+                                Command="{Binding OpenFutureMonthsCommand}" />
                         <BoxView HeightRequest="1" Color="{StaticResource Line}" />
-                        <VerticalStackLayout Spacing="2">
-                            <Label Text="Geçmiş dönemler"
-                                   Style="{StaticResource CardHeading}" />
-                            <Label Text="{Binding HistorySummary}"
-                                   Style="{StaticResource MutedText}" />
-                            <Button Text="Geçmişi gör →"
-                                    Style="{StaticResource LinkButton}"
-                                    Command="{Binding OpenHistoryCommand}" />
-                        </VerticalStackLayout>
+                        <Button Text="Geçmiş dönemler →"
+                                Style="{StaticResource LinkButton}"
+                                Command="{Binding OpenHistoryCommand}" />
                         <BoxView HeightRequest="1" Color="{StaticResource Line}" />
-                        <VerticalStackLayout Spacing="2">
-                            <Label Text="Karar denemesi"
-                                   Style="{StaticResource CardHeading}" />
-                            <Label Text="Planını değiştirmeden 'ya şöyle yapsam?' sorusunu dene."
-                                   Style="{StaticResource MutedText}" />
-                            <Button Text="Simülatörü aç →"
-                                    Style="{StaticResource LinkButton}"
-                                    Command="{Binding OpenSimulationCommand}" />
-                        </VerticalStackLayout>
+                        <Button Text="Gelir ve ödemelerini yönet →"
+                                Style="{StaticResource LinkButton}"
+                                Command="{Binding OpenCommitmentsCommand}" />
+                        <BoxView HeightRequest="1" Color="{StaticResource Line}" />
+                        <Button Text="Simülatörü aç →"
+                                Style="{StaticResource LinkButton}"
+                                Command="{Binding OpenSimulationCommand}" />
                     </VerticalStackLayout>
                 </Border>
 

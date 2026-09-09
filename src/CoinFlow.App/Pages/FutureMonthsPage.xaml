@@ -13,6 +13,20 @@
                 <Label Text="FİNANSAL GÖRÜNÜM" Style="{StaticResource Eyebrow}" />
                 <Label Text="12 Dönem" Style="{StaticResource PageTitle}" />
                 <Label Text="Önümüzdeki 12 dönemde finansal durumunun nasıl değişeceğini gör." Style="{StaticResource MutedText}" />
+                <!-- Sapma uyarısı: projeksiyon checkpoint'e bağlı kalır (I16),
+                     ama mevcut dönemde gözlenen sapmayı söylemek zorunda. -->
+                <Border Padding="14"
+                        IsVisible="{Binding HasDeviationNotice}"
+                        BackgroundColor="{StaticResource WarningSurface}">
+                    <VerticalStackLayout Spacing="6">
+                        <Label Text="{Binding DeviationNoticeText}"
+                               TextColor="{StaticResource WarningText}" />
+                        <Button Text="Mevcut dönemi gör →"
+                                Style="{StaticResource LinkButton}"
+                                Command="{Binding OpenCurrentPeriodCommand}" />
+                    </VerticalStackLayout>
+                </Border>
+
                 <Border Padding="14"
                         IsVisible="{Binding HasInterestSummary}"
                         BackgroundColor="{StaticResource SoftPink}">

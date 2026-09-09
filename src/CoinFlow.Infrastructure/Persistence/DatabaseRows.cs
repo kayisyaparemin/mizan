@@ -376,3 +376,40 @@ internal sealed class SimulationDraftConditionRow
     public int? CardPaymentType { get; set; }
     public bool AppliesToAllStatements { get; set; }
 }
+
+[Table("period_observations")]
+internal sealed class PeriodObservationRow
+{
+    [PrimaryKey] public string Id { get; set; } = string.Empty;
+    [Indexed] public string PeriodPlanSnapshotId { get; set; } = string.Empty;
+    public string ObservedOn { get; set; } = string.Empty;
+    public decimal? ObservedBalance { get; set; }
+    public decimal ObservedLivingSpend { get; set; }
+    public string Note { get; set; } = string.Empty;
+    public string CreatedAtUtc { get; set; } = string.Empty;
+    public string UpdatedAtUtc { get; set; } = string.Empty;
+}
+
+[Table("period_observation_payments")]
+internal sealed class PeriodObservationPaymentRow
+{
+    [PrimaryKey] public string Id { get; set; } = string.Empty;
+    [Indexed] public string PeriodObservationId { get; set; } = string.Empty;
+    public string PeriodPlanPaymentLineId { get; set; } = string.Empty;
+    public int Status { get; set; }
+    public decimal ActualAmount { get; set; }
+    public string? ActualPaymentDate { get; set; }
+    public string Note { get; set; } = string.Empty;
+}
+
+[Table("period_observation_flows")]
+internal sealed class PeriodObservationFlowRow
+{
+    [PrimaryKey] public string Id { get; set; } = string.Empty;
+    [Indexed] public string PeriodObservationId { get; set; } = string.Empty;
+    public int Type { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string Category { get; set; } = string.Empty;
+    public string Date { get; set; } = string.Empty;
+    public decimal Amount { get; set; }
+}

@@ -59,6 +59,7 @@ public static class MauiProgram
         builder.Services.AddSingleton<FinancialInstrumentReconciliationService>();
         builder.Services.AddSingleton<PlanActualComparisonCalculator>();
         builder.Services.AddSingleton<PeriodReviewService>();
+        builder.Services.AddSingleton<PeriodProgressService>();
         builder.Services.AddSingleton<HistoryQueryService>();
         builder.Services.AddSingleton<IPdfTextExtractor, PdfPigPdfTextExtractor>();
         builder.Services.AddSingleton<ICreditCardStatementParser, AkbankAxessStatementParser>();

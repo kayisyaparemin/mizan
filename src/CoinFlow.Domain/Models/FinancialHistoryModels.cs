@@ -192,3 +192,52 @@ public sealed record FinancialReviewCommit(
     IReadOnlyList<TemporaryPaymentPlan> UpdatedPaymentPlans,
     IReadOnlyList<CreditCard> UpdatedCreditCards,
     IReadOnlyList<PlannedLargeExpense> UpdatedLargeExpenses);
+
+/// <summary>
+/// Açık dönemin gözlem defteri: dönem içinde gerçekte ne olduğu, henüz
+/// kesinleşmemiş hâliyle. Alanları <c>PeriodReviewDraft</c> ile birebir
+/// eşlenir — checkpoint'te review'ı doldurur ve tüketilir (I15).
+/// </summary>
+/// <remarks>
+/// Bu kayıt snapshot zincirinin dışındadır. Yazılması ne
+/// <see cref="FinancialSnapshot"/> ne de <see cref="PeriodPlanSnapshot"/>
+/// üretir/değiştirir (I14); projeksiyona da girmez. Açık plan başına tek satır.
+/// </remarks>
+public sealed record PeriodObservation
+{
+    public Guid Id { get; init; } = Guid.NewGuid();
+    public Guid PeriodPlanSnapshotId { get; init; }
+    public DateOnly ObservedOn { get; init; }
+    /// <summary>"Bugün şu kadar param var." Girilmediyse gidişat hesaplanmaz.</summary>
+    public decimal? ObservedBalance { get; init; }
+    public decimal ObservedLivingSpend { get; init; }
+    public string Note { get; init; } = string.Empty;
+    public DateTimeOffset CreatedAtUtc { get; init; }
+    public DateTimeOffset UpdatedAtUtc { get; init; }
+    public IReadOnlyList<PeriodObservationPayment> Payments { get; init; } = [];
+    public IReadOnlyList<PeriodObservationFlow> Flows { get; init; } = [];
+}
+
+/// <summary>Donmuş planın bir ödeme satırının gözlenen hâli.</summary>
+public sealed record PeriodObservationPayment
+{
+    public Guid Id { get; init; } = Guid.NewGuid();
+    public Guid PeriodObservationId { get; init; }
+    public Guid PeriodPlanPaymentLineId { get; init; }
+    public ActualPaymentStatus Status { get; init; }
+    public decimal ActualAmount { get; init; }
+    public DateOnly? ActualPaymentDate { get; init; }
+    public string Note { get; init; } = string.Empty;
+}
+
+/// <summary>Planda olmayan, dönem içinde gerçekleşen gelir veya gider.</summary>
+public sealed record PeriodObservationFlow
+{
+    public Guid Id { get; init; } = Guid.NewGuid();
+    public Guid PeriodObservationId { get; init; }
+    public ActualFlowType Type { get; init; }
+    public string Name { get; init; } = string.Empty;
+    public string Category { get; init; } = string.Empty;
+    public DateOnly Date { get; init; }
+    public decimal Amount { get; init; }
+}

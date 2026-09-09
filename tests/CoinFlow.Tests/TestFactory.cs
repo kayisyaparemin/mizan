@@ -85,6 +85,7 @@ internal static class TestFactory
             snapshotService,
             historicalPlanRevisionService,
             reviewService,
+            new PeriodProgressService(store, clock),
             new HistoryQueryService(store, comparison));
     }
 

@@ -86,6 +86,16 @@ public sealed record UpcomingPaymentLine(
     string Amount,
     string Detail);
 
+/// <summary>
+/// Açık dönemin donmuş planında kalan, henüz ödenmiş işaretlenmemiş satır.
+/// Kaynağı gelecek projeksiyonu değil, dönemin kendi planıdır (I16).
+/// </summary>
+public sealed record RemainingPaymentLine(
+    string Date,
+    string Name,
+    string Amount,
+    string Detail);
+
 public sealed record CardPaymentPreferenceLine(
     Guid Id,
     string Choice,

@@ -27,6 +27,15 @@ public partial class FutureMonthsViewModel(
     [ObservableProperty] private string totalInterestCost = "—";
     [ObservableProperty] private bool hasInterestSummary;
 
+    /// <summary>
+    /// 12 Dönem checkpoint planını gösterir ve kaymaz (I16). Ama mevcut
+    /// dönemde sapma gözlendiyse bunu söylemek zorunda: kullanıcı yanlış
+    /// olduğunu bildiği bir rakama bakıp ekranın susmasıyla karşılaşmamalı.
+    /// Gözlem projeksiyona GİRMEZ, yalnız bu uyarıyı üretir.
+    /// </summary>
+    [ObservableProperty] private bool hasDeviationNotice;
+    [ObservableProperty] private string deviationNoticeText = string.Empty;
+
     [RelayCommand]
     public async Task LoadAsync()
     {
@@ -82,6 +91,7 @@ public partial class FutureMonthsViewModel(
                 interest.DeficitFinancingInterest, 2);
             TotalInterestCost = Money(interest.TotalInterestCost, 2);
             HasInterestSummary = interest.TotalInterestCost > 0m;
+            await RefreshDeviationNoticeAsync();
             HasTargetResult = false;
             EmptyStateMessage = plan.Salaries.Count == 0
                 ? "12 dönemlik planı oluşturmak için önce gelir bilgisi ekle."
@@ -158,6 +168,27 @@ public partial class FutureMonthsViewModel(
 
     private static string PeriodText(SalaryPeriod period) =>
         $"{period.Start.ToString("dd MMM", TurkishCulture)} → {period.End.ToString("dd MMM yyyy", TurkishCulture)}";
+
+    [RelayCommand]
+    private Task OpenCurrentPeriodAsync() =>
+        Shell.Current.GoToAsync("//dashboard/dashboard-content");
+
+    private async Task RefreshDeviationNoticeAsync()
+    {
+        var progress = await service.GetPeriodProgressAsync();
+        if (progress?.Deviation is not { } deviation || deviation == 0m)
+        {
+            HasDeviationNotice = false;
+            DeviationNoticeText = string.Empty;
+            return;
+        }
+
+        HasDeviationNotice = true;
+        DeviationNoticeText =
+            $"Bu projeksiyon {progress.PeriodStart.ToString("d MMMM", TurkishCulture)} checkpoint'ine dayanıyor. " +
+            $"Mevcut dönemde {Money(deviation)} sapma gözlendi. " +
+            $"Dönem {progress.PeriodEnd.ToString("d MMMM", TurkishCulture)} tarihinde kapandığında projeksiyon yenilenecek.";
+    }
 
     private static string PeriodTitle(SalaryPeriodProjection row) =>
         $"{row.PeriodStart.ToString("dd MMMM yyyy", TurkishCulture)} Dönemi";

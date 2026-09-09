@@ -1,71 +1,181 @@
+using CoinFlow.Application.Services;
 using CoinFlow.Infrastructure.Persistence;
 
 namespace CoinFlow.Tests;
 
 /// <summary>
-/// Mevcut tutar Ayarlar'dan Ana Sayfa'ya taşındı ve artık
-/// <c>RefreshCurrentFinancialStateAsync</c> üzerinden gidiyor. Kritik nokta
-/// rakamın kaydedilmesi değil, **çapanın birlikte ilerlemesi**: "X tarihinde
-/// Y param vardı" tek bir cümledir. Çapa geride kalırsa arada ödediğin her şey
-/// hâlâ gelecek ödeme olarak planlanır ve çift sayılır.
+/// Mevcut tutar Ana Sayfa'da bir **gözlemdir** (I14). v1.3.0'da checkpoint
+/// ilerletme aletine bağlanmıştı ve bu testler tam tersini doğruluyordu;
+/// ölçüldüğünde görüldü ki dönem içinde çağrıldığında donmuş planın
+/// penceresi kısalıyor, orijinal plan yetim kalıyor ve plan/gerçek
+/// karşılaştırması anlamsızlaşıyor.
+///
+/// Buradaki testler artık bozulmanın regresyon testidir: gözlem yazmak
+/// snapshot zincirine dokunmamalı.
 /// </summary>
 public sealed class DashboardCurrentBalanceTests
 {
     private static readonly DateOnly SeedDate = new(2026, 8, 20);
-    private static readonly DateOnly Today = new(2026, 9, 7);
+    private static readonly DateOnly MidPeriod = new(2026, 9, 7);
 
+    /// <summary>
+    /// Planın en önemli testi. Ölçülen bozulma buydu: 20.08–10.09 penceresi
+    /// 07.09–10.09'a düşüyor, zorunlu 54.823 → 0, ödeme satırı 2 → 0.
+    /// </summary>
     [Fact]
-    public async Task UpdatingTheCurrentBalance_MovesTheAnchorToToday()
+    public async Task ObservingMidPeriod_LeavesTheFrozenPlanUntouched()
     {
         await WithSeededStore(async store =>
         {
-            var service = TestFactory.Service(store, Today);
-            var before = (await service.GetFinancialPlanAsync()).Settings;
-            Assert.Equal(SeedDate, before.ProjectionAnchorDate);
+            var before = await store.GetFinancialHistoryAsync();
+            var planBefore = Assert.Single(before.Plans);
 
-            await service.RefreshCurrentFinancialStateAsync(-81_000m);
+            var service = TestFactory.Service(store, MidPeriod);
+            await service.ObserveCurrentBalanceAsync(-81_000m);
 
-            var after = (await service.GetFinancialPlanAsync()).Settings;
-            Assert.Equal(-81_000m, after.ProjectionStartingSavings);
-            Assert.Equal(Today, after.ProjectionAnchorDate);
+            var after = await store.GetFinancialHistoryAsync();
+            var planAfter = Assert.Single(after.Plans);
+
+            Assert.Equal(planBefore.Id, planAfter.Id);
+            Assert.Equal(planBefore.PeriodStart, planAfter.PeriodStart);
+            Assert.Equal(planBefore.PeriodEnd, planAfter.PeriodEnd);
+            Assert.Equal(
+                planBefore.PlannedMandatoryPayments,
+                planAfter.PlannedMandatoryPayments);
+            Assert.Equal(
+                planBefore.PlannedLivingBudget,
+                planAfter.PlannedLivingBudget);
+            Assert.Equal(
+                planBefore.PaymentLines.Count,
+                planAfter.PaymentLines.Count);
         });
     }
 
     [Fact]
-    public async Task UpdatedBalance_BecomesTheOpeningOfTheNextPeriod()
+    public async Task ObservingMidPeriod_DoesNotCreateASnapshot()
     {
         await WithSeededStore(async store =>
         {
-            var service = TestFactory.Service(store, Today);
+            var before = await store.GetFinancialHistoryAsync();
+            var snapshotBefore = Assert.Single(before.Snapshots);
 
-            await service.RefreshCurrentFinancialStateAsync(-81_000m);
+            var service = TestFactory.Service(store, MidPeriod);
+            await service.ObserveCurrentBalanceAsync(-81_000m);
+            await service.ObserveCurrentBalanceAsync(-40_000m);
 
-            var first = (await service.GetFuturePeriodsAsync(periodCount: 1))[0];
-            Assert.Equal(-81_000m, first.OpeningProjectedSavings);
-            Assert.Equal(Today, first.ProjectionAnchorDate);
+            var after = await store.GetFinancialHistoryAsync();
+            var snapshotAfter = Assert.Single(after.Snapshots);
+
+            Assert.Equal(snapshotBefore.Id, snapshotAfter.Id);
+            Assert.True(snapshotAfter.IsCurrent);
+            // Çapa ve başlangıç durumu checkpoint'in malıdır; gözlem onlara
+            // dokunmaz.
+            Assert.Equal(SeedDate, snapshotAfter.ProjectionAnchorDate);
+            Assert.Equal(
+                snapshotBefore.ProjectionStartingSavings,
+                snapshotAfter.ProjectionStartingSavings);
+        });
+    }
+
+    [Fact]
+    public async Task ObservingMidPeriod_DoesNotMoveTheReviewCheckpoint()
+    {
+        await WithSeededStore(async store =>
+        {
+            var before = await store.GetFinancialHistoryAsync();
+            var reviewBefore = Assert.Single(before.Plans).ReviewAvailableFrom;
+
+            var service = TestFactory.Service(store, MidPeriod);
+            await service.ObserveCurrentBalanceAsync(-81_000m);
+
+            var after = await store.GetFinancialHistoryAsync();
+            Assert.Equal(
+                reviewBefore,
+                Assert.Single(after.Plans).ReviewAvailableFrom);
+            // Projeksiyonun çapası da yerinde: 12 Dönem kaymaz (I16).
+            var settings = (await service.GetFinancialPlanAsync()).Settings;
+            Assert.Equal(SeedDate, settings.ProjectionAnchorDate);
         });
     }
 
     /// <summary>
-    /// I5 / I6 — her güncelleme geçmişe bir kayıt düşer; öncekinin üzerine
-    /// yazılmaz ve geçmiş yeniden hesaplanmaz.
+    /// Gözlem defteri açık plan başına tektir; ikinci gözlem üzerine yazar.
     /// </summary>
     [Fact]
-    public async Task EachUpdate_LeavesTheEarlierSnapshotInHistory()
+    public async Task RepeatedObservations_KeepASingleLedger()
     {
         await WithSeededStore(async store =>
         {
-            var service = TestFactory.Service(store, Today);
-            var seeded = (await store.GetFinancialHistoryAsync())
-                .Snapshots.Count;
+            var service = TestFactory.Service(store, MidPeriod);
+            await service.ObserveCurrentBalanceAsync(-81_000m);
+            var second = await service.ObserveCurrentBalanceAsync(-40_000m);
 
-            await service.RefreshCurrentFinancialStateAsync(-81_000m);
-            await service.RefreshCurrentFinancialStateAsync(-40_000m);
+            var progress = await service.GetPeriodProgressAsync();
 
-            var history = await store.GetFinancialHistoryAsync();
-            Assert.Equal(seeded + 2, history.Snapshots.Count);
-            var current = Assert.Single(history.Snapshots, x => x.IsCurrent);
-            Assert.Equal(-40_000m, current.ProjectionStartingSavings);
+            Assert.NotNull(progress);
+            Assert.Equal(-40_000m, progress!.ObservedBalance);
+            Assert.Equal(second.Id, progress.Observation!.Id);
+            Assert.Equal(MidPeriod, progress.Observation.ObservedOn);
+        });
+    }
+
+    /// <summary>
+    /// Gözlem yoksa gidişat hesaplanmaz. Rakam uydurmaktansa bloğu hiç
+    /// göstermemek doğrudur.
+    /// </summary>
+    [Fact]
+    public async Task WithoutAnObservation_ThereIsNoTrajectory()
+    {
+        await WithSeededStore(async store =>
+        {
+            var service = TestFactory.Service(store, MidPeriod);
+            var progress = await service.GetPeriodProgressAsync();
+
+            Assert.NotNull(progress);
+            Assert.False(progress!.HasObservation);
+            Assert.Null(progress.ObservedBalance);
+            Assert.Null(progress.ProjectedEndingSavings);
+            Assert.Null(progress.Deviation);
+            // Plan tarafı yine de dolu.
+            Assert.NotEqual(0m, progress.PlannedEndingSavings);
+        });
+    }
+
+    /// <summary>
+    /// Ana Sayfa'nın kendi verisi: donmuş planın penceresi ve kalan satırları.
+    /// Gelecek projeksiyonundan değil, dönemin kendi planından gelir (I16).
+    /// </summary>
+    [Fact]
+    public async Task Progress_ComesFromTheFrozenPlanWindow()
+    {
+        await WithSeededStore(async store =>
+        {
+            var service = TestFactory.Service(store, MidPeriod);
+            var progress = await service.GetPeriodProgressAsync();
+            var plan = Assert.Single(
+                (await store.GetFinancialHistoryAsync()).Plans);
+
+            Assert.NotNull(progress);
+            Assert.Equal(plan.PeriodStart, progress!.PeriodStart);
+            Assert.Equal(plan.PeriodEnd, progress.PeriodEnd);
+            Assert.Equal(plan.PlannedEndingSavings, progress.PlannedEndingSavings);
+            Assert.Equal(plan.PaymentLines.Count, progress.RemainingLines.Count);
+            Assert.Equal(18, progress.ElapsedDays);
+            Assert.Equal(21, progress.TotalDays);
+            Assert.False(progress.IsClosable);
+        });
+    }
+
+    [Fact]
+    public async Task AtTheCheckpoint_ThePeriodBecomesClosable()
+    {
+        await WithSeededStore(async store =>
+        {
+            var service = TestFactory.Service(store, new DateOnly(2026, 9, 10));
+            var progress = await service.GetPeriodProgressAsync();
+
+            Assert.NotNull(progress);
+            Assert.True(progress!.IsClosable);
         });
     }
 

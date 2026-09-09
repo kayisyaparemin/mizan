@@ -201,26 +201,48 @@ jobs:
           cat > release-notes.md <<NOTES
           # Mizan $version
 
-          Simülatörde kurduğun deneme artık uygulamayı kapatınca kaybolmuyor.
+          Ana sayfa artık içinde bulunduğun döneme ait. Mevcut tutar girmek
+          planını ve geçmişini bozmuyor.
 
-          ### Geçici planlar
+          ### Neden gerekliydi
 
-          Simülasyon planını adlandırıp **Geçici Plan Oluştur** ile
-          saklayabiliyorsun. Kaydedilen planlar sayfanın altındaki
-          **Geçici Planların** listesinde durur; **Yükle** dediğinde
-          koşullar simülatöre geri gelir ve üzerine devam edersin.
+          Uygulama üç ayrı işi yapıyor: ileriye projeksiyon, dönem içi gidişat
+          ve dönem sonrası plan/gerçek karşılaştırması. Üçüncüsünün kendi yeri
+          yoktu ve birincisinin makinesini ödünç alıyordu — dönem ortasında
+          mevcut tutarı güncellemek dönemin checkpoint'ini öne çekiyordu.
 
-          - Koşulların açık/kapalı durumu da kaydedilir. Bilerek kapattığın
-            bir koşul geri yüklendiğinde kapalı gelir.
-          - Yükleme ekrandaki planın **yerine geçer**; ekranda koşul varsa
-            önce sorulur. İki planın koşulları birbirine karışmaz.
-          - Aynı adla kaydedersen üzerine yazmayı sorar.
-          - Kaydetmek finansal kayıtlarına dokunmaz. Geçici plan bir deneme;
-            gerçek kayda dönüşmesi için yine **Planı Uygula** gerekiyor, ve
-            uygulamak kaydettiğin planı listeden silmez.
+          Ölçüldü: 20 Ağustos'ta dondurulan 21 günlük plan (zorunlu 54.823 TL,
+          iki ödeme satırı) üç günlük bir plana dönüşüyor, zorunlu 0'a düşüyor,
+          orijinal plan erişilemez hâle geliyordu. Dönem sonundaki plan/gerçek
+          karşılaştırması bu yüzden anlamsızdı.
 
-          Veritabanı şeması v12'ye çıktı: yalnız iki yeni tablo eklendi,
-          mevcut verinin hiçbirine dokunulmadı.
+          ### Ana Sayfa
+
+          Artık yalnız mevcut dönemi gösteriyor, üç blokta:
+
+          - **PLAN** — dönem başında dondurulan taahhüt. Değişmiyor.
+          - **GİDİŞAT** — gözlemden türetilen dönem sonu tahmini ve plana göre
+            fark. Gözlem girmediysen bu blok hiç görünmüyor; rakam uydurulmuyor.
+          - **KALAN** — ödenmiş işaretlemediğin plan satırları, vadesi geçmiş
+            olanlar işaretli.
+
+          **Mevcut tutar artık bir gözlem.** Girdiğin değer dönem planını,
+          kapanış tarihini ve geçmiş kaydını değiştirmiyor; dönemi kapatırken
+          kullanılıyor. Kapanış ekranı dönem boyunca girdiklerinle dolu geliyor
+          — sıfırdan veri girişi değil, onay.
+
+          12 dönem sonu, faiz kırılımı ve geçmiş özeti ana sayfadan kalktı;
+          her biri kendi ekranının verisi. Bağlantılar duruyor, rakamsız.
+
+          ### 12 Dönem
+
+          Projeksiyon checkpoint'e bağlı kalıyor ve dönem içinde kaymıyor —
+          plan tanımı gereği sabittir. Ama mevcut dönemde sapma gözlendiyse
+          üstte söylüyor: hangi checkpoint'e dayandığı, ne kadar sapıldığı ve
+          ne zaman yenileneceği.
+
+          Veritabanı şeması v13'e çıktı: üç yeni tablo eklendi, mevcut
+          verilerin hiçbirine dokunulmadı.
           NOTES
 
       - name: Upload signed APK artifact

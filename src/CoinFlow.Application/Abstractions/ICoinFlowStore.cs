@@ -75,6 +75,18 @@ public interface ICoinFlowStore
         CancellationToken cancellationToken = default);
     // Simülatörde kurulan koşul listesinin adlandırılmış kopyası. Projeksiyona
     // girmez; yalnız simülatöre geri yüklenmek için saklanır.
+    // Açık dönemin gözlem defteri. Snapshot zincirinin dışındadır (I14):
+    // yazılması snapshot veya donmuş plan üretmez, projeksiyona girmez.
+    Task<PeriodObservation?> GetPeriodObservationAsync(
+        Guid periodPlanSnapshotId,
+        CancellationToken cancellationToken = default);
+    Task UpsertPeriodObservationAsync(
+        PeriodObservation observation,
+        CancellationToken cancellationToken = default);
+    Task DeletePeriodObservationAsync(
+        Guid periodPlanSnapshotId,
+        CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<SimulationDraft>> GetSimulationDraftsAsync(
         CancellationToken cancellationToken = default);
     Task UpsertSimulationDraftAsync(

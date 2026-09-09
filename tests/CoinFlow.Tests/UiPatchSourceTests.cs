@@ -60,16 +60,18 @@ public sealed class UiPatchSourceTests
 
         Assert.Contains("Text=\"{Binding CurrentBalanceInput}\"", page);
         Assert.Contains("SaveCurrentBalanceCommand", page);
-        // Çapayı ilerleten yol bu; SaveSettingsAsync'e dönerse tarih
-        // güncellemesi sessizce ayrı bir koda bağlanır.
-        Assert.Contains(
+        // I14 — dönem içi gözlem snapshot zincirine yazmaz. v1.3.0'da bu test
+        // tam tersini şart koşuyordu; o zaman doğru sanılan şey ölçüldü ve
+        // yanlış çıktı: checkpoint öne çekiliyor, donmuş plan yetim kalıyordu.
+        Assert.Contains("ObserveCurrentBalanceAsync(", viewModel);
+        Assert.DoesNotContain(
             "RefreshCurrentFinancialStateAsync(",
             viewModel);
-        // Mevcut tutar durum özetinden önce gelmeli: önce bugünü gir.
+        // Mevcut tutar plan bloğundan önce gelmeli: önce bugünü gir.
         Assert.True(
             page.IndexOf("CurrentBalanceInput", StringComparison.Ordinal) <
-            page.IndexOf("HeadlineAmount", StringComparison.Ordinal),
-            "Mevcut tutar kutusu durum özetinin üstünde olmalı.");
+            page.IndexOf("PlannedEndingText", StringComparison.Ordinal),
+            "Mevcut tutar kutusu PLAN bloğunun üstünde olmalı.");
     }
 
     [Fact]
@@ -86,14 +88,51 @@ public sealed class UiPatchSourceTests
         Assert.Contains("CreditCardCarryInterestRate", settings);
     }
 
+    /// <summary>
+    /// I16 — Ana Sayfa mevcut dönemin ekranıdır. Başka zaman dilimlerinin
+    /// rakamları burada durmaz; her biri kendi ekranının verisidir.
+    /// </summary>
+    [Fact]
+    public void MainPage_OnlyShowsTheCurrentPeriod()
+    {
+        var page = PageSource("MainPage.xaml");
+        var viewModel = ViewModelSource("DashboardViewModel.cs");
+
+        // Gelecek: 12 dönem sonu ve faiz kırılımı 12 Dönem ekranının.
+        Assert.DoesNotContain("TwelveMonth", page);
+        Assert.DoesNotContain("TwelveMonth", viewModel);
+        Assert.DoesNotContain("TightestPeriod", page);
+        // Geçmiş: kapanmış dönem özeti Geçmiş ekranının.
+        Assert.DoesNotContain("HistorySummary", page);
+        Assert.DoesNotContain("StructureSummary", page);
+        // Linkler kalır, rakamsız.
+        Assert.Contains("OpenFutureMonthsCommand", page);
+        Assert.Contains("OpenHistoryCommand", page);
+        // Mevcut dönemin kendi verisi burada.
+        Assert.Contains("PlannedEndingText", page);
+        Assert.Contains("ProjectedEndingText", page);
+        Assert.Contains("RemainingLines", page);
+    }
+
+    /// <summary>
+    /// Ana Sayfa artık rakamlarını gelecek motorundan almıyor. Bu kaçak geri
+    /// gelirse mevcut dönem yeniden projeksiyonun render'ına döner.
+    /// </summary>
+    [Fact]
+    public void MainPage_ReadsTheFrozenPlanNotTheProjection()
+    {
+        var viewModel = ViewModelSource("DashboardViewModel.cs");
+
+        Assert.Contains("GetPeriodProgressAsync()", viewModel);
+        Assert.Contains("ApplyProgress(progress)", viewModel);
+    }
+
     [Fact]
     public void MainPage_SaysTheSameThingOnce()
     {
         var page = PageSource("MainPage.xaml");
         var viewModel = ViewModelSource("DashboardViewModel.cs");
 
-        // Dönem sonu rakamı üç yerde birden duruyordu: uyarı kutusu, hero
-        // ve "Bu dönem nasıl oluşuyor" tablosu. Yalnız hero kaldı.
         Assert.DoesNotContain("Text=\"{Binding EndingSavings}\"", page);
         Assert.DoesNotContain("\"Bu dönem açık veriyor\"", viewModel);
         Assert.Contains("OpenCurrentPeriodDetailCommand", page);
@@ -102,16 +141,36 @@ public sealed class UiPatchSourceTests
         Assert.Contains("\"Geçen dönem kapandı\"", viewModel);
     }
 
+    /// <summary>
+    /// Faiz kırılımı ana sayfadan 12 Dönem'e taşındı (I16); kırılımın kendisi
+    /// korunuyor çünkü ikisi ters yönde hareket edebiliyor (I8).
+    /// </summary>
     [Fact]
-    public void MainPage_BreaksTheTwelvePeriodInterestIntoItsTwoStates()
+    public void TwelvePeriods_BreakTheInterestIntoItsTwoStates()
     {
-        var page = PageSource("MainPage.xaml");
+        var page = PageSource("FutureMonthsPage.xaml");
 
-        // I8 sunumda da geçerli: ikisi ters yönde hareket edebiliyor,
-        // tek toplam bunu gizler.
-        Assert.Contains("{Binding TwelveMonthCardInterest}", page);
-        Assert.Contains("{Binding TwelveMonthDeficitInterest}", page);
-        Assert.Contains("{Binding TwelveMonthInterest}", page);
+        Assert.Contains("{Binding TotalCreditCardInterest}", page);
+        Assert.Contains("{Binding TotalDeficitInterest}", page);
+        Assert.Contains("{Binding TotalInterestCost}", page);
+    }
+
+    /// <summary>
+    /// 12 Dönem checkpoint planını gösterir ve kaymaz — ama sapmayı söyler.
+    /// Kullanıcı yanlış olduğunu bildiği bir rakama bakıp ekranın susmasıyla
+    /// karşılaşmamalı.
+    /// </summary>
+    [Fact]
+    public void TwelvePeriods_DiscloseTheObservedDeviation()
+    {
+        var page = PageSource("FutureMonthsPage.xaml");
+        var viewModel = ViewModelSource("FutureMonthsViewModel.cs");
+
+        Assert.Contains("{Binding DeviationNoticeText}", page);
+        Assert.Contains("HasDeviationNotice", page);
+        // Gözlem yalnız uyarı üretir; projeksiyona girmez.
+        Assert.Contains("GetPeriodProgressAsync()", viewModel);
+        Assert.DoesNotContain("ObservedBalance", viewModel);
     }
 
     /// <summary>
