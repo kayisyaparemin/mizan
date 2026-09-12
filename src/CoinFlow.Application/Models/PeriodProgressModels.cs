@@ -7,9 +7,9 @@ namespace CoinFlow.Application.Models;
 /// gözlem defterinin birleşimi.
 /// </summary>
 /// <remarks>
-/// Burada projeksiyon motoru çalışmaz (I16). Gelecek 12 dönem bilgisi de
-/// taşınmaz — o 12 Dönem ekranının verisidir. Bu modeldeki her rakam ya
-/// donmuş plandan ya gözlemden gelir.
+/// Gelecek 12 dönem bilgisi taşımaz — o 12 Dönem ekranının verisidir (I16).
+/// Ama mevcut dönemin parametrelerini **yeniden hesaplar**: gözlenen bakiye
+/// girildiğinde açık faizinin ne olacağı bu ekranın sorusudur.
 /// </remarks>
 public sealed record PeriodProgress(
     Guid PeriodPlanSnapshotId,
@@ -24,22 +24,37 @@ public sealed record PeriodProgress(
     decimal PlannedIncome,
     decimal PlannedMandatoryPayments,
     decimal PlannedLivingBudget,
-    decimal PlannedInterest,
+    decimal PlannedCardInterest,
+    decimal PlannedDeficitInterest,
     decimal PlannedEndingSavings,
-    // GİDİŞAT bloğu — gözlem yoksa üçü de null.
+    /// <summary>Planın bugün beklediği bakiye; "şu an" satırının plan sütunu.</summary>
+    decimal ExpectedBalanceToday,
+    // GİDİŞAT bloğu — gözlem yoksa hepsi null.
     PeriodObservation? Observation,
     decimal? ObservedBalance,
+    decimal? ProjectedDeficitInterest,
     decimal? ProjectedEndingSavings,
     decimal? Deviation,
     // KALAN bloğu — plandaki, henüz ödenmiş işaretlenmemiş satırlar.
     IReadOnlyList<PeriodPlanPaymentLine> RemainingLines,
     decimal RemainingPlannedTotal,
+    decimal RemainingLivingBudget,
     bool IsClosable)
 {
     public bool HasObservation => Observation is not null;
     public bool HasProjection => ProjectedEndingSavings is not null;
     public bool HasRemainingLines => RemainingLines.Count > 0;
     public bool WasRevised => RevisionCount > 0;
+
+    /// <summary>Bugüne kadarki sapma: gözlenen − planın bugün beklediği.</summary>
+    public decimal? BalanceDeviation =>
+        ObservedBalance is { } balance ? balance - ExpectedBalanceToday : null;
+
+    /// <summary>Açık faizindeki değişim; plandan sapma arttıkça büyür.</summary>
+    public decimal? DeficitInterestDeviation =>
+        ProjectedDeficitInterest is { } projected
+            ? projected - PlannedDeficitInterest
+            : null;
 
     /// <summary>Dönemin ne kadarı geçti; ilerleme çubuğu için 0–1.</summary>
     public double ElapsedRatio => TotalDays <= 0

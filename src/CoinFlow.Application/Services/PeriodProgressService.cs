@@ -8,10 +8,15 @@ namespace CoinFlow.Application.Services;
 /// Mevcut dönemin motoru — Ana Sayfa'nın sahibi olduğu tek zaman dilimi (I16).
 /// </summary>
 /// <remarks>
-/// Yeni bir hesap motoru değil: donmuş planı ve gözlem defterini toplar.
-/// <c>FinancialProjectionCalculator</c> burada çağrılmaz; ana sayfanın
-/// rakamları gelecek motorundan gelmeyi bırakır. Hiçbir metodu snapshot
-/// zincirine yazmaz (I14).
+/// Donmuş planı ve gözlem defterini toplar, sonra **bu dönemin** değişebilen
+/// parametrelerini gözlenen pozisyondan yeniden hesaplar. Sorulan soru şu:
+/// "elimdeki bu tutarla kalan ödemeleri yapınca dönem sonu ve faiz ne olur?"
+///
+/// I16'nın yasakladığı şey ana sayfanın **başka zaman dilimlerinin** rakamını
+/// göstermesidir; mevcut dönemi hesaplamak tam olarak bu servisin işidir.
+/// <c>FinancialProjectionCalculator</c> yine çağrılmaz — gereken tek formül
+/// açık faizidir ve o <see cref="PeriodPlanSnapshotService"/> ile birebir
+/// aynı kuralı kullanır.
 /// </remarks>
 public sealed class PeriodProgressService(
     ICoinFlowStore store,
@@ -30,7 +35,13 @@ public sealed class PeriodProgressService(
         var observation = await store.GetPeriodObservationAsync(
             openPlan.Id,
             cancellationToken);
-        return Build(history, openPlan, observation, clock.Today);
+        var settings = await store.GetSettingsAsync(cancellationToken);
+        return Build(
+            history,
+            openPlan,
+            observation,
+            settings.DeficitFinancingInterestRate,
+            clock.Today);
     }
 
     /// <summary>
@@ -55,6 +66,7 @@ public sealed class PeriodProgressService(
         FinancialHistoryData history,
         PeriodPlanSnapshot openPlan,
         PeriodObservation? observation,
+        decimal deficitInterestRate,
         DateOnly today)
     {
         var revisions = history.Revisions
@@ -71,17 +83,12 @@ public sealed class PeriodProgressService(
                                openPlan.PlannedMandatoryPayments;
         var plannedLiving = latest?.PlannedLivingBudget ??
                             openPlan.PlannedLivingBudget;
+        var plannedCardInterest = latest?.PlannedCardInterest ??
+                                  openPlan.PlannedCardInterest;
+        var plannedDeficitInterest = latest?.PlannedDeficitInterest ??
+                                     openPlan.PlannedDeficitInterest;
         var plannedEnding = latest?.PlannedEndingSavings ??
                             openPlan.PlannedEndingSavings;
-        // Faiz de planın bir kalemi ve dönem sonuna kadar önümüzde: kart
-        // faizi ekstre gününde, açık faizi dönem sonunda işler. İkisi de
-        // gözlenen nakit bakiyenin içinde DEĞİL (I9 — kart faizi karta
-        // kapitalize olur, açık faizi bir planlama kalemidir), bu yüzden
-        // gidişattan ayrıca düşülmeleri gerekir. Düşülmezse plana tam uygun
-        // giden kullanıcı bile faiz kadar kârda görünür.
-        var plannedInterest =
-            (latest?.PlannedCardInterest ?? openPlan.PlannedCardInterest) +
-            (latest?.PlannedDeficitInterest ?? openPlan.PlannedDeficitInterest);
         var planLines = latest?.PaymentLines ?? openPlan.PaymentLines;
 
         var totalDays = Math.Max(
@@ -105,14 +112,41 @@ public sealed class PeriodProgressService(
             .ToArray();
         var remainingPlannedTotal = remainingLines
             .Sum(x => x.PlannedAmount ?? 0m);
-
-        var projected = ProjectEnding(
+        var remainingLiving = RemainingLiving(
             observation,
             plannedLiving,
-            remainingPlannedTotal,
-            plannedInterest,
             elapsedDays,
             totalDays);
+
+        // Planın bugün beklediği bakiye — "şu an" satırının plan sütunu.
+        // Gelir dönem başında alınmış sayılır (dönem maaş gününde başlar),
+        // bugüne kadar vadesi gelen satırlar ödenmiş, yaşam gideri günü
+        // gününe harcanmış kabul edilir.
+        var duePlannedSoFar = planLines
+            .Where(x => x.PlannedDate <= today)
+            .Sum(x => x.PlannedAmount ?? 0m);
+        var expectedToday = openPlan.OpeningSavings
+                            + plannedIncome
+                            - duePlannedSoFar
+                            - (plannedLiving - remainingLiving);
+
+        decimal? projectedDeficitInterest = null;
+        decimal? projectedEnding = null;
+        if (observation?.ObservedBalance is { } balance)
+        {
+            // Motorla birebir aynı kural (PeriodPlanSnapshotService.Freeze):
+            // açık faizi, faiz öncesi dönem sonu negatifse onun mutlak değeri
+            // üzerinden işler. Kart faizi bu hesaba girmez ve nakit dönem
+            // sonunu değiştirmez — karta kapitalize olur (I9).
+            var endingBeforeDeficitInterest =
+                balance - remainingPlannedTotal - remainingLiving;
+            projectedDeficitInterest = endingBeforeDeficitInterest < 0m
+                ? RoundMoney(
+                    Math.Abs(endingBeforeDeficitInterest) * deficitInterestRate)
+                : 0m;
+            projectedEnding =
+                endingBeforeDeficitInterest - projectedDeficitInterest.Value;
+        }
 
         return new PeriodProgress(
             openPlan.Id,
@@ -126,63 +160,44 @@ public sealed class PeriodProgressService(
             plannedIncome,
             plannedMandatory,
             plannedLiving,
-            plannedInterest,
+            plannedCardInterest,
+            plannedDeficitInterest,
             plannedEnding,
+            expectedToday,
             observation,
             observation?.ObservedBalance,
-            projected,
-            projected is null ? null : projected - plannedEnding,
+            projectedDeficitInterest,
+            projectedEnding,
+            projectedEnding is null ? null : projectedEnding - plannedEnding,
             remainingLines,
             remainingPlannedTotal,
+            remainingLiving,
             today >= openPlan.ReviewAvailableFrom);
     }
 
     /// <summary>
-    /// Gidişat: gözlenen bakiyeden dönemin kalanı düşülür.
-    /// Yalnız donmuş plan ve gözlem kullanılır — projeksiyon motoru değil.
+    /// Dönemin kalanına düşen yaşam gideri. Gözlemde gerçek harcama
+    /// girildiyse onun günlük hızı, girilmediyse planın günlük hızı esas alınır.
     /// </summary>
-    /// <remarks>
-    /// Gözlenen bakiye yoksa <c>null</c> döner. Rakam uydurmaktansa gidişat
-    /// bloğunu hiç göstermemek doğrudur; ekranın kendini yalanlaması bu
-    /// projede tekrar eden bir hataydı.
-    /// </remarks>
-    private static decimal? ProjectEnding(
+    private static decimal RemainingLiving(
         PeriodObservation? observation,
         decimal plannedLiving,
-        decimal remainingPlannedTotal,
-        decimal plannedInterest,
         int elapsedDays,
         int totalDays)
     {
-        if (observation?.ObservedBalance is not { } balance)
+        if (totalDays <= 0)
         {
-            return null;
+            return 0m;
         }
 
-        // Yaşam gideri dönem boyunca eşit dağıtılır; gözlenen kısmı zaten
-        // bakiyenin içinde, kalan kısmı önümüzde.
-        var remainingLiving = totalDays <= 0
-            ? 0m
-            : RoundMoney(
-                plannedLiving * (totalDays - elapsedDays) / totalDays);
-        // Gözlemde ayrıca yaşam gideri girildiyse, plan yerine onun kalan
-        // günlere düşen oranı esas alınır.
-        if (observation.ObservedLivingSpend > 0m && elapsedDays > 0)
+        if (observation is { ObservedLivingSpend: > 0m } && elapsedDays > 0)
         {
             var dailyObserved = observation.ObservedLivingSpend / elapsedDays;
-            remainingLiving = RoundMoney(
-                dailyObserved * (totalDays - elapsedDays));
+            return RoundMoney(dailyObserved * (totalDays - elapsedDays));
         }
 
-        // Planlanan gelir toplama girmez: dönem maaş gününde başladığı için
-        // dönemin geliri dönem başında alınmıştır ve gözlenen bakiyenin
-        // içindedir. Dönem ortasına düşen tek seferlik gelir bu hesapta
-        // görünmez — bilinen sadeleştirme, gözlem defterine akış olarak
-        // girildiğinde bakiyeye zaten yansımış olur.
-        return balance
-               - remainingPlannedTotal
-               - remainingLiving
-               - plannedInterest;
+        return RoundMoney(
+            plannedLiving * (totalDays - elapsedDays) / totalDays);
     }
 
     private static decimal RoundMoney(decimal amount) =>

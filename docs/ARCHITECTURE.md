@@ -87,23 +87,30 @@ Zaman dilimleri arasında veri yalnız **checkpoint'te** akar: dönem açılış
 
 `PeriodObservation`, açık dönemin gözlem defteridir (`period_observations` + payment/flow child tabloları, şema v13). Alanları `PeriodReviewDraft` ile birebir eşlenir; checkpoint'te `GetObservedReviewDraftAsync` ile review'ı doldurur ve finalization sırasında tüketilip silinir (I15). Böylece dönem içi gözlem ile dönem sonu gerçekleşmesi iki ayrı veri kümesi değildir — aynı defter, farklı zamanda okunur.
 
-`PeriodProgressService` Ana Sayfa'nın motorudur ve yeni bir hesap yapmaz: donmuş planı (varsa en güncel `PeriodPlanRevision` uygulanmış hâlini) gözlemle toplar. Dönem sonu tahmini
+`PeriodProgressService` Ana Sayfa'nın motorudur. Donmuş planı (varsa en güncel `PeriodPlanRevision` uygulanmış hâlini) gözlemle toplar ve **bu dönemin değişebilen parametrelerini gözlenen pozisyondan yeniden hesaplar**. Sorulan soru şudur: *elimdeki bu tutarla kalan ödemeleri yapınca dönem sonu ve faiz ne olur?*
 
 ```
-gözlenen bakiye − kalan planlı ödemeler − kalan yaşam gideri − planlanan faiz
+faiz öncesi dönem sonu = gözlenen bakiye − kalan planlı ödemeler − kalan yaşam gideri
+açık faizi             = faiz öncesi < 0 ? |faiz öncesi| × DeficitFinancingInterestRate : 0
+dönem sonu tahmini     = faiz öncesi − açık faizi
 ```
 
-ile türetilir; gözlenen bakiye yoksa `null` döner ve ekran gidişat bloğunu hiç göstermez.
+Bu, `PeriodPlanSnapshotService.Freeze`'in kullandığı kuralın birebir aynısıdır; iki taraf aynı formülü kullanmazsa "plana göre fark" yalan söyler. Gözlenen bakiye yoksa hepsi `null` döner ve ekran gidişat bloğunu hiç göstermez.
 
-**Faiz terimi zorunludur.** `PlannedEndingSavings` kart ve açık finansman faizini içerir; gidişat içermezse iki rakam kıyaslanabilir olmaz ve plana tam uygun giden kullanıcıya faiz kadar kâr gösterilir. Faiz gözlenen nakit bakiyenin içinde değildir: kart faizi karta kapitalize olur (I9), açık faizi bir planlama kalemidir — ikisi de dönem sonuna kadar önümüzdedir. Buradaki faiz **planın** faizidir, gözlenen pozisyondan yeniden hesaplanmaz; yeniden hesaplamak projeksiyon motorunu çağırmayı gerektirirdi ve bu ekranda yasaktır (I16). Plandan çok sapılmışsa gerçekleşecek faiz daha yüksek olabilir — bilinen sadeleştirme.
+**Kart faizi nakit dönem sonuna girmez.** `PlannedEndingSavings` da onu içermez — kart carry faizi karta kapitalize olur, nakit akışına yazılmaz (I9). Ekranda ayrı bir bilgi satırı olarak görünür, hesaba katılmaz.
 
-`PeriodPlanSnapshot` şu kimliği sağlar ve gidişat bu kimliğin aynı kalemlerini kullanır:
+**Açık faizi kopyalanmaz, yeniden hesaplanır.** Kullanıcının ana sayfadan beklediği şey tam olarak budur: pozisyon kötüleşince faizin ne olacağını görmek. Plandan sabit almak, gözlemin değiştirdiği tek faiz kalemini dondurmak olurdu. I16 ana sayfanın **başka zaman dilimlerinin** rakamını göstermesini yasaklar; mevcut dönemi hesaplamasını değil — ve bu hesap için projeksiyon motoru gerekmez, tek formül yukarıdadır.
+
+Ekran tek bir fark rakamı değil, **parametre başına karşılaştırma** gösterir (şimdi / planda / fark): şu anki bakiye planın bugün beklediğine karşı, açık faizi plandakine karşı, dönem sonu plandakine karşı. Sütun düzeni Geçmiş ekranıyla aynıdır (PLANLANAN / GERÇEKLEŞEN / FARK) — Ana Sayfa, Geçmiş'in dönem kapanmadan önceki hâlidir.
+
+`PeriodPlanSnapshot` şu kimliği sağlar:
 
 ```
-PlannedEndingSavings = OpeningSavings + PlannedIncome
+faiz öncesi          = OpeningSavings + PlannedIncome
                      − PlannedMandatoryPayments − PlannedLivingBudget
                      − PlannedLargeExpenses
-                     − PlannedCardInterest − PlannedDeficitInterest
+PlannedDeficitInterest = faiz öncesi < 0 ? |faiz öncesi| × oran : 0
+PlannedEndingSavings = faiz öncesi − PlannedDeficitInterest
 ```
 
 `PaymentLines` hem zorunlu ödemeleri hem planlı büyük giderleri taşır; toplamları `PlannedMandatoryPayments + PlannedLargeExpenses`'a eşittir, çift sayım yoktur.

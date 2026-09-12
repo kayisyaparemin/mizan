@@ -201,33 +201,37 @@ jobs:
           cat > release-notes.md <<NOTES
           # Mizan $version
 
-          Gidişat rakamı yanlıştı: faizi saymıyordu.
+          Ana sayfada mevcut tutarı girdiğinde artık **hangi parametrenin ne
+          olacağını** görüyorsun — tek bir "fark" rakamı değil.
+
+          ### Gidişat artık parametre parametre
+
+          | | Şimdi | Fark |
+          |---|---|---|
+          | **Şu an** · planda X | elindeki tutar | bugüne kadarki sapma |
+          | **Finansman açığı faizi** · planda B | A | C |
+          | **Dönem sonu** · planda Y | X | X−Y |
+
+          Yani: *"18, 20 Eylül ve 7 Ekim'deki ödemeleri yapınca dönem sonu X
+          oluyor, planda Y idi. Faiz A oluyor, planda B idi."*
+
+          ### Açık faizi artık yeniden hesaplanıyor
+
+          Önceki sürümde faiz plandan sabit alınıyordu. Oysa finansman açığı
+          faizi **pozisyonunla değişen** tek kalem: kötüleşirsen artar,
+          toparlarsan azalır — ve zaten görmek istediğin şey buydu. Artık
+          girdiğin tutardan yeniden hesaplanıyor, motorun kullandığı formülün
+          birebir aynısıyla.
 
           ### Düzeltme
 
-          Ana sayfadaki **dönem sonu tahmini** kalan ödemeleri ve kalan yaşam
-          giderini düşüyordu ama dönemin faizini hiç saymıyordu. Plan ise
-          sayıyor. İki rakam aynı kalemleri içermeyince "plana göre fark"
-          yalan söylüyordu: plana **tam uygun** giden bir kullanıcıya bile
-          faiz kadar kâr gösteriyordu.
+          Bir önceki sürüm kart faizini de dönem sonundan düşüyordu. Kart
+          faizi karta işler, nakit dönem sonunu değiştirmez — plan da onu
+          düşmüyor. Fazladan düşülen tutar kaldırıldı; kart faizi bilgi
+          satırı olarak duruyor.
 
-          Ölçüldü: planına birebir uyan bir dönemde ekran +5.507,29 TL kâr
-          diyordu — ve o rakam planın finansman açığı faizinin tam kendisiydi.
-          Planından fazla harcayanlar bu yüzden kendilerini önde sanıyordu.
-
-          Artık tahmin planın faizini de düşüyor; plana uygun gidildiğinde
-          fark sıfır çıkıyor. Faiz gözlenen bakiyenin içinde değildir — kart
-          faizi karta işler, açık faizi dönem sonunda hesaplanır — bu yüzden
-          ayrıca düşülmesi gerekiyordu.
-
-          Tahminin altına neyin düşüldüğünü söyleyen bir satır eklendi:
-          *"Kalan ödemeler, kalan yaşam gideri ve X TL planlanan faiz
-          düşülmüş."* Farkın nereden geldiği artık ekranda görünüyor.
-
-          ### Not
-
-          Buradaki faiz **planın** faizidir. Plandan çok saparsan gerçekleşecek
-          faiz daha yüksek olabilir; kesin rakam dönem kapanışında belli olur.
+          Böylece iki taraf aynı kalemleri içeriyor: plana tam uygun
+          gidiyorsan her satırın farkı sıfır çıkıyor.
           NOTES
 
       - name: Upload signed APK artifact

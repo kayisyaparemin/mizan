@@ -144,42 +144,112 @@
                     </VerticalStackLayout>
                 </Border>
 
-                <!-- GİDİŞAT — yalnız gözlem varsa. Rakam uydurulmaz. -->
+                <!-- GİDİŞAT — yalnız gözlem varsa. Rakam uydurulmaz.
+                     Tek bir "fark" değil, parametre parametre karşılaştırma:
+                     elindeki tutarı girdiğinde planın hangi kalemi ne oluyor.
+                     Sütun düzeni Geçmiş ekranıyla aynı (PLANLANAN/GERÇEKLEŞEN/
+                     FARK) — burası onun dönem kapanmadan önceki hâli. -->
                 <Border IsVisible="{Binding HasObservation}"
                         BackgroundColor="{StaticResource ProjectionSurface}">
-                    <VerticalStackLayout Spacing="6">
+                    <VerticalStackLayout Spacing="8">
                         <Label Text="GİDİŞAT" Style="{StaticResource Eyebrow}" />
                         <Label Text="{Binding ObservationDateText}"
                                Style="{StaticResource MutedText}"
                                FontSize="12" />
-                        <Grid ColumnDefinitions="*,Auto"
+
+                        <Grid ColumnDefinitions="*,Auto,Auto"
                               RowDefinitions="Auto,Auto,Auto,Auto"
-                              ColumnSpacing="12"
-                              RowSpacing="6">
-                            <Label Text="Şu an"
-                                   Style="{StaticResource MutedText}" />
+                              ColumnSpacing="10"
+                              RowSpacing="8">
                             <Label Grid.Column="1"
+                                   Text="ŞİMDİ"
+                                   Style="{StaticResource Eyebrow}"
+                                   HorizontalTextAlignment="End" />
+                            <Label Grid.Column="2"
+                                   Text="FARK"
+                                   Style="{StaticResource Eyebrow}"
+                                   HorizontalTextAlignment="End" />
+
+                            <!-- Şu an: gözlenen vs planın bugün beklediği -->
+                            <VerticalStackLayout Grid.Row="1" Spacing="1">
+                                <Label Text="Şu an" />
+                                <Label Text="{Binding ExpectedTodayText}"
+                                       Style="{StaticResource MutedText}"
+                                       FontSize="11" />
+                            </VerticalStackLayout>
+                            <Label Grid.Row="1"
+                                   Grid.Column="1"
                                    Text="{Binding ObservedBalanceText}"
-                                   FontFamily="OpenSansSemibold" />
+                                   FontFamily="OpenSansSemibold"
+                                   HorizontalTextAlignment="End"
+                                   VerticalTextAlignment="Center" />
                             <Label Grid.Row="1"
-                                   Text="Dönem sonu tahmini"
-                                   Style="{StaticResource MutedText}" />
-                            <Label Grid.Row="1"
+                                   Grid.Column="2"
+                                   Text="{Binding BalanceDeviationText}"
+                                   FontFamily="OpenSansSemibold"
+                                   HorizontalTextAlignment="End"
+                                   VerticalTextAlignment="Center"
+                                   TextColor="{StaticResource PositiveText}">
+                                <Label.Triggers>
+                                    <DataTrigger TargetType="Label"
+                                                 Binding="{Binding IsBalanceDeviationNegative}"
+                                                 Value="True">
+                                        <Setter Property="TextColor"
+                                                Value="{StaticResource DeficitText}" />
+                                    </DataTrigger>
+                                </Label.Triggers>
+                            </Label>
+
+                            <!-- Açık faizi: pozisyondan yeniden hesaplanır -->
+                            <VerticalStackLayout Grid.Row="2" Spacing="1">
+                                <Label Text="Finansman açığı faizi" />
+                                <Label Text="{Binding PlannedDeficitInterestText}"
+                                       Style="{StaticResource MutedText}"
+                                       FontSize="11" />
+                            </VerticalStackLayout>
+                            <Label Grid.Row="2"
+                                   Grid.Column="1"
+                                   Text="{Binding ProjectedDeficitInterestText}"
+                                   FontFamily="OpenSansSemibold"
+                                   HorizontalTextAlignment="End"
+                                   VerticalTextAlignment="Center" />
+                            <Label Grid.Row="2"
+                                   Grid.Column="2"
+                                   Text="{Binding DeficitInterestDeviationText}"
+                                   FontFamily="OpenSansSemibold"
+                                   HorizontalTextAlignment="End"
+                                   VerticalTextAlignment="Center"
+                                   TextColor="{StaticResource PositiveText}">
+                                <Label.Triggers>
+                                    <DataTrigger TargetType="Label"
+                                                 Binding="{Binding IsDeficitInterestWorse}"
+                                                 Value="True">
+                                        <Setter Property="TextColor"
+                                                Value="{StaticResource DeficitText}" />
+                                    </DataTrigger>
+                                </Label.Triggers>
+                            </Label>
+
+                            <!-- Dönem sonu: asıl sonuç -->
+                            <VerticalStackLayout Grid.Row="3" Spacing="1">
+                                <Label Text="Dönem sonu"
+                                       FontFamily="OpenSansSemibold" />
+                                <Label Text="{Binding PlannedEndingCompareText}"
+                                       Style="{StaticResource MutedText}"
+                                       FontSize="11" />
+                            </VerticalStackLayout>
+                            <Label Grid.Row="3"
                                    Grid.Column="1"
                                    Text="{Binding ProjectedEndingText}"
-                                   Style="{StaticResource SecondaryAmount}" />
-                            <Label Grid.Row="2"
-                                   Grid.ColumnSpan="2"
-                                   Text="{Binding ProjectionBasisText}"
-                                   Style="{StaticResource MutedText}"
-                                   FontSize="12" />
+                                   FontFamily="OpenSansSemibold"
+                                   HorizontalTextAlignment="End"
+                                   VerticalTextAlignment="Center" />
                             <Label Grid.Row="3"
-                                   Text="Plana göre fark"
-                                   FontFamily="OpenSansSemibold" />
-                            <Label Grid.Row="3"
-                                   Grid.Column="1"
+                                   Grid.Column="2"
                                    Text="{Binding DeviationText}"
                                    FontFamily="OpenSansSemibold"
+                                   HorizontalTextAlignment="End"
+                                   VerticalTextAlignment="Center"
                                    TextColor="{StaticResource PositiveText}">
                                 <Label.Triggers>
                                     <DataTrigger TargetType="Label"
@@ -191,6 +261,10 @@
                                 </Label.Triggers>
                             </Label>
                         </Grid>
+
+                        <Label Text="{Binding ProjectionBasisText}"
+                               Style="{StaticResource MutedText}"
+                               FontSize="11" />
                     </VerticalStackLayout>
                 </Border>
 

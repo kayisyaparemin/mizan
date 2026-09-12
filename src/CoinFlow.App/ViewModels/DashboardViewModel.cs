@@ -40,11 +40,16 @@ public partial class DashboardViewModel(
 
     // --- GİDİŞAT bloğu ---
     [ObservableProperty] private string observedBalanceText = "—";
+    [ObservableProperty] private string expectedTodayText = string.Empty;
+    [ObservableProperty] private string balanceDeviationText = "—";
+    [ObservableProperty] private bool isBalanceDeviationNegative;
+    [ObservableProperty] private string projectedDeficitInterestText = "—";
+    [ObservableProperty] private string plannedDeficitInterestText = string.Empty;
+    [ObservableProperty] private string deficitInterestDeviationText = "—";
+    [ObservableProperty] private bool isDeficitInterestWorse;
     [ObservableProperty] private string projectedEndingText = "—";
-    /// <summary>
-    /// Tahminin neyi içerdiğini söyler. Faiz görünmediğinde kullanıcı farkın
-    /// nereden geldiğini çözemiyordu.
-    /// </summary>
+    [ObservableProperty] private string plannedEndingCompareText = string.Empty;
+    /// <summary>Tahminin neyi içerdiğini söyler; farkın kaynağı görünür olsun.</summary>
     [ObservableProperty] private string projectionBasisText = string.Empty;
     [ObservableProperty] private string deviationText = "—";
     [ObservableProperty] private bool isDeviationNegative;
@@ -282,19 +287,39 @@ public partial class DashboardViewModel(
             CurrentBalanceInput = string.Empty;
         }
 
+        // Parametre parametre karşılaştırma: her satır "şimdi ne / planda ne
+        // / fark ne" söyler. Tek bir fark rakamı, hangi kalemin değiştiğini
+        // gizliyordu.
         ObservedBalanceText = progress.ObservedBalance is { } balance
             ? Money(balance)
             : "—";
+        ExpectedTodayText =
+            $"planda {Money(progress.ExpectedBalanceToday)}";
+        IsBalanceDeviationNegative = progress.BalanceDeviation < 0m;
+        BalanceDeviationText = Delta(progress.BalanceDeviation);
+
+        ProjectedDeficitInterestText =
+            progress.ProjectedDeficitInterest is { } projectedInterest
+                ? Money(projectedInterest)
+                : "—";
+        PlannedDeficitInterestText =
+            $"planda {Money(progress.PlannedDeficitInterest)}";
+        // Faizde artı fark kötüdür; renk mantığı diğer satırların tersi.
+        IsDeficitInterestWorse = progress.DeficitInterestDeviation > 0m;
+        DeficitInterestDeviationText =
+            Delta(progress.DeficitInterestDeviation);
+
         ProjectedEndingText = progress.ProjectedEndingSavings is { } projected
             ? Money(projected)
             : "—";
-        ProjectionBasisText = progress.PlannedInterest > 0m
-            ? $"Kalan ödemeler, kalan yaşam gideri ve {Money(progress.PlannedInterest)} planlanan faiz düşülmüş."
-            : "Kalan ödemeler ve kalan yaşam gideri düşülmüş.";
+        PlannedEndingCompareText =
+            $"planda {Money(progress.PlannedEndingSavings)}";
         IsDeviationNegative = progress.Deviation < 0m;
-        DeviationText = progress.Deviation is { } deviation
-            ? (deviation >= 0m ? "+" : string.Empty) + Money(deviation)
-            : "—";
+        DeviationText = Delta(progress.Deviation);
+
+        ProjectionBasisText = progress.PlannedCardInterest > 0m
+            ? $"Kalan {Money(progress.RemainingPlannedTotal)} ödeme ve {Money(progress.RemainingLivingBudget)} yaşam gideri düşülmüş. Kart faizi ({Money(progress.PlannedCardInterest)}) karta işler, nakit dönem sonunu değiştirmez."
+            : $"Kalan {Money(progress.RemainingPlannedTotal)} ödeme ve {Money(progress.RemainingLivingBudget)} yaşam gideri düşülmüş.";
 
         // KALAN — "bugünden dönem sonuna" değil, "ödenmiş işaretlemediklerin".
         // Vadesi geçmiş ama işaretlenmemiş satırlar da burada durur; başlığı
@@ -327,6 +352,11 @@ public partial class DashboardViewModel(
         RemainingTotalText = Money(progress.RemainingPlannedTotal);
         IsPeriodClosable = progress.IsClosable;
     }
+
+    /// <summary>Fark rakamı; artı işareti bilinçli, yön okunur olsun.</summary>
+    private static string Delta(decimal? value) => value is { } amount
+        ? (amount >= 0m ? "+" : string.Empty) + Money(amount)
+        : "—";
 
     private void ResetToEmptyState(string message, string action)
     {
