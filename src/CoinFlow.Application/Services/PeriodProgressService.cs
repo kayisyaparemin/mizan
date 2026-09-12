@@ -73,6 +73,15 @@ public sealed class PeriodProgressService(
                             openPlan.PlannedLivingBudget;
         var plannedEnding = latest?.PlannedEndingSavings ??
                             openPlan.PlannedEndingSavings;
+        // Faiz de planın bir kalemi ve dönem sonuna kadar önümüzde: kart
+        // faizi ekstre gününde, açık faizi dönem sonunda işler. İkisi de
+        // gözlenen nakit bakiyenin içinde DEĞİL (I9 — kart faizi karta
+        // kapitalize olur, açık faizi bir planlama kalemidir), bu yüzden
+        // gidişattan ayrıca düşülmeleri gerekir. Düşülmezse plana tam uygun
+        // giden kullanıcı bile faiz kadar kârda görünür.
+        var plannedInterest =
+            (latest?.PlannedCardInterest ?? openPlan.PlannedCardInterest) +
+            (latest?.PlannedDeficitInterest ?? openPlan.PlannedDeficitInterest);
         var planLines = latest?.PaymentLines ?? openPlan.PaymentLines;
 
         var totalDays = Math.Max(
@@ -101,6 +110,7 @@ public sealed class PeriodProgressService(
             observation,
             plannedLiving,
             remainingPlannedTotal,
+            plannedInterest,
             elapsedDays,
             totalDays);
 
@@ -116,6 +126,7 @@ public sealed class PeriodProgressService(
             plannedIncome,
             plannedMandatory,
             plannedLiving,
+            plannedInterest,
             plannedEnding,
             observation,
             observation?.ObservedBalance,
@@ -139,6 +150,7 @@ public sealed class PeriodProgressService(
         PeriodObservation? observation,
         decimal plannedLiving,
         decimal remainingPlannedTotal,
+        decimal plannedInterest,
         int elapsedDays,
         int totalDays)
     {
@@ -167,7 +179,10 @@ public sealed class PeriodProgressService(
         // içindedir. Dönem ortasına düşen tek seferlik gelir bu hesapta
         // görünmez — bilinen sadeleştirme, gözlem defterine akış olarak
         // girildiğinde bakiyeye zaten yansımış olur.
-        return balance - remainingPlannedTotal - remainingLiving;
+        return balance
+               - remainingPlannedTotal
+               - remainingLiving
+               - plannedInterest;
     }
 
     private static decimal RoundMoney(decimal amount) =>

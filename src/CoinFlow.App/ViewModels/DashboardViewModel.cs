@@ -41,6 +41,11 @@ public partial class DashboardViewModel(
     // --- GİDİŞAT bloğu ---
     [ObservableProperty] private string observedBalanceText = "—";
     [ObservableProperty] private string projectedEndingText = "—";
+    /// <summary>
+    /// Tahminin neyi içerdiğini söyler. Faiz görünmediğinde kullanıcı farkın
+    /// nereden geldiğini çözemiyordu.
+    /// </summary>
+    [ObservableProperty] private string projectionBasisText = string.Empty;
     [ObservableProperty] private string deviationText = "—";
     [ObservableProperty] private bool isDeviationNegative;
 
@@ -283,6 +288,9 @@ public partial class DashboardViewModel(
         ProjectedEndingText = progress.ProjectedEndingSavings is { } projected
             ? Money(projected)
             : "—";
+        ProjectionBasisText = progress.PlannedInterest > 0m
+            ? $"Kalan ödemeler, kalan yaşam gideri ve {Money(progress.PlannedInterest)} planlanan faiz düşülmüş."
+            : "Kalan ödemeler ve kalan yaşam gideri düşülmüş.";
         IsDeviationNegative = progress.Deviation < 0m;
         DeviationText = progress.Deviation is { } deviation
             ? (deviation >= 0m ? "+" : string.Empty) + Money(deviation)

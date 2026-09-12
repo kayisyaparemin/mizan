@@ -87,7 +87,26 @@ Zaman dilimleri arasında veri yalnız **checkpoint'te** akar: dönem açılış
 
 `PeriodObservation`, açık dönemin gözlem defteridir (`period_observations` + payment/flow child tabloları, şema v13). Alanları `PeriodReviewDraft` ile birebir eşlenir; checkpoint'te `GetObservedReviewDraftAsync` ile review'ı doldurur ve finalization sırasında tüketilip silinir (I15). Böylece dönem içi gözlem ile dönem sonu gerçekleşmesi iki ayrı veri kümesi değildir — aynı defter, farklı zamanda okunur.
 
-`PeriodProgressService` Ana Sayfa'nın motorudur ve yeni bir hesap yapmaz: donmuş planı (varsa en güncel `PeriodPlanRevision` uygulanmış hâlini) gözlemle toplar. Dönem sonu tahmini `gözlenen bakiye − kalan planlı ödemeler − kalan yaşam gideri` ile türetilir; gözlenen bakiye yoksa `null` döner ve ekran gidişat bloğunu hiç göstermez.
+`PeriodProgressService` Ana Sayfa'nın motorudur ve yeni bir hesap yapmaz: donmuş planı (varsa en güncel `PeriodPlanRevision` uygulanmış hâlini) gözlemle toplar. Dönem sonu tahmini
+
+```
+gözlenen bakiye − kalan planlı ödemeler − kalan yaşam gideri − planlanan faiz
+```
+
+ile türetilir; gözlenen bakiye yoksa `null` döner ve ekran gidişat bloğunu hiç göstermez.
+
+**Faiz terimi zorunludur.** `PlannedEndingSavings` kart ve açık finansman faizini içerir; gidişat içermezse iki rakam kıyaslanabilir olmaz ve plana tam uygun giden kullanıcıya faiz kadar kâr gösterilir. Faiz gözlenen nakit bakiyenin içinde değildir: kart faizi karta kapitalize olur (I9), açık faizi bir planlama kalemidir — ikisi de dönem sonuna kadar önümüzdedir. Buradaki faiz **planın** faizidir, gözlenen pozisyondan yeniden hesaplanmaz; yeniden hesaplamak projeksiyon motorunu çağırmayı gerektirirdi ve bu ekranda yasaktır (I16). Plandan çok sapılmışsa gerçekleşecek faiz daha yüksek olabilir — bilinen sadeleştirme.
+
+`PeriodPlanSnapshot` şu kimliği sağlar ve gidişat bu kimliğin aynı kalemlerini kullanır:
+
+```
+PlannedEndingSavings = OpeningSavings + PlannedIncome
+                     − PlannedMandatoryPayments − PlannedLivingBudget
+                     − PlannedLargeExpenses
+                     − PlannedCardInterest − PlannedDeficitInterest
+```
+
+`PaymentLines` hem zorunlu ödemeleri hem planlı büyük giderleri taşır; toplamları `PlannedMandatoryPayments + PlannedLargeExpenses`'a eşittir, çift sayım yoktur.
 
 `RefreshCurrentFinancialStateAsync` yalnız checkpoint yolundan çağrılır (kurulum ve review finalization). Dönem içinde çağrılırsa açık planın penceresi kısalır, orijinal plan yetim kalır ve plan/gerçek karşılaştırması anlamsızlaşır — ölçülmüş bir bozulmadır, `PLAN-IZOLASYON.md`.
 

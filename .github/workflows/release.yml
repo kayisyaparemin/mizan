@@ -201,48 +201,33 @@ jobs:
           cat > release-notes.md <<NOTES
           # Mizan $version
 
-          Ana sayfa artık içinde bulunduğun döneme ait. Mevcut tutar girmek
-          planını ve geçmişini bozmuyor.
+          Gidişat rakamı yanlıştı: faizi saymıyordu.
 
-          ### Neden gerekliydi
+          ### Düzeltme
 
-          Uygulama üç ayrı işi yapıyor: ileriye projeksiyon, dönem içi gidişat
-          ve dönem sonrası plan/gerçek karşılaştırması. Üçüncüsünün kendi yeri
-          yoktu ve birincisinin makinesini ödünç alıyordu — dönem ortasında
-          mevcut tutarı güncellemek dönemin checkpoint'ini öne çekiyordu.
+          Ana sayfadaki **dönem sonu tahmini** kalan ödemeleri ve kalan yaşam
+          giderini düşüyordu ama dönemin faizini hiç saymıyordu. Plan ise
+          sayıyor. İki rakam aynı kalemleri içermeyince "plana göre fark"
+          yalan söylüyordu: plana **tam uygun** giden bir kullanıcıya bile
+          faiz kadar kâr gösteriyordu.
 
-          Ölçüldü: 20 Ağustos'ta dondurulan 21 günlük plan (zorunlu 54.823 TL,
-          iki ödeme satırı) üç günlük bir plana dönüşüyor, zorunlu 0'a düşüyor,
-          orijinal plan erişilemez hâle geliyordu. Dönem sonundaki plan/gerçek
-          karşılaştırması bu yüzden anlamsızdı.
+          Ölçüldü: planına birebir uyan bir dönemde ekran +5.507,29 TL kâr
+          diyordu — ve o rakam planın finansman açığı faizinin tam kendisiydi.
+          Planından fazla harcayanlar bu yüzden kendilerini önde sanıyordu.
 
-          ### Ana Sayfa
+          Artık tahmin planın faizini de düşüyor; plana uygun gidildiğinde
+          fark sıfır çıkıyor. Faiz gözlenen bakiyenin içinde değildir — kart
+          faizi karta işler, açık faizi dönem sonunda hesaplanır — bu yüzden
+          ayrıca düşülmesi gerekiyordu.
 
-          Artık yalnız mevcut dönemi gösteriyor, üç blokta:
+          Tahminin altına neyin düşüldüğünü söyleyen bir satır eklendi:
+          *"Kalan ödemeler, kalan yaşam gideri ve X TL planlanan faiz
+          düşülmüş."* Farkın nereden geldiği artık ekranda görünüyor.
 
-          - **PLAN** — dönem başında dondurulan taahhüt. Değişmiyor.
-          - **GİDİŞAT** — gözlemden türetilen dönem sonu tahmini ve plana göre
-            fark. Gözlem girmediysen bu blok hiç görünmüyor; rakam uydurulmuyor.
-          - **KALAN** — ödenmiş işaretlemediğin plan satırları, vadesi geçmiş
-            olanlar işaretli.
+          ### Not
 
-          **Mevcut tutar artık bir gözlem.** Girdiğin değer dönem planını,
-          kapanış tarihini ve geçmiş kaydını değiştirmiyor; dönemi kapatırken
-          kullanılıyor. Kapanış ekranı dönem boyunca girdiklerinle dolu geliyor
-          — sıfırdan veri girişi değil, onay.
-
-          12 dönem sonu, faiz kırılımı ve geçmiş özeti ana sayfadan kalktı;
-          her biri kendi ekranının verisi. Bağlantılar duruyor, rakamsız.
-
-          ### 12 Dönem
-
-          Projeksiyon checkpoint'e bağlı kalıyor ve dönem içinde kaymıyor —
-          plan tanımı gereği sabittir. Ama mevcut dönemde sapma gözlendiyse
-          üstte söylüyor: hangi checkpoint'e dayandığı, ne kadar sapıldığı ve
-          ne zaman yenileneceği.
-
-          Veritabanı şeması v13'e çıktı: üç yeni tablo eklendi, mevcut
-          verilerin hiçbirine dokunulmadı.
+          Buradaki faiz **planın** faizidir. Plandan çok saparsan gerçekleşecek
+          faiz daha yüksek olabilir; kesin rakam dönem kapanışında belli olur.
           NOTES
 
       - name: Upload signed APK artifact

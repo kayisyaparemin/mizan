@@ -153,7 +153,7 @@
                                Style="{StaticResource MutedText}"
                                FontSize="12" />
                         <Grid ColumnDefinitions="*,Auto"
-                              RowDefinitions="Auto,Auto,Auto"
+                              RowDefinitions="Auto,Auto,Auto,Auto"
                               ColumnSpacing="12"
                               RowSpacing="6">
                             <Label Text="Şu an"
@@ -169,9 +169,14 @@
                                    Text="{Binding ProjectedEndingText}"
                                    Style="{StaticResource SecondaryAmount}" />
                             <Label Grid.Row="2"
+                                   Grid.ColumnSpan="2"
+                                   Text="{Binding ProjectionBasisText}"
+                                   Style="{StaticResource MutedText}"
+                                   FontSize="12" />
+                            <Label Grid.Row="3"
                                    Text="Plana göre fark"
                                    FontFamily="OpenSansSemibold" />
-                            <Label Grid.Row="2"
+                            <Label Grid.Row="3"
                                    Grid.Column="1"
                                    Text="{Binding DeviationText}"
                                    FontFamily="OpenSansSemibold"

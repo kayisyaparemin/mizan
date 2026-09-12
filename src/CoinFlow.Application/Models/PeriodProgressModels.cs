@@ -24,6 +24,7 @@ public sealed record PeriodProgress(
     decimal PlannedIncome,
     decimal PlannedMandatoryPayments,
     decimal PlannedLivingBudget,
+    decimal PlannedInterest,
     decimal PlannedEndingSavings,
     // GİDİŞAT bloğu — gözlem yoksa üçü de null.
     PeriodObservation? Observation,
