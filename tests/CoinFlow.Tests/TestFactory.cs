@@ -85,7 +85,10 @@ internal static class TestFactory
             snapshotService,
             historicalPlanRevisionService,
             reviewService,
-            new PeriodProgressService(store, clock),
+            new PeriodProgressService(
+                store,
+                clock,
+                new CreditCardStatementCalculator()),
             new HistoryQueryService(store, comparison));
     }
 

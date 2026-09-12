@@ -1,5 +1,6 @@
 using CoinFlow.Application.Abstractions;
 using CoinFlow.Application.Models;
+using CoinFlow.Domain.Calculations;
 using CoinFlow.Domain.Models;
 
 namespace CoinFlow.Application.Services;
@@ -8,19 +9,18 @@ namespace CoinFlow.Application.Services;
 /// Mevcut dönemin motoru — Ana Sayfa'nın sahibi olduğu tek zaman dilimi (I16).
 /// </summary>
 /// <remarks>
-/// Donmuş planı ve gözlem defterini toplar, sonra **bu dönemin** değişebilen
-/// parametrelerini gözlenen pozisyondan yeniden hesaplar. Sorulan soru şu:
-/// "elimdeki bu tutarla kalan ödemeleri yapınca dönem sonu ve faiz ne olur?"
+/// Donmuş planı ve gözlem defterini toplar, sonra bu dönemin değişebilen
+/// parametrelerini gözlenen pozisyondan yeniden hesaplar: yaşam gideri
+/// havuzundan ne kaldı, KMH faizi ne olacak, dönem sonu nereye gidiyor.
 ///
-/// I16'nın yasakladığı şey ana sayfanın **başka zaman dilimlerinin** rakamını
-/// göstermesidir; mevcut dönemi hesaplamak tam olarak bu servisin işidir.
-/// <c>FinancialProjectionCalculator</c> yine çağrılmaz — gereken tek formül
-/// açık faizidir ve o <see cref="PeriodPlanSnapshotService"/> ile birebir
-/// aynı kuralı kullanır.
+/// I16 ana sayfanın **başka zaman dilimlerinin** rakamını göstermesini
+/// yasaklar; mevcut dönemi hesaplamasını değil.
+/// <c>FinancialProjectionCalculator</c> yine çağrılmaz.
 /// </remarks>
 public sealed class PeriodProgressService(
     ICoinFlowStore store,
-    IClock clock)
+    IClock clock,
+    CreditCardStatementCalculator cardStatementCalculator)
 {
     public async Task<PeriodProgress?> GetAsync(
         CancellationToken cancellationToken = default)
@@ -36,11 +36,13 @@ public sealed class PeriodProgressService(
             openPlan.Id,
             cancellationToken);
         var settings = await store.GetSettingsAsync(cancellationToken);
+        var cards = await store.GetCreditCardsAsync(cancellationToken);
         return Build(
             history,
             openPlan,
             observation,
-            settings.DeficitFinancingInterestRate,
+            settings,
+            CurrentCardPayments(openPlan, cards, settings),
             clock.Today);
     }
 
@@ -62,11 +64,36 @@ public sealed class PeriodProgressService(
                 .FirstOrDefault();
     }
 
+    /// <summary>
+    /// Kartların şu anki durumuna göre bu dönemde düşen ödeme. Donmuş plan
+    /// o günkü tahmini saklar; bu, aradan geçen ekstre girişleri ve ödeme
+    /// kararlarından sonraki hâlidir.
+    /// </summary>
+    private IReadOnlyDictionary<Guid, decimal> CurrentCardPayments(
+        PeriodPlanSnapshot openPlan,
+        IReadOnlyList<CreditCard> cards,
+        UserSettings settings)
+    {
+        var result = new Dictionary<Guid, decimal>();
+        foreach (var card in cards)
+        {
+            var payment = cardStatementCalculator
+                .Project(card, 6, true, settings.CreditCardCarryInterestRate)
+                .Where(x => x.PaymentDueDate > openPlan.PeriodStart &&
+                            x.PaymentDueDate <= openPlan.PeriodEnd)
+                .Sum(x => x.Payment ?? 0m);
+            result[card.Id] = payment;
+        }
+
+        return result;
+    }
+
     public static PeriodProgress Build(
         FinancialHistoryData history,
         PeriodPlanSnapshot openPlan,
         PeriodObservation? observation,
-        decimal deficitInterestRate,
+        UserSettings settings,
+        IReadOnlyDictionary<Guid, decimal> currentCardPayments,
         DateOnly today)
     {
         var revisions = history.Revisions
@@ -75,16 +102,13 @@ public sealed class PeriodProgressService(
             .ThenBy(x => x.RevisionNumber)
             .ToArray();
         // Karar 7 — dönem içinde "planım ne" sorusunun cevabı yaşayan
-        // taahhüttür. Orijinal plan kaybolmuyor; Geçmiş ekranı Orijinal Plan /
-        // Son Plan / Gerçek üçlüsünü ayrı sütunlarda tutuyor.
+        // taahhüttür. Orijinal plan Geçmiş ekranında korunuyor.
         var latest = revisions.LastOrDefault();
         var plannedIncome = latest?.PlannedIncome ?? openPlan.PlannedIncome;
         var plannedMandatory = latest?.PlannedMandatoryPayments ??
                                openPlan.PlannedMandatoryPayments;
         var plannedLiving = latest?.PlannedLivingBudget ??
                             openPlan.PlannedLivingBudget;
-        var plannedCardInterest = latest?.PlannedCardInterest ??
-                                  openPlan.PlannedCardInterest;
         var plannedDeficitInterest = latest?.PlannedDeficitInterest ??
                                      openPlan.PlannedDeficitInterest;
         var plannedEnding = latest?.PlannedEndingSavings ??
@@ -99,54 +123,98 @@ public sealed class PeriodProgressService(
             0,
             totalDays);
 
-        var settledLineIds = observation is null
-            ? new HashSet<Guid>()
-            : observation.Payments
-                .Where(x => x.Status != ActualPaymentStatus.Unpaid)
-                .Select(x => x.PeriodPlanPaymentLineId)
-                .ToHashSet();
-        var remainingLines = planLines
-            .Where(x => !settledLineIds.Contains(x.Id))
+        // Bir plan satırı iki yoldan "yapılmış" sayılır:
+        //  1. Gözlem defterinde açıkça işaretlenmişse (review akışından gelir),
+        //  2. Vadesi geçmişse — karta ekstre kesilmeden ödeme yapılmaz ve
+        //     vade günü gelen ödeme yapılır. Kullanıcıdan ayrıca işaretlemesini
+        //     istemek gereksiz; planın kendi varsayımı zaten budur.
+        var explicitEntries = observation?.Payments
+            .ToDictionary(x => x.PeriodPlanPaymentLineId) ??
+            new Dictionary<Guid, PeriodObservationPayment>();
+        var settledTotal = 0m;
+        var remaining = new List<PeriodPlanPaymentLine>();
+        foreach (var line in planLines)
+        {
+            if (explicitEntries.TryGetValue(line.Id, out var entry))
+            {
+                if (entry.Status == ActualPaymentStatus.Unpaid)
+                {
+                    remaining.Add(line);
+                }
+                else
+                {
+                    settledTotal += entry.ActualAmount;
+                }
+
+                continue;
+            }
+
+            if (line.PlannedDate <= today)
+            {
+                settledTotal += line.PlannedAmount ?? 0m;
+            }
+            else
+            {
+                remaining.Add(line);
+            }
+        }
+
+        var remainingLines = remaining
             .OrderBy(x => x.PlannedDate)
             .ThenBy(x => x.Name)
             .ToArray();
         var remainingPlannedTotal = remainingLines
             .Sum(x => x.PlannedAmount ?? 0m);
-        var remainingLiving = RemainingLiving(
-            observation,
-            plannedLiving,
-            elapsedDays,
-            totalDays);
 
-        // Planın bugün beklediği bakiye — "şu an" satırının plan sütunu.
-        // Gelir dönem başında alınmış sayılır (dönem maaş gününde başlar),
-        // bugüne kadar vadesi gelen satırlar ödenmiş, yaşam gideri günü
-        // gününe harcanmış kabul edilir.
-        var duePlannedSoFar = planLines
-            .Where(x => x.PlannedDate <= today)
-            .Sum(x => x.PlannedAmount ?? 0m);
-        var expectedToday = openPlan.OpeningSavings
-                            + plannedIncome
-                            - duePlannedSoFar
-                            - (plannedLiving - remainingLiving);
+        // YAŞAM GİDERİ HAVUZU. Bakiyedeki düşüş, işaretlenen ödemeler
+        // çıkarıldıktan sonra yaşam giderine sayılır. Günlere bölünmez:
+        // planlanan bir havuzdur, harcanan ondan düşer, kalan geriye kalandır.
+        decimal? observedLivingSpend = null;
+        decimal? remainingLiving = null;
+        if (observation?.ObservedBalance is { } balance)
+        {
+            var spent = openPlan.OpeningSavings
+                        + plannedIncome
+                        - settledTotal
+                        - balance;
+            // Bakiye beklenenden yüksekse harcama negatife düşemez.
+            observedLivingSpend = Math.Max(0m, spent);
+            remainingLiving =
+                Math.Max(0m, plannedLiving - observedLivingSpend.Value);
+        }
 
         decimal? projectedDeficitInterest = null;
         decimal? projectedEnding = null;
-        if (observation?.ObservedBalance is { } balance)
+        if (observation?.ObservedBalance is { } current &&
+            remainingLiving is { } living)
         {
-            // Motorla birebir aynı kural (PeriodPlanSnapshotService.Freeze):
-            // açık faizi, faiz öncesi dönem sonu negatifse onun mutlak değeri
-            // üzerinden işler. Kart faizi bu hesaba girmez ve nakit dönem
-            // sonunu değiştirmez — karta kapitalize olur (I9).
+            // Motorla birebir aynı kural (PeriodPlanSnapshotService.Freeze).
+            // Kart faizi bu hesaba girmez: karta kapitalize olur, nakit dönem
+            // sonunu değiştirmez (I9).
             var endingBeforeDeficitInterest =
-                balance - remainingPlannedTotal - remainingLiving;
+                current - remainingPlannedTotal - living;
             projectedDeficitInterest = endingBeforeDeficitInterest < 0m
                 ? RoundMoney(
-                    Math.Abs(endingBeforeDeficitInterest) * deficitInterestRate)
+                    Math.Abs(endingBeforeDeficitInterest) *
+                    settings.DeficitFinancingInterestRate)
                 : 0m;
             projectedEnding =
                 endingBeforeDeficitInterest - projectedDeficitInterest.Value;
         }
+
+        var cards = planLines
+            .Where(x => x.SourceType == PlanPaymentSourceType.CreditCard)
+            .OrderBy(x => x.PlannedDate)
+            .ThenBy(x => x.Name)
+            .Select(line => new PeriodCardComparison(
+                line.SourceEntityId,
+                line.Name,
+                line.PlannedDate,
+                line.PlannedAmount ?? 0m,
+                currentCardPayments.TryGetValue(line.SourceEntityId, out var now)
+                    ? now
+                    : null))
+            .ToArray();
 
         return new PeriodProgress(
             openPlan.Id,
@@ -159,45 +227,19 @@ public sealed class PeriodProgressService(
             revisions.Length,
             plannedIncome,
             plannedMandatory,
-            plannedLiving,
-            plannedCardInterest,
-            plannedDeficitInterest,
             plannedEnding,
-            expectedToday,
-            observation,
-            observation?.ObservedBalance,
+            plannedLiving,
+            observedLivingSpend,
+            remainingLiving,
+            cards,
+            plannedDeficitInterest,
             projectedDeficitInterest,
+            observation?.ObservedBalance,
             projectedEnding,
-            projectedEnding is null ? null : projectedEnding - plannedEnding,
+            observation,
             remainingLines,
             remainingPlannedTotal,
-            remainingLiving,
             today >= openPlan.ReviewAvailableFrom);
-    }
-
-    /// <summary>
-    /// Dönemin kalanına düşen yaşam gideri. Gözlemde gerçek harcama
-    /// girildiyse onun günlük hızı, girilmediyse planın günlük hızı esas alınır.
-    /// </summary>
-    private static decimal RemainingLiving(
-        PeriodObservation? observation,
-        decimal plannedLiving,
-        int elapsedDays,
-        int totalDays)
-    {
-        if (totalDays <= 0)
-        {
-            return 0m;
-        }
-
-        if (observation is { ObservedLivingSpend: > 0m } && elapsedDays > 0)
-        {
-            var dailyObserved = observation.ObservedLivingSpend / elapsedDays;
-            return RoundMoney(dailyObserved * (totalDays - elapsedDays));
-        }
-
-        return RoundMoney(
-            plannedLiving * (totalDays - elapsedDays) / totalDays);
     }
 
     private static decimal RoundMoney(decimal amount) =>

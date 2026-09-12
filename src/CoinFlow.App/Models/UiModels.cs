@@ -188,3 +188,13 @@ public sealed record SimulationLine(
     bool DifferenceIsNegative,
     string InterestDifference,
     bool HasInterestDifference);
+
+/// <summary>
+/// Bir kartın bu dönemdeki ödemesi: donmuş planın dediği ile kartın şu anki
+/// durumunun dediği.
+/// </summary>
+public sealed record CardProgressLine(
+    string Name,
+    string DueDate,
+    string Planned,
+    string Current);

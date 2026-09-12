@@ -176,7 +176,7 @@ public partial class FutureMonthsViewModel(
     private async Task RefreshDeviationNoticeAsync()
     {
         var progress = await service.GetPeriodProgressAsync();
-        if (progress?.Deviation is not { } deviation || deviation == 0m)
+        if (progress?.EndingDeviation is not { } deviation || deviation == 0m)
         {
             HasDeviationNotice = false;
             DeviationNoticeText = string.Empty;

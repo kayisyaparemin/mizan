@@ -135,7 +135,7 @@ public sealed class DashboardCurrentBalanceTests
             Assert.False(progress!.HasObservation);
             Assert.Null(progress.ObservedBalance);
             Assert.Null(progress.ProjectedEndingSavings);
-            Assert.Null(progress.Deviation);
+            Assert.Null(progress.EndingDeviation);
             // Plan tarafı yine de dolu.
             Assert.NotEqual(0m, progress.PlannedEndingSavings);
         });
@@ -159,10 +159,41 @@ public sealed class DashboardCurrentBalanceTests
             Assert.Equal(plan.PeriodStart, progress!.PeriodStart);
             Assert.Equal(plan.PeriodEnd, progress.PeriodEnd);
             Assert.Equal(plan.PlannedEndingSavings, progress.PlannedEndingSavings);
-            Assert.Equal(plan.PaymentLines.Count, progress.RemainingLines.Count);
             Assert.Equal(18, progress.ElapsedDays);
             Assert.Equal(21, progress.TotalDays);
             Assert.False(progress.IsClosable);
+        });
+    }
+
+    /// <summary>
+    /// KALAN yalnız vadesi **gelmemiş** satırları taşır. Karta ekstre
+    /// kesilmeden ödeme yapılmaz ve vade günü gelen ödeme yapılır; planın
+    /// kendi varsayımı budur. Kullanıcıdan ayrıca "ödedim" demesini istemek
+    /// gereksiz — o kayıt zaten sonraki maaş döneminin review'ında tutulur.
+    /// </summary>
+    [Fact]
+    public async Task RemainingLines_DropALineOnceItsDueDatePasses()
+    {
+        await WithSeededStore(async store =>
+        {
+            var plan = Assert.Single(
+                (await store.GetFinancialHistoryAsync()).Plans);
+            var firstDue = plan.PaymentLines.Min(x => x.PlannedDate);
+
+            var before = await TestFactory
+                .Service(store, firstDue.AddDays(-1))
+                .GetPeriodProgressAsync();
+            var after = await TestFactory
+                .Service(store, firstDue)
+                .GetPeriodProgressAsync();
+
+            Assert.Equal(plan.PaymentLines.Count, before!.RemainingLines.Count);
+            Assert.DoesNotContain(
+                after!.RemainingLines,
+                x => x.PlannedDate <= firstDue);
+            Assert.True(
+                after.RemainingPlannedTotal < before.RemainingPlannedTotal,
+                "Vadesi geçen satır kalan toplamdan da düşmeli.");
         });
     }
 

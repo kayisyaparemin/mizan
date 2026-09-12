@@ -11,7 +11,13 @@ namespace CoinFlow.Tests;
 public sealed class PeriodObservationTests
 {
     private static readonly DateOnly SeedDate = new(2026, 8, 20);
-    private static readonly DateOnly MidPeriod = new(2026, 9, 7);
+    /// <summary>
+    /// Dönemin ilk günleri: hiçbir plan satırının vadesi gelmemiş. Vadesi
+    /// geçen satır kendiliğinden ödenmiş sayıldığı için (bkz.
+    /// <see cref="DashboardCurrentBalanceTests"/>) buradaki testler elle
+    /// işaretlemeyi ölçebilsin diye o tarihten önce durur.
+    /// </summary>
+    private static readonly DateOnly BeforeAnyDueDate = new(2026, 8, 25);
     private static readonly DateOnly Checkpoint = new(2026, 9, 10);
 
     [Fact]
@@ -23,18 +29,18 @@ public sealed class PeriodObservationTests
             await using (var store = NewStore(path))
             {
                 await SeedAsync(store);
-                var service = TestFactory.Service(store, MidPeriod);
+                var service = TestFactory.Service(store, BeforeAnyDueDate);
                 await service.ObserveCurrentBalanceAsync(-81_000m);
             }
 
             await using (var reopened = NewStore(path))
             {
-                var service = TestFactory.Service(reopened, MidPeriod);
+                var service = TestFactory.Service(reopened, BeforeAnyDueDate);
                 var progress = await service.GetPeriodProgressAsync();
 
                 Assert.NotNull(progress);
                 Assert.Equal(-81_000m, progress!.ObservedBalance);
-                Assert.Equal(MidPeriod, progress.Observation!.ObservedOn);
+                Assert.Equal(BeforeAnyDueDate, progress.Observation!.ObservedOn);
             }
         }
         finally
@@ -51,7 +57,7 @@ public sealed class PeriodObservationTests
     {
         await WithSeededStore(async store =>
         {
-            var service = TestFactory.Service(store, MidPeriod);
+            var service = TestFactory.Service(store, BeforeAnyDueDate);
             var before = await service.GetPeriodProgressAsync();
             Assert.NotNull(before);
             var line = before!.RemainingLines[0];
@@ -78,7 +84,7 @@ public sealed class PeriodObservationTests
     {
         await WithSeededStore(async store =>
         {
-            var service = TestFactory.Service(store, MidPeriod);
+            var service = TestFactory.Service(store, BeforeAnyDueDate);
             var progress = await service.GetPeriodProgressAsync();
             var line = progress!.RemainingLines[0];
 
@@ -100,7 +106,7 @@ public sealed class PeriodObservationTests
     {
         await WithSeededStore(async store =>
         {
-            var service = TestFactory.Service(store, MidPeriod);
+            var service = TestFactory.Service(store, BeforeAnyDueDate);
 
             await Assert.ThrowsAsync<InvalidOperationException>(() =>
                 service.ObservePaymentAsync(
@@ -119,7 +125,7 @@ public sealed class PeriodObservationTests
     {
         await WithSeededStore(async store =>
         {
-            var midService = TestFactory.Service(store, MidPeriod);
+            var midService = TestFactory.Service(store, BeforeAnyDueDate);
             var progress = await midService.GetPeriodProgressAsync();
             var line = progress!.RemainingLines[0];
             await midService.ObservePaymentAsync(

@@ -97,11 +97,22 @@ dönem sonu tahmini     = faiz öncesi − açık faizi
 
 Bu, `PeriodPlanSnapshotService.Freeze`'in kullandığı kuralın birebir aynısıdır; iki taraf aynı formülü kullanmazsa "plana göre fark" yalan söyler. Gözlenen bakiye yoksa hepsi `null` döner ve ekran gidişat bloğunu hiç göstermez.
 
-**Kart faizi nakit dönem sonuna girmez.** `PlannedEndingSavings` da onu içermez — kart carry faizi karta kapitalize olur, nakit akışına yazılmaz (I9). Ekranda ayrı bir bilgi satırı olarak görünür, hesaba katılmaz.
+**Kart faizi nakit dönem sonuna girmez.** `PlannedEndingSavings` da onu içermez — kart carry faizi karta kapitalize olur, nakit akışına yazılmaz (I9). Ana Sayfa'nın gidişat bloğu onu hiç göstermez: kart borcuna ve ödeme kararına bağlıdır, gözlenen nakit pozisyonu onu oynatmaz. Faizin yeri 12 Dönem ekranıdır.
 
 **Açık faizi kopyalanmaz, yeniden hesaplanır.** Kullanıcının ana sayfadan beklediği şey tam olarak budur: pozisyon kötüleşince faizin ne olacağını görmek. Plandan sabit almak, gözlemin değiştirdiği tek faiz kalemini dondurmak olurdu. I16 ana sayfanın **başka zaman dilimlerinin** rakamını göstermesini yasaklar; mevcut dönemi hesaplamasını değil — ve bu hesap için projeksiyon motoru gerekmez, tek formül yukarıdadır.
 
-Ekran tek bir fark rakamı değil, **parametre başına karşılaştırma** gösterir (şimdi / planda / fark): şu anki bakiye planın bugün beklediğine karşı, açık faizi plandakine karşı, dönem sonu plandakine karşı. Sütun düzeni Geçmiş ekranıyla aynıdır (PLANLANAN / GERÇEKLEŞEN / FARK) — Ana Sayfa, Geçmiş'in dönem kapanmadan önceki hâlidir.
+**Yaşam gideri bir havuzdur, günlük hız değil.** `PlannedLivingBudget` dönem boyunca harcanabilecek toplamdır; 20.000 planlanmış ve 15.000 harcanmışsa 5.000 bakiye kalmıştır. Harcanan, gözlenen bakiyedeki düşüşten ödenmiş plan satırları çıkarılarak bulunur:
+
+```
+harcanan = OpeningSavings + PlannedIncome − ödenmiş plan satırları − gözlenen bakiye
+kalan    = max(0, PlannedLivingBudget − harcanan)
+```
+
+Havuzun **içinde** harcamak dönem sonunu değiştirmez (harcanan + kalan her zaman planlanana eşittir); yalnız havuz aşılınca fazlası dönem sonuna ve dolayısıyla açık faizine yansır. Önceki sürüm bu havuzu geçen güne bölüp "bugüne kadar şu kadar harcamış olmalıydın" diye kıyaslıyordu ve plana tam uyan kullanıcıya yoktan sapma üretiyordu. Kart harcaması bu havuza girmez — kartın içinde ekstre tarihiyle yönetilir (I9).
+
+**Vadesi geçen plan satırı ödenmiş sayılır.** Bir satır iki yoldan "yapılmış" olur: gözlem defterinde açıkça işaretlenmişse, ya da `PlannedDate <= today` ise. İkincisi planın kendi varsayımıdır — karta ekstre kesilmeden ödeme yapılmaz, vade günü gelen ödeme de yapılır. Kullanıcıdan her satır için ayrıca onay istemek gereksizdir; gerçekleşen tutar zaten sonraki checkpoint'in review'ında kaydedilir.
+
+Ekran tek bir fark rakamı değil, **parametre başına karşılaştırma** gösterir: yaşam gideri (planlanan / harcanan / kalan), kartlar (planlanan ekstre / mevcut ekstre, kart başına), açık faizi ve dönem sonu (planlanan / mevcut). Açık faizi satırı yalnız gerçekten açık varsa açılır — sıfır yazmak için alan ayrılmaz. Ana Sayfa, Geçmiş'in dönem kapanmadan önceki hâlidir.
 
 `PeriodPlanSnapshot` şu kimliği sağlar:
 

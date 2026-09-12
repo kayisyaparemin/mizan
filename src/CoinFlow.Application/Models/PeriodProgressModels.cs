@@ -3,13 +3,14 @@ using CoinFlow.Domain.Models;
 namespace CoinFlow.Application.Models;
 
 /// <summary>
-/// Ana Sayfa'nın kendi verisi. Mevcut dönemin donmuş planı ile o döneme ait
-/// gözlem defterinin birleşimi.
+/// Ana Sayfa'nın kendi verisi: mevcut dönemin donmuş planı ile gözlem
+/// defterinin birleşimi, parametre parametre.
 /// </summary>
 /// <remarks>
 /// Gelecek 12 dönem bilgisi taşımaz — o 12 Dönem ekranının verisidir (I16).
-/// Ama mevcut dönemin parametrelerini **yeniden hesaplar**: gözlenen bakiye
-/// girildiğinde açık faizinin ne olacağı bu ekranın sorusudur.
+/// Ama mevcut dönemin değişebilen parametrelerini yeniden hesaplar: elindeki
+/// tutarı girdiğinde yaşam gideri havuzundan ne kaldığı, KMH faizinin ne
+/// olacağı ve dönem sonunun nereye gittiği bu ekranın sorusudur.
 /// </remarks>
 public sealed record PeriodProgress(
     Guid PeriodPlanSnapshotId,
@@ -18,46 +19,78 @@ public sealed record PeriodProgress(
     DateOnly Today,
     int ElapsedDays,
     int TotalDays,
-    // PLAN bloğu — en güncel revizyon uygulanmış hâli (karar 7).
     DateOnly PlanFrozenOn,
     int RevisionCount,
     decimal PlannedIncome,
     decimal PlannedMandatoryPayments,
-    decimal PlannedLivingBudget,
-    decimal PlannedCardInterest,
-    decimal PlannedDeficitInterest,
     decimal PlannedEndingSavings,
-    /// <summary>Planın bugün beklediği bakiye; "şu an" satırının plan sütunu.</summary>
-    decimal ExpectedBalanceToday,
-    // GİDİŞAT bloğu — gözlem yoksa hepsi null.
-    PeriodObservation? Observation,
-    decimal? ObservedBalance,
+    // YAŞAM GİDERİ — havuz. Günlere bölünmez: 20.000 planlandıysa ve 15.000
+    // harcandıysa 5.000 kalmıştır. Kart harcaması buraya girmez; o kartın
+    // içinde ekstre tarihiyle yönetilir.
+    decimal PlannedLivingBudget,
+    decimal? ObservedLivingSpend,
+    decimal? RemainingLivingBudget,
+    // KREDİ KARTLARI — planlanan ödeme ile şu anki ödemenin karşılaştırması.
+    IReadOnlyList<PeriodCardComparison> Cards,
+    // KMH — açık finansman faizi; pozisyonla değişir.
+    decimal PlannedDeficitInterest,
     decimal? ProjectedDeficitInterest,
+    // DÖNEM SONU
+    decimal? ObservedBalance,
     decimal? ProjectedEndingSavings,
-    decimal? Deviation,
-    // KALAN bloğu — plandaki, henüz ödenmiş işaretlenmemiş satırlar.
+    PeriodObservation? Observation,
+    // KALAN — plandaki, henüz ödenmiş işaretlenmemiş satırlar.
     IReadOnlyList<PeriodPlanPaymentLine> RemainingLines,
     decimal RemainingPlannedTotal,
-    decimal RemainingLivingBudget,
     bool IsClosable)
 {
     public bool HasObservation => Observation is not null;
-    public bool HasProjection => ProjectedEndingSavings is not null;
     public bool HasRemainingLines => RemainingLines.Count > 0;
     public bool WasRevised => RevisionCount > 0;
+    public bool HasCards => Cards.Count > 0;
 
-    /// <summary>Bugüne kadarki sapma: gözlenen − planın bugün beklediği.</summary>
-    public decimal? BalanceDeviation =>
-        ObservedBalance is { } balance ? balance - ExpectedBalanceToday : null;
+    /// <summary>
+    /// KMH satırı yalnız gerçekten açık varsa gösterilir; sıfır yazmak için
+    /// alan açılmaz.
+    /// </summary>
+    public bool HasDeficitFinancing =>
+        PlannedDeficitInterest > 0m || ProjectedDeficitInterest > 0m;
 
-    /// <summary>Açık faizindeki değişim; plandan sapma arttıkça büyür.</summary>
+    /// <summary>Yaşam gideri havuzu aşıldıysa fark; aşılmadıysa null.</summary>
+    public decimal? LivingOverspend =>
+        ObservedLivingSpend is { } spent && spent > PlannedLivingBudget
+            ? spent - PlannedLivingBudget
+            : null;
+
+    public decimal? EndingDeviation =>
+        ProjectedEndingSavings is { } projected
+            ? projected - PlannedEndingSavings
+            : null;
+
     public decimal? DeficitInterestDeviation =>
         ProjectedDeficitInterest is { } projected
             ? projected - PlannedDeficitInterest
             : null;
 
-    /// <summary>Dönemin ne kadarı geçti; ilerleme çubuğu için 0–1.</summary>
     public double ElapsedRatio => TotalDays <= 0
         ? 0d
         : Math.Clamp((double)ElapsedDays / TotalDays, 0d, 1d);
+}
+
+/// <summary>
+/// Bir kartın bu dönemdeki ödemesi: donmuş planın dediği ile kartın şu anki
+/// durumunun dediği.
+/// </summary>
+public sealed record PeriodCardComparison(
+    Guid CardId,
+    string Name,
+    DateOnly DueDate,
+    decimal Planned,
+    decimal? Current)
+{
+    public decimal? Difference => Current is { } current
+        ? current - Planned
+        : null;
+
+    public bool HasCurrent => Current is not null;
 }

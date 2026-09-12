@@ -4,29 +4,29 @@ using CoinFlow.Infrastructure.Persistence;
 namespace CoinFlow.Tests;
 
 /// <summary>
-/// Gidişat hesabı: "elimdeki tutarla kalan ödemeleri yapınca dönem sonu ve
-/// faiz ne olur?" Her parametre plandaki karşılığıyla kıyaslanabilir olmalı.
+/// Gidişat: "elimdeki tutarla kalan ödemeleri yapınca yaşam gideri havuzumdan
+/// ne kalır, KMH faizi ne olur, dönem sonu nereye gider?"
 /// </summary>
 /// <remarks>
-/// İki gerçek hatadan doğdu. Önce gidişat faizi hiç saymıyordu ve plana tam
-/// uyan kullanıcıya faiz kadar kâr gösteriyordu. Sonra faiz plandan sabit
-/// alındı — oysa açık faizi gözlenen pozisyonla **değişir** ve kullanıcının
-/// görmek istediği tam olarak o değişimdi.
+/// Üç hatadan doğdu. (1) Gidişat faizi hiç saymıyordu. (2) Faiz plandan sabit
+/// alınıyordu, oysa pozisyonla değişir. (3) Yaşam gideri günlere bölünüyordu,
+/// oysa bir **havuz**: 20.000 planlanıp 15.000 harcandıysa 5.000 kalmıştır.
+/// Üçüncüsü en sinsisiydi — plana tam uyan kullanıcıya yoktan sapma
+/// uyduruyordu.
 ///
-/// Kanonik seed'in faizi sıfır olduğu için mevcut testlerin hiçbiri bunları
-/// yakalayamıyordu; buradaki senaryolar bilinçli olarak açık durumda kurulur.
+/// Kanonik seed'in faizi sıfır olduğu için senaryolar bilinçli olarak açık
+/// durumda kurulur.
 /// </remarks>
 public sealed class PeriodTrajectoryTests
 {
     private static readonly DateOnly SeedDate = new(2026, 8, 20);
 
     /// <summary>
-    /// Asıl regresyon testi. Plana tam uyuyorsan her sütun eşit, her fark
-    /// sıfır olmalı; başka her sonuç iki tarafın farklı kalemler içerdiğini
-    /// gösterir.
+    /// Asıl regresyon testi: hiç harcama yapılmamışken gidişat planın
+    /// aynısını vermeli.
     /// </summary>
     [Fact]
-    public async Task OnPlan_EveryParameterMatches()
+    public async Task WithNothingSpentYet_TheTrajectoryMatchesThePlan()
     {
         await WithDeficitPlan(async (store, plan) =>
         {
@@ -34,21 +34,101 @@ public sealed class PeriodTrajectoryTests
                 plan.PlannedDeficitInterest > 0m,
                 "Senaryo faizsiz kurulmuş; test asıl riski ölçmüyor.");
 
-            var elapsed = 2;
-            var service = TestFactory.Service(
-                store,
-                plan.PeriodStart.AddDays(elapsed));
-            await service.ObserveCurrentBalanceAsync(
-                OnPlanBalance(plan, elapsed));
+            var service = ServiceAt(store, plan, 2);
+            await service.ObserveCurrentBalanceAsync(StartingPosition(plan));
             var progress = await service.GetPeriodProgressAsync();
 
             Assert.NotNull(progress);
-            Assert.Equal(0m, progress!.BalanceDeviation);
-            Assert.Equal(0m, progress.DeficitInterestDeviation);
-            Assert.Equal(0m, progress.Deviation);
+            Assert.Equal(0m, progress!.ObservedLivingSpend);
+            Assert.Equal(plan.PlannedLivingBudget, progress.RemainingLivingBudget);
             Assert.Equal(
                 plan.PlannedDeficitInterest,
                 progress.ProjectedDeficitInterest);
+            Assert.Equal(
+                plan.PlannedEndingSavings,
+                progress.ProjectedEndingSavings);
+            Assert.Equal(0m, progress.EndingDeviation);
+        });
+    }
+
+    /// <summary>
+    /// Havuzun **içinde** harcamak dönem sonunu değiştirmez. Planlanan 20.000
+    /// iken 15.000 harcandıysa 5.000 kalmıştır; toplam yine 20.000.
+    /// Eski günlere bölen model burada yoktan sapma üretiyordu.
+    /// </summary>
+    [Fact]
+    public async Task SpendingInsideTheBudget_DoesNotMoveThePeriodEnding()
+    {
+        await WithDeficitPlan(async (store, plan) =>
+        {
+            var spent = 5_000m;
+            Assert.True(spent < plan.PlannedLivingBudget);
+
+            var service = ServiceAt(store, plan, 2);
+            await service.ObserveCurrentBalanceAsync(
+                StartingPosition(plan) - spent);
+            var progress = await service.GetPeriodProgressAsync();
+
+            Assert.NotNull(progress);
+            Assert.Equal(spent, progress!.ObservedLivingSpend);
+            Assert.Equal(
+                plan.PlannedLivingBudget - spent,
+                progress.RemainingLivingBudget);
+            // Havuzdan harcamak toplamı değiştirmez.
+            Assert.Equal(
+                plan.PlannedEndingSavings,
+                progress.ProjectedEndingSavings);
+            Assert.Equal(0m, progress.EndingDeviation);
+            Assert.Null(progress.LivingOverspend);
+        });
+    }
+
+    /// <summary>
+    /// Havuz aşılınca fazlası dönem sonuna yansır — ve KMH faizi de artar.
+    /// </summary>
+    [Fact]
+    public async Task SpendingBeyondTheBudget_WorsensTheEndingAndTheInterest()
+    {
+        await WithDeficitPlan(async (store, plan) =>
+        {
+            var overspend = 5_000m;
+            var service = ServiceAt(store, plan, 2);
+            await service.ObserveCurrentBalanceAsync(
+                StartingPosition(plan) - plan.PlannedLivingBudget - overspend);
+            var progress = await service.GetPeriodProgressAsync();
+
+            Assert.NotNull(progress);
+            Assert.Equal(0m, progress!.RemainingLivingBudget);
+            Assert.Equal(overspend, progress.LivingOverspend);
+            // Dönem sonu aşım kadar kötüleşir, üstüne artan faiz biner.
+            Assert.True(progress.EndingDeviation < -overspend);
+            Assert.True(progress.DeficitInterestDeviation > 0m);
+        });
+    }
+
+    /// <summary>
+    /// Vadesi geçen plan satırı ödenmiş sayılır; kullanıcıdan ayrıca
+    /// işaretlemesi istenmez. Karta ekstre kesilmeden ödeme yapılmaz ve vade
+    /// günü gelen ödeme yapılır — planın kendi varsayımı da budur.
+    /// </summary>
+    [Fact]
+    public async Task LinesPastTheirDueDate_CountAsPaid()
+    {
+        await WithDeficitPlan(async (store, plan) =>
+        {
+            var lastDue = plan.PaymentLines.Max(x => x.PlannedDate);
+            var after = lastDue.DayNumber - plan.PeriodStart.DayNumber + 1;
+            var service = ServiceAt(store, plan, after);
+            // Bütün satırlar ödenmiş, hiç yaşam gideri harcanmamış pozisyon.
+            var paid = plan.PaymentLines.Sum(x => x.PlannedAmount ?? 0m);
+            await service.ObserveCurrentBalanceAsync(
+                StartingPosition(plan) - paid);
+            var progress = await service.GetPeriodProgressAsync();
+
+            Assert.NotNull(progress);
+            Assert.Empty(progress!.RemainingLines);
+            Assert.Equal(0m, progress.RemainingPlannedTotal);
+            Assert.Equal(0m, progress.ObservedLivingSpend);
             Assert.Equal(
                 plan.PlannedEndingSavings,
                 progress.ProjectedEndingSavings);
@@ -56,66 +136,22 @@ public sealed class PeriodTrajectoryTests
     }
 
     /// <summary>
-    /// Kullanıcının asıl istediği: "faiz A oluyor, planda B idi, C fark."
-    /// Açık faizi gözlenen pozisyondan yeniden hesaplanır, plandan
-    /// kopyalanmaz.
-    /// </summary>
-    [Fact]
-    public async Task WorsePosition_RaisesTheDeficitInterest()
-    {
-        await WithDeficitPlan(async (store, plan) =>
-        {
-            var elapsed = 2;
-            var service = TestFactory.Service(
-                store,
-                plan.PeriodStart.AddDays(elapsed));
-            var settings = await store.GetSettingsAsync();
-
-            await service.ObserveCurrentBalanceAsync(
-                OnPlanBalance(plan, elapsed) - 20_000m);
-            var progress = await service.GetPeriodProgressAsync();
-
-            Assert.NotNull(progress);
-            // 20.000 daha kötü pozisyon → açığın mutlak değeri 20.000 büyür.
-            // ending = before − faiz olduğu için before = ending + faiz.
-            var plannedBefore = plan.PlannedEndingSavings +
-                                plan.PlannedDeficitInterest;
-            var expectedInterest = decimal.Round(
-                (Math.Abs(plannedBefore) + 20_000m) *
-                settings.DeficitFinancingInterestRate,
-                2,
-                MidpointRounding.AwayFromZero);
-            Assert.Equal(expectedInterest, progress!.ProjectedDeficitInterest);
-            Assert.True(
-                progress.DeficitInterestDeviation > 0m,
-                "Pozisyon kötüleşince faiz artmalı.");
-            Assert.Equal(-20_000m, progress.BalanceDeviation);
-        });
-    }
-
-    /// <summary>
-    /// I9 — kart faizi karta kapitalize olur, nakit dönem sonunu değiştirmez.
-    /// Motor da (<c>PeriodPlanSnapshotService.Freeze</c>) onu
-    /// <c>PlannedEndingSavings</c>'e katmaz; gidişat da katmamalı.
+    /// I9 — kart faizi karta kapitalize olur, nakit dönem sonuna girmez.
+    /// Motor da (<c>PeriodPlanSnapshotService.Freeze</c>) onu katmıyor.
     /// </summary>
     [Fact]
     public async Task CardInterest_DoesNotEnterTheCashEnding()
     {
         await WithDeficitPlan(async (store, plan) =>
         {
-            var elapsed = 2;
-            var service = TestFactory.Service(
-                store,
-                plan.PeriodStart.AddDays(elapsed));
-            await service.ObserveCurrentBalanceAsync(
-                OnPlanBalance(plan, elapsed));
+            var service = ServiceAt(store, plan, 2);
+            await service.ObserveCurrentBalanceAsync(StartingPosition(plan));
             var progress = await service.GetPeriodProgressAsync();
 
             Assert.NotNull(progress);
-            // Nakit dönem sonu = faiz öncesi − yalnız açık faizi.
             var endingBefore = progress!.ObservedBalance!.Value
                                - progress.RemainingPlannedTotal
-                               - progress.RemainingLivingBudget;
+                               - progress.RemainingLivingBudget!.Value;
             Assert.Equal(
                 endingBefore - progress.ProjectedDeficitInterest!.Value,
                 progress.ProjectedEndingSavings);
@@ -123,117 +159,73 @@ public sealed class PeriodTrajectoryTests
     }
 
     [Fact]
-    public async Task Overspending_ShowsANegativeDeviation()
-    {
-        await WithDeficitPlan(async (store, plan) =>
-        {
-            var elapsed = 2;
-            var service = TestFactory.Service(
-                store,
-                plan.PeriodStart.AddDays(elapsed));
-
-            await service.ObserveCurrentBalanceAsync(
-                OnPlanBalance(plan, elapsed) - 5_000m);
-            var progress = await service.GetPeriodProgressAsync();
-
-            Assert.NotNull(progress);
-            Assert.Equal(-5_000m, progress!.BalanceDeviation);
-            // Dönem sonu farkı harcamadan **büyüktür**: açık faizi de artar.
-            Assert.True(
-                progress.Deviation < -5_000m,
-                "Kötüleşen pozisyon faizi de artırdığı için dönem sonu farkı " +
-                "harcama farkından büyük olmalı.");
-        });
-    }
-
-    [Fact]
-    public async Task UnderSpending_ShowsAPositiveDeviation()
-    {
-        await WithDeficitPlan(async (store, plan) =>
-        {
-            var elapsed = 2;
-            var service = TestFactory.Service(
-                store,
-                plan.PeriodStart.AddDays(elapsed));
-
-            await service.ObserveCurrentBalanceAsync(
-                OnPlanBalance(plan, elapsed) + 3_000m);
-            var progress = await service.GetPeriodProgressAsync();
-
-            Assert.NotNull(progress);
-            Assert.Equal(3_000m, progress!.BalanceDeviation);
-            Assert.True(progress.Deviation > 3_000m);
-            Assert.True(
-                progress.DeficitInterestDeviation < 0m,
-                "İyileşen pozisyon faizi düşürmeli.");
-        });
-    }
-
-    /// <summary>
-    /// Dönem sonu artıya geçerse açık faizi hiç doğmaz.
-    /// </summary>
-    [Fact]
     public async Task PositionTurningPositive_RemovesTheDeficitInterest()
     {
         await WithDeficitPlan(async (store, plan) =>
         {
-            var elapsed = 2;
-            var service = TestFactory.Service(
-                store,
-                plan.PeriodStart.AddDays(elapsed));
-
+            var service = ServiceAt(store, plan, 2);
             await service.ObserveCurrentBalanceAsync(500_000m);
             var progress = await service.GetPeriodProgressAsync();
 
             Assert.NotNull(progress);
             Assert.Equal(0m, progress!.ProjectedDeficitInterest);
             Assert.True(progress.ProjectedEndingSavings > 0m);
+            // Planda faiz vardı; satır kaybolmaz, iyileşmeyi göstermesi
+            // gerekiyor. Alan yalnız iki taraf da sıfırken hiç açılmaz.
+            Assert.True(progress.HasDeficitFinancing);
         });
     }
 
     /// <summary>
-    /// "Şu an" satırının plan sütunu: planın bugün beklediği bakiye.
+    /// Kart satırları plandaki ödeme ile kartın şu anki hâlini yan yana
+    /// koyar; dönemde kart yoksa bölüm hiç üretilmez.
     /// </summary>
     [Fact]
-    public async Task ExpectedBalanceToday_FollowsThePlansOwnPace()
+    public async Task CardRows_PairThePlanWithTheCurrentCard()
     {
         await WithDeficitPlan(async (store, plan) =>
         {
-            var elapsed = 2;
-            var service = TestFactory.Service(
-                store,
-                plan.PeriodStart.AddDays(elapsed));
-            await service.ObserveCurrentBalanceAsync(0m);
+            var service = ServiceAt(store, plan, 2);
+            await service.ObserveCurrentBalanceAsync(StartingPosition(plan));
             var progress = await service.GetPeriodProgressAsync();
 
             Assert.NotNull(progress);
-            Assert.Equal(
-                OnPlanBalance(plan, elapsed),
-                progress!.ExpectedBalanceToday);
+            var cardLines = plan.PaymentLines
+                .Count(x => x.SourceType ==
+                            Domain.Models.PlanPaymentSourceType.CreditCard);
+            Assert.Equal(cardLines, progress!.Cards.Count);
+            Assert.All(progress.Cards, card =>
+                Assert.True(card.Planned > 0m));
         });
     }
 
-    /// <summary>
-    /// Plana tam uygun bakiye: gelir alınmış, bugüne kadar vadesi gelen
-    /// satırlar ödenmiş, yaşam gideri günü gününe harcanmış.
-    /// </summary>
-    private static decimal OnPlanBalance(
-        Domain.Models.PeriodPlanSnapshot plan,
-        int elapsed)
+    /// <summary>Gözlem yoksa hiçbir gidişat rakamı üretilmez.</summary>
+    [Fact]
+    public async Task WithoutAnObservation_NoTrajectoryIsProduced()
     {
-        var total = plan.PeriodEnd.DayNumber - plan.PeriodStart.DayNumber;
-        var dueSoFar = plan.PaymentLines
-            .Where(x => x.PlannedDate <= plan.PeriodStart.AddDays(elapsed))
-            .Sum(x => x.PlannedAmount ?? 0m);
-        var remainingLiving = decimal.Round(
-            plan.PlannedLivingBudget * (total - elapsed) / total,
-            2,
-            MidpointRounding.AwayFromZero);
-        return plan.OpeningSavings
-               + plan.PlannedIncome
-               - dueSoFar
-               - (plan.PlannedLivingBudget - remainingLiving);
+        await WithDeficitPlan(async (store, plan) =>
+        {
+            var service = ServiceAt(store, plan, 2);
+            var progress = await service.GetPeriodProgressAsync();
+
+            Assert.NotNull(progress);
+            Assert.Null(progress!.ObservedLivingSpend);
+            Assert.Null(progress.RemainingLivingBudget);
+            Assert.Null(progress.ProjectedDeficitInterest);
+            Assert.Null(progress.ProjectedEndingSavings);
+        });
     }
+
+    /// <summary>Dönem başı pozisyonu: açılış + dönemin geliri.</summary>
+    private static decimal StartingPosition(
+        Domain.Models.PeriodPlanSnapshot plan) =>
+        plan.OpeningSavings + plan.PlannedIncome;
+
+    private static Application.Services.CoinFlowService ServiceAt(
+        SqliteCoinFlowStore store,
+        Domain.Models.PeriodPlanSnapshot plan,
+        int elapsedDays) =>
+        TestFactory.Service(store, plan.PeriodStart.AddDays(elapsedDays));
 
     /// <summary>
     /// Dönem sonu açık verdiğinde finansman açığı faizi doğar; senaryoyu

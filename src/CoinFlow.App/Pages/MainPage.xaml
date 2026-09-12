@@ -144,127 +144,173 @@
                     </VerticalStackLayout>
                 </Border>
 
-                <!-- GİDİŞAT — yalnız gözlem varsa. Rakam uydurulmaz.
-                     Tek bir "fark" değil, parametre parametre karşılaştırma:
-                     elindeki tutarı girdiğinde planın hangi kalemi ne oluyor.
-                     Sütun düzeni Geçmiş ekranıyla aynı (PLANLANAN/GERÇEKLEŞEN/
-                     FARK) — burası onun dönem kapanmadan önceki hâli. -->
+                <!-- GİDİŞAT — yalnız gözlem varsa. Parametre parametre:
+                     her bölüm planlananı şu anki hâliyle yan yana koyar.
+                     Yaşam gideri bir HAVUZ; günlere bölünmez. Kart harcaması
+                     yaşam gideri değildir, kartın içinde ekstre tarihiyle
+                     yönetilir. -->
                 <Border IsVisible="{Binding HasObservation}"
                         BackgroundColor="{StaticResource ProjectionSurface}">
-                    <VerticalStackLayout Spacing="8">
-                        <Label Text="GİDİŞAT" Style="{StaticResource Eyebrow}" />
-                        <Label Text="{Binding ObservationDateText}"
-                               Style="{StaticResource MutedText}"
-                               FontSize="12" />
+                    <VerticalStackLayout Spacing="14">
+                        <VerticalStackLayout Spacing="2">
+                            <Label Text="GİDİŞAT" Style="{StaticResource Eyebrow}" />
+                            <Label Text="{Binding ObservationDateText}"
+                                   Style="{StaticResource MutedText}"
+                                   FontSize="12" />
+                        </VerticalStackLayout>
 
-                        <Grid ColumnDefinitions="*,Auto,Auto"
-                              RowDefinitions="Auto,Auto,Auto,Auto"
-                              ColumnSpacing="10"
-                              RowSpacing="8">
-                            <Label Grid.Column="1"
-                                   Text="ŞİMDİ"
-                                   Style="{StaticResource Eyebrow}"
-                                   HorizontalTextAlignment="End" />
-                            <Label Grid.Column="2"
-                                   Text="FARK"
-                                   Style="{StaticResource Eyebrow}"
-                                   HorizontalTextAlignment="End" />
-
-                            <!-- Şu an: gözlenen vs planın bugün beklediği -->
-                            <VerticalStackLayout Grid.Row="1" Spacing="1">
-                                <Label Text="Şu an" />
-                                <Label Text="{Binding ExpectedTodayText}"
-                                       Style="{StaticResource MutedText}"
-                                       FontSize="11" />
-                            </VerticalStackLayout>
-                            <Label Grid.Row="1"
-                                   Grid.Column="1"
-                                   Text="{Binding ObservedBalanceText}"
-                                   FontFamily="OpenSansSemibold"
-                                   HorizontalTextAlignment="End"
-                                   VerticalTextAlignment="Center" />
-                            <Label Grid.Row="1"
-                                   Grid.Column="2"
-                                   Text="{Binding BalanceDeviationText}"
-                                   FontFamily="OpenSansSemibold"
-                                   HorizontalTextAlignment="End"
-                                   VerticalTextAlignment="Center"
-                                   TextColor="{StaticResource PositiveText}">
-                                <Label.Triggers>
-                                    <DataTrigger TargetType="Label"
-                                                 Binding="{Binding IsBalanceDeviationNegative}"
-                                                 Value="True">
-                                        <Setter Property="TextColor"
-                                                Value="{StaticResource DeficitText}" />
-                                    </DataTrigger>
-                                </Label.Triggers>
-                            </Label>
-
-                            <!-- Açık faizi: pozisyondan yeniden hesaplanır -->
-                            <VerticalStackLayout Grid.Row="2" Spacing="1">
-                                <Label Text="Finansman açığı faizi" />
-                                <Label Text="{Binding PlannedDeficitInterestText}"
-                                       Style="{StaticResource MutedText}"
-                                       FontSize="11" />
-                            </VerticalStackLayout>
-                            <Label Grid.Row="2"
-                                   Grid.Column="1"
-                                   Text="{Binding ProjectedDeficitInterestText}"
-                                   FontFamily="OpenSansSemibold"
-                                   HorizontalTextAlignment="End"
-                                   VerticalTextAlignment="Center" />
-                            <Label Grid.Row="2"
-                                   Grid.Column="2"
-                                   Text="{Binding DeficitInterestDeviationText}"
-                                   FontFamily="OpenSansSemibold"
-                                   HorizontalTextAlignment="End"
-                                   VerticalTextAlignment="Center"
-                                   TextColor="{StaticResource PositiveText}">
-                                <Label.Triggers>
-                                    <DataTrigger TargetType="Label"
-                                                 Binding="{Binding IsDeficitInterestWorse}"
-                                                 Value="True">
-                                        <Setter Property="TextColor"
-                                                Value="{StaticResource DeficitText}" />
-                                    </DataTrigger>
-                                </Label.Triggers>
-                            </Label>
-
-                            <!-- Dönem sonu: asıl sonuç -->
-                            <VerticalStackLayout Grid.Row="3" Spacing="1">
-                                <Label Text="Dönem sonu"
+                        <!-- YAŞAM GİDERİ — havuz -->
+                        <VerticalStackLayout Spacing="6">
+                            <Label Text="Yaşam gideri"
+                                   FontFamily="OpenSansSemibold" />
+                            <Grid ColumnDefinitions="*,*,*"
+                                  RowDefinitions="Auto,Auto"
+                                  ColumnSpacing="8"
+                                  RowSpacing="3">
+                                <Label Text="PLANLANAN"
+                                       Style="{StaticResource Eyebrow}" />
+                                <Label Grid.Column="1"
+                                       Text="HARCANAN"
+                                       Style="{StaticResource Eyebrow}"
+                                       HorizontalTextAlignment="Center" />
+                                <Label Grid.Column="2"
+                                       Text="KALAN"
+                                       Style="{StaticResource Eyebrow}"
+                                       HorizontalTextAlignment="End" />
+                                <Label Grid.Row="1"
+                                       Text="{Binding PlannedLivingText}"
                                        FontFamily="OpenSansSemibold" />
-                                <Label Text="{Binding PlannedEndingCompareText}"
-                                       Style="{StaticResource MutedText}"
-                                       FontSize="11" />
-                            </VerticalStackLayout>
-                            <Label Grid.Row="3"
-                                   Grid.Column="1"
-                                   Text="{Binding ProjectedEndingText}"
-                                   FontFamily="OpenSansSemibold"
-                                   HorizontalTextAlignment="End"
-                                   VerticalTextAlignment="Center" />
-                            <Label Grid.Row="3"
-                                   Grid.Column="2"
-                                   Text="{Binding DeviationText}"
-                                   FontFamily="OpenSansSemibold"
-                                   HorizontalTextAlignment="End"
-                                   VerticalTextAlignment="Center"
-                                   TextColor="{StaticResource PositiveText}">
-                                <Label.Triggers>
-                                    <DataTrigger TargetType="Label"
-                                                 Binding="{Binding IsDeviationNegative}"
-                                                 Value="True">
-                                        <Setter Property="TextColor"
-                                                Value="{StaticResource DeficitText}" />
-                                    </DataTrigger>
-                                </Label.Triggers>
-                            </Label>
-                        </Grid>
+                                <Label Grid.Row="1"
+                                       Grid.Column="1"
+                                       Text="{Binding SpentLivingText}"
+                                       FontFamily="OpenSansSemibold"
+                                       HorizontalTextAlignment="Center" />
+                                <Label Grid.Row="1"
+                                       Grid.Column="2"
+                                       Text="{Binding RemainingLivingText}"
+                                       FontFamily="OpenSansSemibold"
+                                       HorizontalTextAlignment="End" />
+                            </Grid>
+                            <Label Text="{Binding LivingOverspendText}"
+                                   IsVisible="{Binding HasLivingOverspend}"
+                                   Style="{StaticResource MutedText}"
+                                   FontSize="12"
+                                   TextColor="{StaticResource DeficitText}" />
+                        </VerticalStackLayout>
 
-                        <Label Text="{Binding ProjectionBasisText}"
-                               Style="{StaticResource MutedText}"
-                               FontSize="11" />
+                        <!-- KREDİ KARTLARI -->
+                        <VerticalStackLayout Spacing="6"
+                                             IsVisible="{Binding HasCardLines}">
+                            <Label Text="Kredi kartları"
+                                   FontFamily="OpenSansSemibold" />
+                            <Grid ColumnDefinitions="*,Auto,Auto"
+                                  ColumnSpacing="10">
+                                <Label Grid.Column="1"
+                                       Text="PLANLANAN"
+                                       Style="{StaticResource Eyebrow}"
+                                       HorizontalTextAlignment="End" />
+                                <Label Grid.Column="2"
+                                       Text="MEVCUT"
+                                       Style="{StaticResource Eyebrow}"
+                                       HorizontalTextAlignment="End" />
+                            </Grid>
+                            <VerticalStackLayout BindableLayout.ItemsSource="{Binding CardLines}"
+                                                 Spacing="5">
+                                <BindableLayout.ItemTemplate>
+                                    <DataTemplate x:DataType="models:CardProgressLine">
+                                        <Grid ColumnDefinitions="*,Auto,Auto"
+                                              ColumnSpacing="10">
+                                            <VerticalStackLayout Spacing="1">
+                                                <Label Text="{Binding Name}" />
+                                                <Label Text="{Binding DueDate}"
+                                                       Style="{StaticResource MutedText}"
+                                                       FontSize="11" />
+                                            </VerticalStackLayout>
+                                            <Label Grid.Column="1"
+                                                   Text="{Binding Planned}"
+                                                   HorizontalTextAlignment="End"
+                                                   VerticalTextAlignment="Center" />
+                                            <Label Grid.Column="2"
+                                                   Text="{Binding Current}"
+                                                   FontFamily="OpenSansSemibold"
+                                                   HorizontalTextAlignment="End"
+                                                   VerticalTextAlignment="Center" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </BindableLayout.ItemTemplate>
+                            </VerticalStackLayout>
+                        </VerticalStackLayout>
+
+                        <!-- KMH — yalnız gerçekten açık varsa; sıfır yazmak
+                             için alan açılmaz. -->
+                        <VerticalStackLayout Spacing="6"
+                                             IsVisible="{Binding HasDeficitFinancing}">
+                            <Label Text="KMH faizi"
+                                   FontFamily="OpenSansSemibold" />
+                            <Grid ColumnDefinitions="*,Auto,Auto"
+                                  RowDefinitions="Auto,Auto"
+                                  ColumnSpacing="10"
+                                  RowSpacing="3">
+                                <Label Grid.Column="1"
+                                       Text="PLANLANAN"
+                                       Style="{StaticResource Eyebrow}"
+                                       HorizontalTextAlignment="End" />
+                                <Label Grid.Column="2"
+                                       Text="MEVCUT"
+                                       Style="{StaticResource Eyebrow}"
+                                       HorizontalTextAlignment="End" />
+                                <Label Grid.Row="1"
+                                       Grid.Column="1"
+                                       Text="{Binding PlannedDeficitInterestText}"
+                                       HorizontalTextAlignment="End" />
+                                <Label Grid.Row="1"
+                                       Grid.Column="2"
+                                       Text="{Binding ProjectedDeficitInterestText}"
+                                       FontFamily="OpenSansSemibold"
+                                       HorizontalTextAlignment="End" />
+                            </Grid>
+                        </VerticalStackLayout>
+
+                        <!-- DÖNEM SONU -->
+                        <VerticalStackLayout Spacing="6">
+                            <BoxView HeightRequest="1"
+                                     Color="{StaticResource Line}" />
+                            <Label Text="Dönem sonu"
+                                   FontFamily="OpenSansSemibold" />
+                            <Grid ColumnDefinitions="*,Auto,Auto"
+                                  RowDefinitions="Auto,Auto"
+                                  ColumnSpacing="10"
+                                  RowSpacing="3">
+                                <Label Grid.Column="1"
+                                       Text="PLANLANAN"
+                                       Style="{StaticResource Eyebrow}"
+                                       HorizontalTextAlignment="End" />
+                                <Label Grid.Column="2"
+                                       Text="MEVCUT"
+                                       Style="{StaticResource Eyebrow}"
+                                       HorizontalTextAlignment="End" />
+                                <Label Grid.Row="1"
+                                       Grid.Column="1"
+                                       Text="{Binding PlannedEndingCompareText}"
+                                       HorizontalTextAlignment="End"
+                                       VerticalTextAlignment="Center" />
+                                <Label Grid.Row="1"
+                                       Grid.Column="2"
+                                       Text="{Binding ProjectedEndingText}"
+                                       Style="{StaticResource SecondaryAmount}"
+                                       HorizontalTextAlignment="End"
+                                       TextColor="{StaticResource PositiveText}">
+                                    <Label.Triggers>
+                                        <DataTrigger TargetType="Label"
+                                                     Binding="{Binding IsProjectedEndingNegative}"
+                                                     Value="True">
+                                            <Setter Property="TextColor"
+                                                    Value="{StaticResource DeficitText}" />
+                                        </DataTrigger>
+                                    </Label.Triggers>
+                                </Label>
+                            </Grid>
+                        </VerticalStackLayout>
                     </VerticalStackLayout>
                 </Border>
 

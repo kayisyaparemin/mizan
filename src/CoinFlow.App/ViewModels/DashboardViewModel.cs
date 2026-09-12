@@ -39,20 +39,28 @@ public partial class DashboardViewModel(
     [ObservableProperty] private string plannedEndingText = "—";
 
     // --- GİDİŞAT bloğu ---
-    [ObservableProperty] private string observedBalanceText = "—";
-    [ObservableProperty] private string expectedTodayText = string.Empty;
-    [ObservableProperty] private string balanceDeviationText = "—";
-    [ObservableProperty] private bool isBalanceDeviationNegative;
+    /// <summary>
+    /// Yaşam gideri bir havuz: planlanan / harcanan / kalan. Günlere
+    /// bölünmez — 20.000 planlanıp 15.000 harcandıysa 5.000 kalmıştır.
+    /// </summary>
+    [ObservableProperty] private string plannedLivingText = "—";
+    [ObservableProperty] private string spentLivingText = "—";
+    [ObservableProperty] private string remainingLivingText = "—";
+    [ObservableProperty] private bool hasLivingOverspend;
+    [ObservableProperty] private string livingOverspendText = string.Empty;
+
+    /// <summary>Kartlar: planlanan ödeme ile kartın şu anki hâli.</summary>
+    public ObservableCollection<CardProgressLine> CardLines { get; } = [];
+    [ObservableProperty] private bool hasCardLines;
+
+    [ObservableProperty] private bool hasDeficitFinancing;
+    [ObservableProperty] private string plannedDeficitInterestText = "—";
     [ObservableProperty] private string projectedDeficitInterestText = "—";
-    [ObservableProperty] private string plannedDeficitInterestText = string.Empty;
-    [ObservableProperty] private string deficitInterestDeviationText = "—";
-    [ObservableProperty] private bool isDeficitInterestWorse;
+
+    [ObservableProperty] private string plannedEndingCompareText = "—";
     [ObservableProperty] private string projectedEndingText = "—";
-    [ObservableProperty] private string plannedEndingCompareText = string.Empty;
-    /// <summary>Tahminin neyi içerdiğini söyler; farkın kaynağı görünür olsun.</summary>
-    [ObservableProperty] private string projectionBasisText = string.Empty;
-    [ObservableProperty] private string deviationText = "—";
-    [ObservableProperty] private bool isDeviationNegative;
+    [ObservableProperty] private bool isProjectedEndingNegative;
+    [ObservableProperty] private string observedBalanceText = "—";
 
     // --- KALAN bloğu ---
     [ObservableProperty]
@@ -287,39 +295,52 @@ public partial class DashboardViewModel(
             CurrentBalanceInput = string.Empty;
         }
 
-        // Parametre parametre karşılaştırma: her satır "şimdi ne / planda ne
-        // / fark ne" söyler. Tek bir fark rakamı, hangi kalemin değiştiğini
-        // gizliyordu.
+        // Parametre parametre: her bölüm planlanan ile şu anki hâli yan yana
+        // koyar. Tek bir "fark" rakamı hangi kalemin değiştiğini gizliyordu.
         ObservedBalanceText = progress.ObservedBalance is { } balance
             ? Money(balance)
             : "—";
-        ExpectedTodayText =
-            $"planda {Money(progress.ExpectedBalanceToday)}";
-        IsBalanceDeviationNegative = progress.BalanceDeviation < 0m;
-        BalanceDeviationText = Delta(progress.BalanceDeviation);
 
+        // YAŞAM GİDERİ — havuz
+        PlannedLivingText = Money(progress.PlannedLivingBudget);
+        SpentLivingText = progress.ObservedLivingSpend is { } spent
+            ? Money(spent)
+            : "—";
+        RemainingLivingText = progress.RemainingLivingBudget is { } left
+            ? Money(left)
+            : "—";
+        HasLivingOverspend = progress.LivingOverspend is not null;
+        LivingOverspendText = progress.LivingOverspend is { } over
+            ? $"Havuz {Money(over)} aşıldı; fazlası dönem sonuna yansıyor."
+            : string.Empty;
+
+        // KREDİ KARTLARI
+        CardLines.Clear();
+        foreach (var card in progress.Cards)
+        {
+            CardLines.Add(new CardProgressLine(
+                card.Name,
+                card.DueDate.ToString("dd MMM", TurkishCulture),
+                Money(card.Planned),
+                card.Current is { } now ? Money(now) : "—"));
+        }
+
+        HasCardLines = CardLines.Count > 0;
+
+        // KMH — yalnız gerçekten açık varsa
+        HasDeficitFinancing = progress.HasDeficitFinancing;
+        PlannedDeficitInterestText = Money(progress.PlannedDeficitInterest);
         ProjectedDeficitInterestText =
             progress.ProjectedDeficitInterest is { } projectedInterest
                 ? Money(projectedInterest)
                 : "—";
-        PlannedDeficitInterestText =
-            $"planda {Money(progress.PlannedDeficitInterest)}";
-        // Faizde artı fark kötüdür; renk mantığı diğer satırların tersi.
-        IsDeficitInterestWorse = progress.DeficitInterestDeviation > 0m;
-        DeficitInterestDeviationText =
-            Delta(progress.DeficitInterestDeviation);
 
+        // DÖNEM SONU
+        PlannedEndingCompareText = Money(progress.PlannedEndingSavings);
         ProjectedEndingText = progress.ProjectedEndingSavings is { } projected
             ? Money(projected)
             : "—";
-        PlannedEndingCompareText =
-            $"planda {Money(progress.PlannedEndingSavings)}";
-        IsDeviationNegative = progress.Deviation < 0m;
-        DeviationText = Delta(progress.Deviation);
-
-        ProjectionBasisText = progress.PlannedCardInterest > 0m
-            ? $"Kalan {Money(progress.RemainingPlannedTotal)} ödeme ve {Money(progress.RemainingLivingBudget)} yaşam gideri düşülmüş. Kart faizi ({Money(progress.PlannedCardInterest)}) karta işler, nakit dönem sonunu değiştirmez."
-            : $"Kalan {Money(progress.RemainingPlannedTotal)} ödeme ve {Money(progress.RemainingLivingBudget)} yaşam gideri düşülmüş.";
+        IsProjectedEndingNegative = progress.ProjectedEndingSavings < 0m;
 
         // KALAN — "bugünden dönem sonuna" değil, "ödenmiş işaretlemediklerin".
         // Vadesi geçmiş ama işaretlenmemiş satırlar da burada durur; başlığı
@@ -352,11 +373,6 @@ public partial class DashboardViewModel(
         RemainingTotalText = Money(progress.RemainingPlannedTotal);
         IsPeriodClosable = progress.IsClosable;
     }
-
-    /// <summary>Fark rakamı; artı işareti bilinçli, yön okunur olsun.</summary>
-    private static string Delta(decimal? value) => value is { } amount
-        ? (amount >= 0m ? "+" : string.Empty) + Money(amount)
-        : "—";
 
     private void ResetToEmptyState(string message, string action)
     {

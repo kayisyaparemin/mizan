@@ -201,37 +201,41 @@ jobs:
           cat > release-notes.md <<NOTES
           # Mizan $version
 
-          Ana sayfada mevcut tutarı girdiğinde artık **hangi parametrenin ne
-          olacağını** görüyorsun — tek bir "fark" rakamı değil.
+          Yaşam gideri artık bir **havuz**. 20.000 planladıysan ve 15.000
+          harcadıysan 5.000 bakiyen var — önceki sürüm bunu günlere bölüyor ve
+          plana tam uyan kullanıcıya yoktan sapma uyduruyordu.
 
-          ### Gidişat artık parametre parametre
+          ### Gidişat bloğu baştan yazıldı
 
-          | | Şimdi | Fark |
-          |---|---|---|
-          | **Şu an** · planda X | elindeki tutar | bugüne kadarki sapma |
-          | **Finansman açığı faizi** · planda B | A | C |
-          | **Dönem sonu** · planda Y | X | X−Y |
+          \`\`\`
+          Yaşam gideri   PLANLANAN   HARCANAN   KALAN
+                            20.000      15.000   5.000
 
-          Yani: *"18, 20 Eylül ve 7 Ekim'deki ödemeleri yapınca dönem sonu X
-          oluyor, planda Y idi. Faiz A oluyor, planda B idi."*
+          Kredi kartları             PLANLANAN   MEVCUT
+            Axess · 05 Eki              38.594   41.027
 
-          ### Açık faizi artık yeniden hesaplanıyor
+          KMH faizi                  PLANLANAN   MEVCUT
+                                       7.536      7.536
 
-          Önceki sürümde faiz plandan sabit alınıyordu. Oysa finansman açığı
-          faizi **pozisyonunla değişen** tek kalem: kötüleşirsen artar,
-          toparlarsan azalır — ve zaten görmek istediğin şey buydu. Artık
-          girdiğin tutardan yeniden hesaplanıyor, motorun kullandığı formülün
-          birebir aynısıyla.
+          Dönem sonu                 PLANLANAN   MEVCUT
+                                    -158.257   -158.257
+          \`\`\`
 
-          ### Düzeltme
+          Her satır planlananı bugünkü hâliyle yan yana koyuyor. KMH satırı
+          yalnız gerçekten açık varsa açılıyor; sıfır yazmak için alan
+          ayrılmıyor.
 
-          Bir önceki sürüm kart faizini de dönem sonundan düşüyordu. Kart
-          faizi karta işler, nakit dönem sonunu değiştirmez — plan da onu
-          düşmüyor. Fazladan düşülen tutar kaldırıldı; kart faizi bilgi
-          satırı olarak duruyor.
+          ### Kart harcaması yaşam gideri değil
 
-          Böylece iki taraf aynı kalemleri içeriyor: plana tam uygun
-          gidiyorsan her satırın farkı sıfır çıkıyor.
+          Kart harcamaları kartın içinde ekstre tarihiyle yönetiliyor, yaşam
+          gideri havuzundan düşmüyor. Kartlar kendi bölümünde duruyor: plandaki
+          ödeme ile kartın bugünkü hâli.
+
+          ### Vadesi geçen ödeme kendiliğinden ödenmiş sayılıyor
+
+          Karta ekstre kesilmeden ödeme yapılmıyor, vade günü gelen ödeme de
+          yapılıyor. Artık her satır için "ödedim" demen gerekmiyor — o kayıt
+          zaten sonraki maaş döneminin değerlendirmesinde tutuluyor.
           NOTES
 
       - name: Upload signed APK artifact
