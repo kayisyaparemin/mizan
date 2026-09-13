@@ -1126,6 +1126,11 @@ public partial class SimulationViewModel(
         return $"Bu plan gerçek finans planına eklenecek.\n\n{summary}\n{detail}";
     }
 
+    // Kültür açıkça verilir: varsayılan kültürde ay adı İngilizce çıkıyor.
+    // Tarih yoksa eski interpolasyon gibi boş metin döner.
+    private static string LongDate(DateOnly? date) =>
+        date?.ToString("dd MMMM yyyy", TurkishCulture) ?? string.Empty;
+
     private void RefreshTargetResultAfterSimulation()
     {
         if (string.IsNullOrWhiteSpace(TargetAmount))
@@ -1315,10 +1320,6 @@ public partial class SimulationViewModel(
             SimulationScenarioType.LoanPartialPrepayment => "Kredi ara ödeme",
             _ => "Koşul"
         };
-
-    // Kültür açıkça verilir: varsayılan kültürde ay adı İngilizce çıkıyor.
-    private static string LongDate(DateOnly? date) =>
-        date?.ToString("dd MMMM yyyy", TurkishCulture) ?? "—";
 
     private string LoanLabel(Guid? loanId) =>
         Loans.FirstOrDefault(x => x.Value == loanId)?.Label ?? "Kredi";

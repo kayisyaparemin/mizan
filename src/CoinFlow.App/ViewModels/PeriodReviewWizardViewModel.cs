@@ -99,7 +99,7 @@ public partial class PeriodReviewWizardViewModel(
             var plan = _context.OriginalPlan;
             var finalPlan = FinalPlanValues.From(plan, _context.Revision);
             PeriodText =
-                $"{plan.PeriodStart:dd MMMM yyyy} → {plan.PeriodEnd:dd MMMM yyyy}";
+                $"{plan.PeriodStart.ToString("dd MMMM yyyy", TurkishCulture)} → {plan.PeriodEnd.ToString("dd MMMM yyyy", TurkishCulture)}";
             PlannedIncome = Money(finalPlan.PlannedIncome, 2);
             PlannedLoans = Money(finalPlan.PlannedLoanPayments, 2);
             PlannedCards = Money(finalPlan.PlannedCardPayments, 2);
@@ -320,7 +320,7 @@ public partial class PeriodReviewWizardViewModel(
             var result = await service.FinalizePeriodReviewAsync(draft);
             ComparisonSummary = result.Comparison.Summary;
             SuccessText =
-                $"{result.NewSnapshot.SnapshotDate:dd MMMM yyyy} itibarıyla yeni 12 dönemlik planın güncellendi.";
+                $"{result.NewSnapshot.SnapshotDate.ToString("dd MMMM yyyy", TurkishCulture)} itibarıyla yeni 12 dönemlik planın güncellendi.";
             await feedback.ShowSuccessAsync("Dönem bilgileri kaydedildi.");
             IsSuccess = true;
         }

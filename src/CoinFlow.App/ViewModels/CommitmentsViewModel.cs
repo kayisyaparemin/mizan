@@ -281,7 +281,7 @@ public partial class CommitmentsViewModel(
                 1,
                 useProjectionFallback: true)[0];
             var paymentText = card.CurrentStatement is { } statement
-                ? $"Ekstre: {Money(statement.StatementAmount)} • Son ödeme: {statement.DueDate:dd MMM}"
+                ? $"Ekstre: {Money(statement.StatementAmount)} • Son ödeme: {statement.DueDate.ToString("dd MMM", TurkishCulture)}"
                 : upcoming.Payment is decimal payment
                     ? $"Yaklaşan tahmini ödeme: {Money(payment)} • Son ödeme: {upcoming.PaymentDueDate:dd.MM.yyyy}"
                     : "Yaklaşan ödeme henüz belirlenmedi";

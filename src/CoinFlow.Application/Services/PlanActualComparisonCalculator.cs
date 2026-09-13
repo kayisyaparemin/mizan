@@ -1,3 +1,4 @@
+using System.Globalization;
 using CoinFlow.Application.Models;
 using CoinFlow.Domain.Models;
 
@@ -5,6 +6,11 @@ namespace CoinFlow.Application.Services;
 
 public sealed class PlanActualComparisonCalculator
 {
+    // Özet ekranda gösterilip PeriodActual ile kaydediliyor; cihaz kültürüne
+    // bırakılırsa İngilizce cihazda "1,234.56 TL" olarak kalıcılaşır.
+    private static readonly CultureInfo TurkishCulture =
+        CultureInfo.GetCultureInfo("tr-TR");
+
     public PlanActualComparison Calculate(
         PeriodPlanSnapshot plan,
         PeriodPlanRevision? revision,
@@ -64,7 +70,7 @@ public sealed class PlanActualComparisonCalculator
 
         var direction = endingDifference > 0m ? "üzerinde" : "altında";
         var lead =
-            $"Dönem sonu finansal durumun planın {Math.Abs(endingDifference):N2} TL {direction} gerçekleşti.";
+            $"Dönem sonu finansal durumun planın {Math.Abs(endingDifference).ToString("N2", TurkishCulture)} TL {direction} gerçekleşti.";
         var cause = lines
             .Where(x =>
                 x.Category is not "Dönem düzeltmesi" and
@@ -74,7 +80,7 @@ public sealed class PlanActualComparisonCalculator
             .FirstOrDefault();
         return cause is null
             ? lead
-            : $"{lead} En belirgin fark {cause.Category} kaleminde {Math.Abs(cause.Difference):N2} TL oldu.";
+            : $"{lead} En belirgin fark {cause.Category} kaleminde {Math.Abs(cause.Difference).ToString("N2", TurkishCulture)} TL oldu.";
     }
 
     private sealed record FinalPlanValues(

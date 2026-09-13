@@ -1,3 +1,4 @@
+using System.Globalization;
 using CoinFlow.Application.Abstractions;
 using CoinFlow.Application.Models;
 using CoinFlow.Application.Services;
@@ -84,6 +85,49 @@ public sealed class FinancialSnapshotReviewTests
                 FirstReviewDate.AddDays(1))
                 .GetPeriodReviewAvailabilityAsync()).IsDue);
         });
+    }
+
+    [Fact]
+    public async Task ReviewTexts_UseTurkishFormats_OnEnglishDevice()
+    {
+        // Emülatör İngilizce çalışıyor; ekrana giden metinler yine de Türkçe
+        // ay adı ve Türkçe ondalık ayırıcı kullanmalı.
+        var original = CultureInfo.CurrentCulture;
+        CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("en-US");
+        try
+        {
+            await WithStore(async store =>
+            {
+                var initial = TestFactory.Service(store, InitialDate);
+                await initial.LoadCanonicalDevelopmentDataAsync();
+                await initial.GetFinancialPlanAsync();
+
+                Assert.Equal(
+                    "Son güncelleme: 20 Ağustos 2026",
+                    (await TestFactory.Service(
+                        store,
+                        FirstReviewDate.AddDays(-1))
+                        .GetPeriodReviewAvailabilityAsync()).Message);
+
+                var review = TestFactory.Service(store, FirstReviewDate);
+                Assert.Equal(
+                    "20 Ağustos dönemi güncellenmeye hazır.",
+                    (await review.GetPeriodReviewAvailabilityAsync()).Message);
+
+                var context = await review.GetPeriodReviewContextAsync();
+                var preview = await review.PreviewPeriodReviewAsync(
+                    DefaultDraft(
+                        context,
+                        context.OriginalPlan.PlannedLivingBudget + 1_234.50m));
+                Assert.Matches(
+                    @"planın \d{1,3}(\.\d{3})*,\d{2} TL (altında|üzerinde)",
+                    preview.Comparison.Summary);
+            });
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = original;
+        }
     }
 
     [Fact]

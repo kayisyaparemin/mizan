@@ -35,7 +35,7 @@ public partial class HistoryDetailViewModel(
             var period = await service.GetHistoryPeriodAsync(actualId);
             var plan = period.OriginalPlan;
             PeriodText =
-                $"{plan.PeriodStart:dd MMMM yyyy} → {plan.PeriodEnd:dd MMMM yyyy}";
+                $"{plan.PeriodStart.ToString("dd MMMM yyyy", TurkishCulture)} → {plan.PeriodEnd.ToString("dd MMMM yyyy", TurkishCulture)}";
             Summary = period.Comparison.Summary;
             OriginalLiving = Money(plan.PlannedLivingBudget, 2);
             HasRevision = period.Revision is not null;
@@ -55,7 +55,7 @@ public partial class HistoryDetailViewModel(
                 2);
             Difference = SignedMoney(period.Comparison.Difference);
             NewSnapshotText =
-                $"{period.ResultSnapshot.SnapshotDate:dd MMMM yyyy} • {Money(period.ResultSnapshot.ProjectionStartingSavings, 2)}";
+                $"{period.ResultSnapshot.SnapshotDate.ToString("dd MMMM yyyy", TurkishCulture)} • {Money(period.ResultSnapshot.ProjectionStartingSavings, 2)}";
             ReconciliationText = SignedMoney(
                 period.Actual.ReconciliationAdjustment);
 

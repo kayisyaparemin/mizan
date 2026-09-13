@@ -1,3 +1,4 @@
+using System.Globalization;
 using CoinFlow.Application.Abstractions;
 using CoinFlow.Application.Models;
 using CoinFlow.Domain.Models;
@@ -12,6 +13,9 @@ public sealed class PeriodReviewService(
     FinancialInstrumentReconciliationService instrumentService,
     PlanActualComparisonCalculator comparisonCalculator)
 {
+    private static readonly CultureInfo TurkishCulture =
+        CultureInfo.GetCultureInfo("tr-TR");
+
     public async Task<PeriodReviewAvailability> GetAvailabilityAsync(
         CancellationToken cancellationToken = default)
     {
@@ -38,8 +42,8 @@ public sealed class PeriodReviewService(
                   !finalized &&
                   clock.Today >= plan.ReviewAvailableFrom;
         var message = due
-            ? $"{plan!.PeriodStart:dd MMMM} dönemi güncellenmeye hazır."
-            : $"Son güncelleme: {current.SnapshotDate:dd MMMM yyyy}";
+            ? $"{plan!.PeriodStart.ToString("dd MMMM", TurkishCulture)} dönemi güncellenmeye hazır."
+            : $"Son güncelleme: {current.SnapshotDate.ToString("dd MMMM yyyy", TurkishCulture)}";
         return new PeriodReviewAvailability(
             true,
             due,
