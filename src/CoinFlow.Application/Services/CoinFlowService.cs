@@ -20,7 +20,8 @@ public sealed class CoinFlowService(
     PeriodReviewService reviewService,
     PeriodProgressService periodProgressService,
     HistoryQueryService historyService,
-    LoanPayoffService loanPayoffService)
+    LoanPayoffService loanPayoffService,
+    LoanPayoffAdvisor loanPayoffAdvisor)
 {
     public Task InitializeAsync(CancellationToken cancellationToken = default) =>
         store.InitializeAsync(cancellationToken);
@@ -274,6 +275,24 @@ public sealed class CoinFlowService(
             date,
             requests,
             firstSalaryDate: query.Boundary?.FirstUnrealizedSalaryDate);
+    }
+
+    /// <summary>
+    /// 12 Dönem'in kredi kapatma önerisi. Simülatörle aynı plan ve sınır
+    /// kullanılır ki önerilen ay simülatörde denendiğinde aynı sonucu versin.
+    /// </summary>
+    public async Task<IReadOnlyList<LoanPayoffAdvice>> GetLoanPayoffAdviceAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var date = clock.Today;
+        var query = await GetProjectionPlanAsync(date, cancellationToken);
+        return CanBuildProjection(query.Plan)
+            ? loanPayoffAdvisor.Advise(
+                query.Plan,
+                date,
+                query.Boundary?.FirstUnrealizedSalaryDate,
+                cancellationToken: cancellationToken)
+            : [];
     }
 
     /// <summary>

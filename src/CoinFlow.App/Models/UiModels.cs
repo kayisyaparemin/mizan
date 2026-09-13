@@ -212,3 +212,13 @@ public sealed record LoanImpactLine(
     string Title,
     string Detail,
     string Saving);
+
+/// <summary>12 Dönem'deki kredi kapatma önerisinin bir satırı.</summary>
+public sealed record LoanAdviceLine(
+    Guid LoanId,
+    string Title,
+    string Headline,
+    string Detail,
+    bool IsRecommended,
+    bool NeedsPrincipal,
+    DateOnly? Date);

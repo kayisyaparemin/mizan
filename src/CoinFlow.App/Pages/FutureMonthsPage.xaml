@@ -42,6 +42,53 @@
                         </Grid>
                     </VerticalStackLayout>
                 </Border>
+                <!-- Kredi kapatma önerisi: her kredi için ufuktaki taksit günleri
+                     denenir; önerilen gün hiçbir dönemde açık oluşturmaz ve
+                     toplamda kazandırır. -->
+                <Border Padding="14" IsVisible="{Binding HasLoanAdvice}">
+                    <VerticalStackLayout Spacing="10">
+                        <Label Text="Kredi Kapatma" Style="{StaticResource SectionTitle}" />
+                        <VerticalStackLayout BindableLayout.ItemsSource="{Binding LoanAdvice}"
+                                             Spacing="12">
+                            <BindableLayout.ItemTemplate>
+                                <DataTemplate>
+                                    <VerticalStackLayout Spacing="4">
+                                        <BoxView HeightRequest="1" Color="{StaticResource Line}" />
+                                        <Label Text="{Binding Title}"
+                                               FontFamily="OpenSansSemibold" />
+                                        <Label Text="{Binding Headline}"
+                                               TextColor="{StaticResource WarningText}">
+                                            <Label.Triggers>
+                                                <DataTrigger TargetType="Label"
+                                                             Binding="{Binding IsRecommended}"
+                                                             Value="True">
+                                                    <Setter Property="TextColor"
+                                                            Value="{StaticResource PositiveText}" />
+                                                    <Setter Property="FontFamily"
+                                                            Value="OpenSansSemibold" />
+                                                </DataTrigger>
+                                            </Label.Triggers>
+                                        </Label>
+                                        <Label Text="{Binding Detail}"
+                                               Style="{StaticResource MutedText}"
+                                               FontSize="12" />
+                                        <Button Text="Simülatörde dene →"
+                                                IsVisible="{Binding IsRecommended}"
+                                                Style="{StaticResource LinkButton}"
+                                                HorizontalOptions="Start"
+                                                Command="{Binding Source={x:Reference PageRoot}, Path=BindingContext.TryLoanClosureCommand}"
+                                                CommandParameter="{Binding .}" />
+                                        <Button Text="Krediyi düzenle →"
+                                                IsVisible="{Binding NeedsPrincipal}"
+                                                Style="{StaticResource LinkButton}"
+                                                HorizontalOptions="Start"
+                                                Command="{Binding Source={x:Reference PageRoot}, Path=BindingContext.EditLoansCommand}" />
+                                    </VerticalStackLayout>
+                                </DataTemplate>
+                            </BindableLayout.ItemTemplate>
+                        </VerticalStackLayout>
+                    </VerticalStackLayout>
+                </Border>
                 <Border Padding="14" IsVisible="{Binding HasProjection}">
                     <VerticalStackLayout Spacing="8">
                         <Label Text="Ne zaman karşılayabilirim?" Style="{StaticResource SectionTitle}" />

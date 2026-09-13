@@ -696,6 +696,51 @@ public partial class SimulationViewModel(
         }
     }
 
+    /// <summary>
+    /// 12 Dönem'in önerisini simülatöre koşul olarak ekler ve hesaplar. Aynı
+    /// kredi için taslakta bir kapama koşulu varsa onun yerine geçer; diğer
+    /// koşullara dokunmaz.
+    /// </summary>
+    public async Task TryLoanClosureAsync(Guid loanId, DateOnly date)
+    {
+        if (!IsPlanAvailable ||
+            Loans.FirstOrDefault(x => x.Value == loanId) is not { } loan)
+        {
+            return;
+        }
+
+        try
+        {
+            ResetConditionForm();
+            SelectedScenarioType = ScenarioTypes.First(x =>
+                x.Value == SimulationScenarioType.LoanEarlyClosure);
+            SelectedLoan = loan;
+            StartDate = date.ToDateTime(TimeOnly.MinValue);
+            Name = $"{loan.Label} erken kapama";
+            var request = BuildRequest();
+            foreach (var existing in DraftConditions
+                         .Where(x => x.Request.Type ==
+                                     SimulationScenarioType.LoanEarlyClosure &&
+                                     x.Request.LoanId == loanId)
+                         .ToArray())
+            {
+                DraftConditions.Remove(existing);
+            }
+
+            DraftConditions.Add(CreateConditionView(request));
+            ResetConditionForm();
+            MarkResultsStale();
+            NotifyDraftChanged();
+        }
+        catch (Exception exception)
+        {
+            SetStatus(UserFacingMessages.FromException(exception));
+            return;
+        }
+
+        await CalculateAsync();
+    }
+
     [RelayCommand]
     private void EditCondition(SimulationDraftConditionView? condition)
     {

@@ -13,6 +13,10 @@ public partial class FutureMonthsViewModel(
     CoinFlowService service) : ViewModelBase
 {
     public ObservableCollection<ProjectionLine> Periods { get; } = [];
+    public ObservableCollection<LoanAdviceLine> LoanAdvice { get; } = [];
+    [ObservableProperty] private bool hasLoanAdvice;
+    [ObservableProperty] private bool isLoadingLoanAdvice;
+    private CancellationTokenSource? _loanAdviceCancellation;
     private bool _preserveOnNextAppearance;
 
     [ObservableProperty] private string targetAmount = string.Empty;
@@ -92,6 +96,7 @@ public partial class FutureMonthsViewModel(
             TotalInterestCost = Money(interest.TotalInterestCost, 2);
             HasInterestSummary = interest.TotalInterestCost > 0m;
             await RefreshDeviationNoticeAsync();
+            _ = RefreshLoanAdviceAsync();
             HasTargetResult = false;
             EmptyStateMessage = plan.Salaries.Count == 0
                 ? "12 dönemlik planı oluşturmak için önce gelir bilgisi ekle."
@@ -189,6 +194,111 @@ public partial class FutureMonthsViewModel(
             $"Mevcut dönemde {Money(deviation)} sapma gözlendi. " +
             $"Dönem {progress.PeriodEnd.ToString("d MMMM", TurkishCulture)} tarihinde kapandığında projeksiyon yenilenecek.";
     }
+
+    /// <summary>
+    /// Her kredi için ufuktaki taksit günlerini dener; birkaç düzine
+    /// projeksiyon demek. Dönem listesi beklemesin diye arka planda çalışır,
+    /// sayfa yeniden açılınca öncekini iptal eder.
+    /// </summary>
+    private async Task RefreshLoanAdviceAsync()
+    {
+        _loanAdviceCancellation?.Cancel();
+        var cancellation = new CancellationTokenSource();
+        _loanAdviceCancellation = cancellation;
+        try
+        {
+            IsLoadingLoanAdvice = true;
+            var advice = await Task.Run(
+                () => service.GetLoanPayoffAdviceAsync(cancellation.Token),
+                cancellation.Token);
+            LoanAdvice.Clear();
+            foreach (var item in advice)
+            {
+                LoanAdvice.Add(ToLine(item));
+            }
+
+            HasLoanAdvice = LoanAdvice.Count > 0;
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception exception)
+        {
+            LoanAdvice.Clear();
+            HasLoanAdvice = false;
+            SetStatus(UserFacingMessages.FromException(exception));
+        }
+        finally
+        {
+            if (ReferenceEquals(_loanAdviceCancellation, cancellation))
+            {
+                IsLoadingLoanAdvice = false;
+            }
+        }
+    }
+
+    private static LoanAdviceLine ToLine(LoanPayoffAdvice advice)
+    {
+        var (headline, detail) = advice.Status switch
+        {
+            LoanPayoffAdviceStatus.Recommended => (
+                $"{LongDate(advice.Date)} tarihinde {Money(advice.PayoffAmount ?? 0m)} ile kapatabilirsin",
+                RecommendedDetail(advice)),
+            LoanPayoffAdviceStatus.NoSafeMonth => (
+                "12 dönem içinde açık oluşturmadan kapatılabilecek ay yok",
+                "Kapatmak kredi faizinden kazandırırdı ama bir dönemde finansman açığına girmen ya da açığını büyütmen gerekiyor."),
+            LoanPayoffAdviceStatus.NotWorthIt => (
+                "12 dönem içinde kapatmak kazandırmıyor",
+                "Kapatmak için gereken para finansman açığı faizine mal oluyor; bu, kredinin kendi faizinden pahalı."),
+            LoanPayoffAdviceStatus.NeedsPrincipal => (
+                "Kapatma hesabı için kalan anaparayı gir",
+                "Finansal Yapı → Krediler'den krediyi düzenle; en güvenilirini bankanın kapatma tutarı."),
+            _ => (
+                $"{LongDate(advice.Date)} tarihinde erken kapama planlandı",
+                "Finansal Yapı → Krediler'den geri alabilirsin.")
+        };
+        return new LoanAdviceLine(
+            advice.LoanId,
+            advice.LoanName,
+            headline,
+            detail,
+            advice.Status == LoanPayoffAdviceStatus.Recommended,
+            advice.Status == LoanPayoffAdviceStatus.NeedsPrincipal,
+            advice.Date);
+    }
+
+    private static string RecommendedDetail(LoanPayoffAdvice advice)
+    {
+        var saving = advice.InterestSaving ?? 0m;
+        var net = advice.NetGain ?? 0m;
+        var detail =
+            $"Kredinin ömrü boyunca {Money(saving)} faiz ödemezsin · hiçbir dönemde açık oluşmuyor";
+        if (net < saving - 1m)
+        {
+            detail += $" · açık faizi düşülünce net {Money(net)}";
+        }
+
+        if (advice.BestDate is { } best && advice.BestNetGain is { } bestNet)
+        {
+            detail += $"\nEn kârlı gün: {LongDate(best)} (net {Money(bestNet)})";
+        }
+
+        return detail;
+    }
+
+    private static string LongDate(DateOnly? date) =>
+        date?.ToString("d MMMM yyyy", TurkishCulture) ?? "—";
+
+    [RelayCommand]
+    private Task TryLoanClosureAsync(LoanAdviceLine? line) =>
+        line is { IsRecommended: true, Date: { } date }
+            ? Shell.Current.GoToAsync(
+                $"//simulation/simulation-content?closeLoan={line.LoanId:D}&date={date:yyyy-MM-dd}")
+            : Task.CompletedTask;
+
+    [RelayCommand]
+    private Task EditLoansAsync() =>
+        Shell.Current.GoToAsync("//commitments/commitments-content?section=payment");
 
     private static string PeriodTitle(SalaryPeriodProjection row) =>
         $"{row.PeriodStart.ToString("dd MMMM yyyy", TurkishCulture)} Dönemi";

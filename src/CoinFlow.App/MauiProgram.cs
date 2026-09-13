@@ -64,6 +64,7 @@ public static class MauiProgram
         builder.Services.AddSingleton<PeriodProgressService>();
         builder.Services.AddSingleton<HistoryQueryService>();
         builder.Services.AddSingleton<LoanPayoffService>();
+        builder.Services.AddSingleton<LoanPayoffAdvisor>();
         builder.Services.AddSingleton<IPdfTextExtractor, PdfPigPdfTextExtractor>();
         builder.Services.AddSingleton<ICreditCardStatementParser, AkbankAxessStatementParser>();
         builder.Services.AddSingleton<ICreditCardStatementParser, GarantiBonusStatementParser>();

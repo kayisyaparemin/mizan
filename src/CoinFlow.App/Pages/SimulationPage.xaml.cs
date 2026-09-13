@@ -4,10 +4,12 @@ using CoinFlow.Application.Models;
 
 namespace CoinFlow.App.Pages;
 
-public partial class SimulationPage : ContentPage
+public partial class SimulationPage : ContentPage, IQueryAttributable
 {
     private readonly SimulationViewModel _viewModel;
     private readonly IUserFeedbackService _feedback;
+    private Guid? _requestedClosureLoanId;
+    private DateOnly? _requestedClosureDate;
 
     public SimulationPage(
         SimulationViewModel viewModel,
@@ -25,6 +27,33 @@ public partial class SimulationPage : ContentPage
         {
             await _viewModel.LoadAsync();
         }
+
+        // 12 Dönem'in kredi kapatma önerisinden gelindi: öneri koşul olarak
+        // eklenip hemen hesaplanır.
+        if (_requestedClosureLoanId is Guid loanId &&
+            _requestedClosureDate is DateOnly date)
+        {
+            _requestedClosureLoanId = null;
+            _requestedClosureDate = null;
+            await _viewModel.TryLoanClosureAsync(loanId, date);
+        }
+    }
+
+    public void ApplyQueryAttributes(IDictionary<string, object> query)
+    {
+        _requestedClosureLoanId =
+            query.TryGetValue("closeLoan", out var loan) &&
+            Guid.TryParse(loan?.ToString(), out var loanId)
+                ? loanId
+                : null;
+        _requestedClosureDate =
+            query.TryGetValue("date", out var date) &&
+            DateOnly.TryParseExact(
+                date?.ToString(),
+                "yyyy-MM-dd",
+                out var parsed)
+                ? parsed
+                : null;
     }
 
     private async void OnApplyPlanClicked(object? sender, EventArgs eventArgs)

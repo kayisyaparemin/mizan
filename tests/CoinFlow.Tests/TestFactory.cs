@@ -27,6 +27,21 @@ internal static class TestFactory
             strategyResolver);
     }
 
+    public static LoanPayoffAdvisor LoanPayoffAdvisor(
+        FinancialProjectionCalculator? projection = null)
+    {
+        var calculator = projection ?? ProjectionCalculator();
+        var builder = LoanScheduleBuilder();
+        return new LoanPayoffAdvisor(
+            calculator,
+            new SimulationCalculator(
+                calculator,
+                new InstallmentScheduleCalculator(),
+                builder),
+            new LoanAmortizationCalculator(new LoanScheduleCalculator()),
+            builder);
+    }
+
     public static LoanPaymentScheduleBuilder LoanScheduleBuilder()
     {
         var schedule = new LoanScheduleCalculator();
@@ -104,7 +119,8 @@ internal static class TestFactory
             new LoanPayoffService(
                 clock,
                 new LoanAmortizationCalculator(new LoanScheduleCalculator()),
-                LoanScheduleBuilder()));
+                LoanScheduleBuilder()),
+            LoanPayoffAdvisor(projectionCalculator));
     }
 
     public static FinancialPlan CanonicalPlan() => new()

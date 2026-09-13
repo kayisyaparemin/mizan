@@ -201,37 +201,35 @@ jobs:
           cat > release-notes.md <<NOTES
           # Mizan $version
 
-          Simülatörde artık **krediyi erken kapatmayı** ve **krediye ara
-          ödeme yapmayı** deneyebilirsin.
+          **"Şu ayda krediyi kapatabilirsin."** 12 Dönem ekranında yeni bir
+          Kredi Kapatma kartı var.
 
-          ### Krediyi erken kapat
+          ### Nasıl karar veriyor?
 
-          Krediyi ve tarihi seç. Uygulama o günkü kalan anaparayı ve son
-          taksitten bu yana işleyen faizi hesaplar; sonraki taksitler
-          kalkar. Tarih varsayılan olarak bir sonraki taksit gününe gelir —
-          o gün kapatırsan işleyen faiz olmaz.
+          Her kredin için önümüzdeki 12 dönemdeki taksit günlerinde krediyi
+          kapatmayı tek tek dener ve 12 dönemi yeniden hesaplar. Bir günü
+          yalnızca iki koşul birden sağlanırsa önerir:
 
-          ### Krediye ara ödeme yap
+          - **Hiçbir dönemde finansman açığına girmiyorsun** ya da mevcut
+            açığın büyümüyor,
+          - **toplamda kazanıyorsun** — ödemeyeceğin kredi faizi, kapatmak
+            için kullandığın paranın maliyetinden fazla.
 
-          Anaparadan düşecek tutarı gir ve seç:
+          Bu yüzden bakiyen yetse bile her krediyi önermez: açık faizin
+          kredinin faizinden yüksekse krediyi o parayla kapatmak zarardır ve
+          kart bunu söyler.
 
-          - **Vadeyi kısalt** — taksit aynı kalır, kredi daha erken biter
-            (son taksit küçülebilir).
-          - **Taksiti azalt** — kredi aynı tarihte biter, taksit küçülür.
+          ### Kartta ne görürsün?
 
-          ### Kredi Faizi Tasarrufu
+          - *"18 Aralık 2026 tarihinde 33.177 TL ile kapatabilirsin"* ve
+            kredinin ömrü boyunca ödemeyeceğin faiz.
+          - Uygun gün yoksa sebebi: açığa girmeden kapatılabilecek ay yok,
+            ya da kapatmak kazandırmıyor.
+          - Kredinin anaparası girilmemişse: *"Kapatma hesabı için kalan
+            anaparayı gir."*
 
-          Sonuç ekranında yeni bir bölüm: ne ödeyeceğin, kredinin ne zaman
-          biteceği ve **kredinin ömrü boyunca ödemeyeceğin faiz**. Faiz
-          Karşılaştırması tablosu aynı anda kapatmanın KMH faizine etkisini
-          gösterir — iki tarafı yan yana görürsün.
-
-          ### Planı Uygula ve geri al
-
-          Uyguladığın erken ödeme Finansal Yapı → Krediler'de, kredinin
-          altında o günkü tutarıyla görünür. **Sil** ile geri alırsın.
-          Dönemi kapatırken *ödendi* dersen kredine işlenir; *ödenmedi*
-          dersen iptal olur.
+          **Simülatörde dene →** öneriyi Simülatöre koşul olarak ekler ve
+          hesabı hemen yapar; beğenirsen oradan **Planı Uygula**.
           NOTES
 
       - name: Upload signed APK artifact
