@@ -49,28 +49,51 @@ public sealed record MandatoryPaymentSummary(
     decimal Total);
 
 public sealed class MandatoryPaymentCalculator(
-    LoanScheduleCalculator loanScheduleCalculator,
+    LoanPaymentScheduleBuilder loanScheduleBuilder,
     ScheduledPaymentCalculator scheduledPaymentCalculator)
 {
     public IReadOnlyList<ObligationItem> BuildObligations(
         IEnumerable<Loan> loans,
         IEnumerable<TemporaryPaymentPlan> plans,
+        IEnumerable<ObligationItem> creditCardPayments) =>
+        BuildObligations(loans, [], plans, creditCardPayments);
+
+    /// <remarks>
+    /// Erken ödeme satırı kredinin tipini (<see cref="ObligationType.Loan"/>)
+    /// taşır ama <see cref="ObligationItem.PaymentId"/>'sinde erken ödemenin
+    /// kimliği vardır. Toplamlar onu kredi ödemesi sayar; checkpoint'te
+    /// reconciliation kimliğe bakarak taksitten ayırır.
+    /// </remarks>
+    public IReadOnlyList<ObligationItem> BuildObligations(
+        IEnumerable<Loan> loans,
+        IEnumerable<LoanPrepayment> prepayments,
+        IEnumerable<TemporaryPaymentPlan> plans,
         IEnumerable<ObligationItem> creditCardPayments)
     {
         var items = new List<ObligationItem>();
+        var events = prepayments.ToArray();
 
         foreach (var loan in loans.Where(x => x.IsActive))
         {
-            var dates = loanScheduleCalculator.GetPaymentDates(loan);
-            var finalDate = dates.LastOrDefault();
-            items.AddRange(dates
-                .Select(date => new ObligationItem(
-                    $"{loan.Bank} {loan.Name}".Trim(),
+            var name = $"{loan.Bank} {loan.Name}".Trim();
+            items.AddRange(loanScheduleBuilder
+                .Replay(loan, events)
+                .Payments
+                .Select(payment => new ObligationItem(
+                    payment.Kind switch
+                    {
+                        LoanPaymentKind.EarlyClosure => $"{name} · erken kapama",
+                        LoanPaymentKind.PartialPrepayment => $"{name} · ara ödeme",
+                        _ => name
+                    },
                     ObligationType.Loan,
-                    date,
-                    loan.MonthlyPayment,
-                    date == finalDate,
-                    PaymentId: loan.Id)));
+                    payment.Date,
+                    payment.Amount,
+                    payment.IsFinal,
+                    Detail: payment.Kind == LoanPaymentKind.Installment
+                        ? string.Empty
+                        : "Erken ödeme: anapara + işleyen faiz",
+                    PaymentId: payment.SourceId)));
         }
 
         items.AddRange(scheduledPaymentCalculator.GetItems(plans));

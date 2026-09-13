@@ -201,36 +201,37 @@ jobs:
           cat > release-notes.md <<NOTES
           # Mizan $version
 
-          Kredi erken kapama özelliğinin **zemini**. Bu sürümde kredilerin
-          faizini, gerçek anaparasını ve bugün kapatsan ne ödeyeceğini
-          görüyorsun. "Şu ayda kapatabilirsin" önerisi sonraki sürümlerde.
+          Simülatörde artık **krediyi erken kapatmayı** ve **krediye ara
+          ödeme yapmayı** deneyebilirsin.
 
-          ### Önemli düzeltme: kalan anapara yanlış düşülüyordu
+          ### Krediyi erken kapat
 
-          Dönem kapatınca ödenen taksitin **tamamı** kalan borçtan
-          düşülüyordu. Oysa taksitin bir kısmı faiz. 22 taksitli bir
-          kredide 12 taksit sonra gerçek anapara 111.758 TL iken uygulama
-          16.173 TL gösterecekti. Artık yalnız anapara payı düşüyor.
+          Krediyi ve tarihi seç. Uygulama o günkü kalan anaparayı ve son
+          taksitten bu yana işleyen faizi hesaplar; sonraki taksitler
+          kalkar. Tarih varsayılan olarak bir sonraki taksit gününe gelir —
+          o gün kapatırsan işleyen faiz olmaz.
 
-          **Önceki dönemleri kapattıysan** kredilerinin anaparası zaten
-          fazla düşmüş olabilir. Kredi satırında *"anaparası güncel
-          görünmüyor"* uyarısı görürsen bankandan kapatma tutarını al ve
-          krediyi düzenleyerek tarihiyle gir.
+          ### Krediye ara ödeme yap
 
-          ### Finansal Yapı → Krediler
+          Anaparadan düşecek tutarı gir ve seç:
 
-          - Her kredide: **kalan anapara · aylık faiz · bugün kapatma
-            tutarı · kapatınca ödemeyeceğin faiz**.
-          - Faizi girmen gerekmiyor; taksitten hesaplanıyor (BSMV ve KKDF
-            dahil).
-          - Krediler artık **düzenlenebiliyor**.
-          - **Bankanın kapatma tutarını** tarihiyle girersen hesap ondan
-            yapılıyor; en güvenilir kaynak bu.
-          - **Kredi türü:** tüketici kredisinde erken kapama ücreti yok;
-            sabit faizli konut kredisinde kalan vadeye göre %1 / %2
-            (6502 sayılı Kanun md. 27 ve 37).
-          - Kalan anapara yerine kalan taksitlerin toplamını girersen
-            uygulama bunu fark edip uyarıyor.
+          - **Vadeyi kısalt** — taksit aynı kalır, kredi daha erken biter
+            (son taksit küçülebilir).
+          - **Taksiti azalt** — kredi aynı tarihte biter, taksit küçülür.
+
+          ### Kredi Faizi Tasarrufu
+
+          Sonuç ekranında yeni bir bölüm: ne ödeyeceğin, kredinin ne zaman
+          biteceği ve **kredinin ömrü boyunca ödemeyeceğin faiz**. Faiz
+          Karşılaştırması tablosu aynı anda kapatmanın KMH faizine etkisini
+          gösterir — iki tarafı yan yana görürsün.
+
+          ### Planı Uygula ve geri al
+
+          Uyguladığın erken ödeme Finansal Yapı → Krediler'de, kredinin
+          altında o günkü tutarıyla görünür. **Sil** ile geri alırsın.
+          Dönemi kapatırken *ödendi* dersen kredine işlenir; *ödenmedi*
+          dersen iptal olur.
           NOTES
 
       - name: Upload signed APK artifact

@@ -153,6 +153,7 @@ public sealed class CoinFlowService(
         var salariesTask = store.GetSalaryScheduleAsync(cancellationToken);
         var incomesTask = store.GetOtherIncomesAsync(cancellationToken);
         var loansTask = store.GetLoansAsync(cancellationToken);
+        var prepaymentsTask = store.GetLoanPrepaymentsAsync(cancellationToken);
         var plansTask = store.GetPaymentPlansAsync(cancellationToken);
         var cardsTask = store.GetCreditCardsAsync(cancellationToken);
         var largeExpensesTask =
@@ -165,6 +166,7 @@ public sealed class CoinFlowService(
             salariesTask,
             incomesTask,
             loansTask,
+            prepaymentsTask,
             plansTask,
             cardsTask,
             largeExpensesTask,
@@ -176,6 +178,7 @@ public sealed class CoinFlowService(
             Salaries = await salariesTask,
             OtherIncomes = await incomesTask,
             Loans = await loansTask,
+            LoanPrepayments = await prepaymentsTask,
             PaymentPlans = await plansTask,
             CreditCards = await cardsTask,
             PlannedLargeExpenses = await largeExpensesTask,
@@ -486,6 +489,9 @@ public sealed class CoinFlowService(
                 .ToArray(),
             scenario.PaymentAssignmentStrategies
                 .Where(x => requestIds.Contains(x.Id))
+                .ToArray(),
+            scenario.LoanPrepayments
+                .Where(x => requestIds.Contains(x.Id))
                 .ToArray());
     }
 
@@ -539,6 +545,13 @@ public sealed class CoinFlowService(
                         batch.PaymentAssignmentStrategies.Single().Id,
                         SimulationApplyDestination.Settings,
                         "Gelir kullanım düzeni kaydedildi."),
+                SimulationScenarioType.LoanEarlyClosure or
+                    SimulationScenarioType.LoanPartialPrepayment =>
+                    AppliedResult(
+                        request,
+                        batch.LoanPrepayments.Single().Id,
+                        SimulationApplyDestination.Payments,
+                        "Erken ödeme kredinin planına eklendi."),
                 _ => throw new ArgumentOutOfRangeException(nameof(requests))
             };
         }
@@ -597,6 +610,11 @@ public sealed class CoinFlowService(
                 when plan.PaymentAssignmentStrategies.Any(x => x.Id == entityId) =>
                 AppliedResult(request, entityId, SimulationApplyDestination.Settings,
                     "Gelir kullanım düzeni değişikliği daha önce kaydedildi."),
+            SimulationScenarioType.LoanEarlyClosure or
+                SimulationScenarioType.LoanPartialPrepayment
+                when plan.LoanPrepayments.Any(x => x.Id == entityId) =>
+                AppliedResult(request, entityId, SimulationApplyDestination.Payments,
+                    "Erken ödeme daha önce kredinin planına eklendi."),
             _ => null
         };
     }
@@ -751,6 +769,20 @@ public sealed class CoinFlowService(
         CancellationToken cancellationToken = default)
     {
         await store.DeleteLoanAsync(id, cancellationToken);
+        await CapturePlanningChangeAsync(
+            "Kredi planı değişti",
+            cancellationToken);
+    }
+
+    /// <summary>
+    /// Uygulanmış bir erken ödemeyi geri alır. Kredinin kendisi hiç
+    /// değişmediği için geri almak olayı silmekten ibarettir.
+    /// </summary>
+    public async Task DeleteLoanPrepaymentAsync(
+        Guid id,
+        CancellationToken cancellationToken = default)
+    {
+        await store.DeleteLoanPrepaymentAsync(id, cancellationToken);
         await CapturePlanningChangeAsync(
             "Kredi planı değişti",
             cancellationToken);

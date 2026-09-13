@@ -1139,6 +1139,7 @@ public sealed class SimulationTests
                     }
                 ],
                 [],
+                [],
                 []);
 
             await Assert.ThrowsAnyAsync<Exception>(() =>

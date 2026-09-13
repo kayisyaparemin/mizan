@@ -48,6 +48,7 @@ public sealed class FinancialProjectionCalculator(
         var obligations = mandatoryPaymentCalculator
             .BuildObligations(
                 plan.Loans,
+                plan.LoanPrepayments,
                 plan.PaymentPlans,
                 cardBundle.Obligations)
             .Concat(BuildLargeExpenseObligations(plan.PlannedLargeExpenses))

@@ -226,6 +226,29 @@ public partial class CommitmentsViewModel(
                 overview.IssueMessage is not null));
         }
 
+        foreach (var planned in loanPayoffService.DescribePrepayments(plan))
+        {
+            var loanName = $"{planned.Loan.Bank} {planned.Loan.Name}".Trim();
+            var mode = planned.Prepayment.Mode switch
+            {
+                LoanPrepaymentMode.FullClosure => "erken kapama",
+                LoanPrepaymentMode.ReduceTerm => "ara ödeme · vade kısalır",
+                _ => "ara ödeme · taksit azalır"
+            };
+            _allItems.Add(new FinancialRecordLine(
+                planned.Prepayment.Id,
+                ManagementSection.Payment,
+                FinancialRecordKind.LoanPrepayment,
+                $"{loanName} · {mode}",
+                $"Planlı: {planned.Prepayment.Date:dd.MM.yyyy}",
+                planned.Amount is decimal amount ? Money(amount) : "—",
+                "Erken ödeme",
+                planned.IsUnquotable
+                    ? "Kredinin anaparası hesaplanamadığı için bu ödeme projeksiyona girmiyor."
+                    : "Simülatörden uygulandı. Silersen kredi eski ödeme planına döner.",
+                planned.IsUnquotable));
+        }
+
         foreach (var paymentPlan in plan.PaymentPlans)
         {
             var paymentDetail = paymentPlan.Kind == PaymentPlanKind.Installment &&
@@ -754,6 +777,9 @@ public partial class CommitmentsViewModel(
                 case FinancialRecordKind.Loan:
                     await service.DeleteLoanAsync(item.Id);
                     break;
+                case FinancialRecordKind.LoanPrepayment:
+                    await service.DeleteLoanPrepaymentAsync(item.Id);
+                    break;
                 case FinancialRecordKind.CreditCard:
                     await service.DeleteCreditCardAsync(item.Id);
                     break;
@@ -1219,6 +1245,7 @@ public partial class CommitmentsViewModel(
                     CreditCardItems.Add(item);
                     break;
                 case FinancialRecordKind.Loan:
+                case FinancialRecordKind.LoanPrepayment:
                     LoanItems.Add(item);
                     break;
                 case FinancialRecordKind.InstallmentPlan:
@@ -1247,7 +1274,7 @@ public partial class CommitmentsViewModel(
         FirstCardId = CreditCardItems.FirstOrDefault()?.Id;
         StructureSummary =
             $"{IncomeItems.Count} gelir • {CreditCardItems.Count} kart • " +
-            $"{LoanItems.Count} kredi • {RegularPaymentItems.Count + OneTimePaymentItems.Count} ödeme";
+            $"{LoanItems.Count(x => x.Kind == FinancialRecordKind.Loan)} kredi • {RegularPaymentItems.Count + OneTimePaymentItems.Count} ödeme";
     }
 
     private void ApplyStatementImport(

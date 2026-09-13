@@ -29,10 +29,23 @@ public partial class SimulationViewModel(
         new("Tek seferlik gelir", SimulationScenarioType.FutureIncome),
         new("Gelir değişikliği", SimulationScenarioType.SalaryChange),
         new("Gelir kullanım düzeni değişikliği", SimulationScenarioType.PaymentStrategyChange),
-        new("Kart ödeme şeklini değiştir", SimulationScenarioType.CreditCardPaymentMode)
+        new("Kart ödeme şeklini değiştir", SimulationScenarioType.CreditCardPaymentMode),
+        new("Krediyi erken kapat", SimulationScenarioType.LoanEarlyClosure),
+        new("Krediye ara ödeme yap", SimulationScenarioType.LoanPartialPrepayment)
     ];
 
     public ObservableCollection<SelectionOption<Guid>> CreditCards { get; } = [];
+    public ObservableCollection<SelectionOption<Guid>> Loans { get; } = [];
+    public ObservableCollection<LoanImpactLine> LoanImpacts { get; } = [];
+
+    public IReadOnlyList<SelectionOption<LoanPrepaymentMode>>
+        PrepaymentModes { get; } =
+    [
+        new("Vadeyi kısalt (taksit aynı kalır)", LoanPrepaymentMode.ReduceTerm),
+        new("Taksiti azalt (vade aynı kalır)", LoanPrepaymentMode.ReduceInstallment)
+    ];
+
+    private readonly Dictionary<Guid, Loan> _loans = [];
     public ObservableCollection<SimulationDraftConditionView>
         DraftConditions { get; } = [];
     public ObservableCollection<SimulatorPeriodView> Results { get; } = [];
@@ -95,6 +108,12 @@ public partial class SimulationViewModel(
     [ObservableProperty] private SelectionOption<DateOnly>? selectedStrategySalaryDate;
     [ObservableProperty] private SelectionOption<CreditCardPaymentType>? selectedCardPaymentMode;
     [ObservableProperty] private SelectionOption<bool>? selectedCardPaymentScope;
+    [ObservableProperty] private SelectionOption<Guid>? selectedLoan;
+    [ObservableProperty] private SelectionOption<LoanPrepaymentMode>? selectedPrepaymentMode;
+    [ObservableProperty] private bool isLoanPrepayment;
+    [ObservableProperty] private bool isPartialPrepayment;
+    [ObservableProperty] private string amountLabel = "Tutar";
+    [ObservableProperty] private bool hasLoanImpacts;
     [ObservableProperty] private string scenarioDescription = string.Empty;
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanApplyPlan))]
@@ -257,6 +276,16 @@ public partial class SimulationViewModel(
                     card.Id));
             }
 
+            Loans.Clear();
+            _loans.Clear();
+            foreach (var loan in plan.Loans.Where(x => x.IsActive))
+            {
+                Loans.Add(new SelectionOption<Guid>(
+                    $"{loan.Bank} {loan.Name}".Trim(),
+                    loan.Id));
+                _loans[loan.Id] = loan;
+            }
+
             var currentMode = overview.Current?.Mode ??
                               throw new InvalidOperationException(
                                   "Gelir kullanım düzeni bulunamadı.");
@@ -274,6 +303,7 @@ public partial class SimulationViewModel(
 
             SelectedScenarioType ??= ScenarioTypes[0];
             SelectedCreditCard ??= CreditCards.FirstOrDefault();
+            SelectedLoan ??= Loans.FirstOrDefault();
         }
         catch (Exception exception)
         {
@@ -342,10 +372,27 @@ public partial class SimulationViewModel(
         IsFinancing = type == SimulationScenarioType.FinancingLoan;
         IsStrategyChange = type == SimulationScenarioType.PaymentStrategyChange;
         IsCardPayoff = type == SimulationScenarioType.CreditCardPaymentMode;
-        NeedsAmount = !IsStrategyChange && !IsCardPayoff;
+        IsLoanPrepayment = type is
+            SimulationScenarioType.LoanEarlyClosure or
+            SimulationScenarioType.LoanPartialPrepayment;
+        IsPartialPrepayment =
+            type == SimulationScenarioType.LoanPartialPrepayment;
+        NeedsAmount = !IsStrategyChange && !IsCardPayoff &&
+                      type != SimulationScenarioType.LoanEarlyClosure;
+        AmountLabel = IsPartialPrepayment
+            ? "Anaparadan düşecek tutar"
+            : "Tutar";
         StartDateLabel = IsCardPayoff
             ? "Hangi ekstreden itibaren (son ödeme tarihi)"
-            : "Başlangıç / işlem tarihi";
+            : IsLoanPrepayment
+                ? "Ödeme tarihi"
+                : "Başlangıç / işlem tarihi";
+        if (IsLoanPrepayment)
+        {
+            SelectedLoan ??= Loans.FirstOrDefault();
+            SelectedPrepaymentMode ??= PrepaymentModes[0];
+            MoveStartDateToNextInstallment();
+        }
         if (IsCardPayoff)
         {
             SelectedCardPaymentMode ??= CardPaymentModes[0];
@@ -376,6 +423,10 @@ public partial class SimulationViewModel(
                 "Yeni düzen yalnızca seçtiğin dönemden itibaren hesaplanır; Simülasyon Yap finans kayıtlarını değiştirmez.",
             SimulationScenarioType.CreditCardPaymentMode =>
                 "Kartın ödeme şeklini değiştirir. Kart faizi ile finansman açığı faizi ters yönde hareket edebilir; Faiz Karşılaştırması ikisini ayrı gösterir.",
+            SimulationScenarioType.LoanEarlyClosure =>
+                "Kalan anapara ve son taksitten bu yana işleyen faiz tek seferde ödenir; sonraki taksitler kalkar. Taksit gününde kapatırsan işleyen faiz olmaz. Tüketici kredisinde erken kapama ücreti alınamaz.",
+            SimulationScenarioType.LoanPartialPrepayment =>
+                "Girdiğin tutar anaparadan düşer; o tutarın son taksitten bu yana işleyen faizi de ödenir. Vadeyi kısaltırsan taksit aynı kalır, taksiti azaltırsan kredi aynı tarihte biter.",
             _ => string.Empty
         };
     }
@@ -384,6 +435,44 @@ public partial class SimulationViewModel(
     partial void OnAmountChanged(string value) { }
     partial void OnSelectedCreditCardChanged(SelectionOption<Guid>? value) =>
         _ = value;
+
+    partial void OnSelectedLoanChanged(SelectionOption<Guid>? value)
+    {
+        if (IsLoanPrepayment && _editingConditionId is null)
+        {
+            MoveStartDateToNextInstallment();
+        }
+    }
+
+    /// <summary>
+    /// Erken ödemenin en ucuz günü taksit günüdür: işleyen faiz sıfırdır.
+    /// Tarihi seçilen tarihten sonraki ilk taksit gününe taşır ve plan adını
+    /// krediden türetir; düzenlenen koşulda kullanıcının seçimine dokunmaz.
+    /// </summary>
+    private void MoveStartDateToNextInstallment()
+    {
+        if (_editingConditionId is not null ||
+            SelectedLoan is not { } option ||
+            !_loans.TryGetValue(option.Value, out var loan))
+        {
+            return;
+        }
+
+        Name = IsPartialPrepayment
+            ? $"{option.Label} ara ödeme"
+            : $"{option.Label} erken kapama";
+        var from = DateOnly.FromDateTime(DateTime.Today);
+        var next = Enumerable.Range(0, loan.RemainingInstallmentCount)
+            .Select(index => CalendarRules.AddMonthsKeepingDay(
+                loan.NextPaymentDate,
+                index,
+                loan.PaymentDay))
+            .FirstOrDefault(date => date >= from);
+        if (next != default)
+        {
+            StartDate = next.ToDateTime(TimeOnly.MinValue);
+        }
+    }
     partial void OnStartDateChanged(DateTime value) { }
     partial void OnPaymentCountChanged(string value) { }
     partial void OnFirstPaymentDateChanged(DateTime value) =>
@@ -667,6 +756,8 @@ public partial class SimulationViewModel(
     private void ClearResults()
     {
         Results.Clear();
+        LoanImpacts.Clear();
+        HasLoanImpacts = false;
         NarrativeInsights.Clear();
         SummaryMetrics.Clear();
         InterestComparison.Clear();
@@ -865,6 +956,8 @@ public partial class SimulationViewModel(
             Results.Clear();
             NarrativeInsights.Clear();
             SummaryMetrics.Clear();
+            LoanImpacts.Clear();
+            HasLoanImpacts = false;
             InterestComparison.Clear();
             _lastBaselineProjection = [];
             HasResults = false;
@@ -906,9 +999,10 @@ public partial class SimulationViewModel(
         return new SimulationRequest(
             type,
             Name,
-            IsStrategyChange || IsCardPayoff
+            IsStrategyChange || IsCardPayoff ||
+            type == SimulationScenarioType.LoanEarlyClosure
                 ? 0m
-                : ParseMoney(Amount, "Tutar"),
+                : ParseMoney(Amount, AmountLabel),
             IsStrategyChange
                 ? SelectedStrategySalaryDate?.Value ??
                   throw new InvalidOperationException(
@@ -931,7 +1025,12 @@ public partial class SimulationViewModel(
                   throw new InvalidOperationException(
                       "Kart ödeme şeklini seçmelisin.")
                 : null,
-            IsCardPayoff && SelectedCardPaymentScope?.Value == true);
+            IsCardPayoff && SelectedCardPaymentScope?.Value == true,
+            IsLoanPrepayment
+                ? SelectedLoan?.Value ??
+                  throw new InvalidOperationException("Bir kredi seçmelisin.")
+                : null,
+            IsPartialPrepayment ? SelectedPrepaymentMode?.Value : null);
     }
 
     private string BuildApplyConfirmation(IReadOnlyList<SimulationRequest> requests)
@@ -954,25 +1053,30 @@ public partial class SimulationViewModel(
     {
         var summary = request.Type is
             SimulationScenarioType.PaymentStrategyChange or
-            SimulationScenarioType.CreditCardPaymentMode
+            SimulationScenarioType.CreditCardPaymentMode or
+            SimulationScenarioType.LoanEarlyClosure
                 ? request.Name.Trim()
                 : $"{Money(request.Amount)} {request.Name.Trim()}";
         var detail = request.Type switch
         {
             SimulationScenarioType.CreditCardInstallmentPurchase =>
-                $"Kart: {CardLabel(request.CreditCardId)}\n{request.PaymentCount} taksit\nİşlem: {request.StartDate:dd MMMM yyyy}",
+                $"Kart: {CardLabel(request.CreditCardId)}\n{request.PaymentCount} taksit\nİşlem: {LongDate(request.StartDate)}",
             SimulationScenarioType.CreditCardSinglePayment =>
-                $"Kart: {CardLabel(request.CreditCardId)}\nİşlem: {request.StartDate:dd MMMM yyyy}",
+                $"Kart: {CardLabel(request.CreditCardId)}\nİşlem: {LongDate(request.StartDate)}",
             SimulationScenarioType.CreditCardPaymentMode =>
-                $"Kart: {CardLabel(request.CreditCardId)}\n{CardModeLabel(request.CardPaymentType)} · {CardScopeLabel(request.AppliesToAllStatements)}\n{request.StartDate:dd MMMM yyyy}",
+                $"Kart: {CardLabel(request.CreditCardId)}\n{CardModeLabel(request.CardPaymentType)} · {CardScopeLabel(request.AppliesToAllStatements)}\n{LongDate(request.StartDate)}",
             SimulationScenarioType.FinancingLoan =>
-                $"{request.PaymentCount} taksit • toplam {Money(request.TotalRepaymentAmount.GetValueOrDefault())}\nİlk ödeme: {request.FirstPaymentDate:dd MMMM yyyy}",
+                $"{request.PaymentCount} taksit • toplam {Money(request.TotalRepaymentAmount.GetValueOrDefault())}\nİlk ödeme: {LongDate(request.FirstPaymentDate)}",
             SimulationScenarioType.CashDebt or
                 SimulationScenarioType.RecurringPayment =>
-                $"{request.PaymentCount} ödeme\nİlk ödeme: {request.FirstPaymentDate:dd MMMM yyyy}",
+                $"{request.PaymentCount} ödeme\nİlk ödeme: {LongDate(request.FirstPaymentDate)}",
             SimulationScenarioType.PaymentStrategyChange =>
-                $"Başlangıç dönemi: {request.EffectiveSalaryDate:dd MMMM yyyy}",
-            _ => $"Tarih: {request.StartDate:dd MMMM yyyy}"
+                $"Başlangıç dönemi: {LongDate(request.EffectiveSalaryDate)}",
+            SimulationScenarioType.LoanEarlyClosure =>
+                $"Kredi: {LoanLabel(request.LoanId)}\nKapatma: {LongDate(request.StartDate)}\nTutar o günkü kalan anapara ve işleyen faizden hesaplanır.",
+            SimulationScenarioType.LoanPartialPrepayment =>
+                $"Kredi: {LoanLabel(request.LoanId)}\nAnaparadan düşecek: {Money(request.Amount)} · {PrepaymentModeLabel(request.PrepaymentMode)}\nTarih: {LongDate(request.StartDate)}",
+            _ => $"Tarih: {LongDate(request.StartDate)}"
         };
         return $"Bu plan gerçek finans planına eklenecek.\n\n{summary}\n{detail}";
     }
@@ -1137,9 +1241,13 @@ public partial class SimulationViewModel(
             SimulationScenarioType.SalaryChange =>
                 $"{amount} • Yeni gelir",
             SimulationScenarioType.PaymentStrategyChange =>
-                $"{StrategyModeLabel(request.NewPaymentAssignmentMode)} • {request.EffectiveSalaryDate:dd MMMM yyyy} dönemi",
+                $"{StrategyModeLabel(request.NewPaymentAssignmentMode)} • {LongDate(request.EffectiveSalaryDate)} dönemi",
             SimulationScenarioType.CreditCardPaymentMode =>
                 $"{CardLabel(request.CreditCardId)} • {CardModeLabel(request.CardPaymentType)}",
+            SimulationScenarioType.LoanEarlyClosure =>
+                $"{LoanLabel(request.LoanId)} • Erken kapama",
+            SimulationScenarioType.LoanPartialPrepayment =>
+                $"{LoanLabel(request.LoanId)} • {amount} ara ödeme • {PrepaymentModeLabel(request.PrepaymentMode)}",
             _ => request.Name
         };
     }
@@ -1158,8 +1266,22 @@ public partial class SimulationViewModel(
             SimulationScenarioType.SalaryChange => "Gelir değişikliği",
             SimulationScenarioType.PaymentStrategyChange => "Gelir kullanım düzeni",
             SimulationScenarioType.CreditCardPaymentMode => "Kart ödeme şekli",
+            SimulationScenarioType.LoanEarlyClosure => "Kredi erken kapama",
+            SimulationScenarioType.LoanPartialPrepayment => "Kredi ara ödeme",
             _ => "Koşul"
         };
+
+    // Kültür açıkça verilir: varsayılan kültürde ay adı İngilizce çıkıyor.
+    private static string LongDate(DateOnly? date) =>
+        date?.ToString("dd MMMM yyyy", TurkishCulture) ?? "—";
+
+    private string LoanLabel(Guid? loanId) =>
+        Loans.FirstOrDefault(x => x.Value == loanId)?.Label ?? "Kredi";
+
+    private static string PrepaymentModeLabel(LoanPrepaymentMode? mode) =>
+        mode == LoanPrepaymentMode.ReduceInstallment
+            ? "taksit azalır"
+            : "vade kısalır";
 
     private string CardLabel(Guid? creditCardId) =>
         CreditCards.FirstOrDefault(x => x.Value == creditCardId)?.Label ??
@@ -1207,6 +1329,15 @@ public partial class SimulationViewModel(
             : SelectedCardPaymentMode;
         SelectedCardPaymentScope = CardPaymentScopes.First(x =>
             x.Value == request.AppliesToAllStatements);
+        SelectedLoan = request.LoanId is { } loanId
+            ? Loans.FirstOrDefault(x => x.Value == loanId)
+            : SelectedLoan;
+        SelectedPrepaymentMode = request.PrepaymentMode is { } prepaymentMode
+            ? PrepaymentModes.FirstOrDefault(x => x.Value == prepaymentMode)
+            : SelectedPrepaymentMode;
+        // Tip değişimi tarihi taksit gününe taşımış olabilir; kayıtlı tarih
+        // kullanıcının seçimidir.
+        StartDate = request.StartDate.ToDateTime(TimeOnly.MinValue);
     }
 
     private void ResetConditionForm()
@@ -1223,6 +1354,8 @@ public partial class SimulationViewModel(
         SelectedStrategySalaryDate = StrategySalaryDates.FirstOrDefault();
         SelectedCardPaymentMode = CardPaymentModes[0];
         SelectedCardPaymentScope = CardPaymentScopes[0];
+        SelectedLoan = Loans.FirstOrDefault();
+        SelectedPrepaymentMode = PrepaymentModes[0];
         OnPropertyChanged(nameof(IsEditingCondition));
         OnPropertyChanged(nameof(AddConditionButtonText));
     }
@@ -1317,6 +1450,7 @@ public partial class SimulationViewModel(
         {
             InterestComparison.Add(row);
         }
+        PopulateLoanImpacts(result.LoanImpacts);
         _lastBaselineProjection = result.Baseline;
         _lastScenarioProjection = result.Scenario;
         FriendlySummary = string.Join(Environment.NewLine,
@@ -1366,6 +1500,8 @@ public partial class SimulationViewModel(
         var projectionSummary = simulatorInsightService.Build(baseline);
         AssignmentModeText = AssignmentModeLabel(
             baseline[0].PaymentAssignmentMode);
+        LoanImpacts.Clear();
+        HasLoanImpacts = false;
         InterestComparison.Clear();
         HasMonthlyBurden = false;
         MonthlyBurden = string.Empty;
@@ -1394,6 +1530,36 @@ public partial class SimulationViewModel(
             Results.Add(row);
         }
 
+    }
+
+    /// <summary>
+    /// K8 — kredi faizi tasarrufu 12 dönemlik faiz tablosuna katılmaz; o
+    /// tablo kart ve açık faizidir. Tasarruf kredinin ömrü boyuncadır, ayrı
+    /// satırda gösterilir.
+    /// </summary>
+    private void PopulateLoanImpacts(
+        IReadOnlyList<LoanPrepaymentImpact> impacts)
+    {
+        LoanImpacts.Clear();
+        foreach (var impact in impacts)
+        {
+            var end = impact.ScenarioEndDate is { } scenarioEnd
+                ? scenarioEnd.ToString("MMMM yyyy", TurkishCulture)
+                : "—";
+            var baselineEnd = impact.BaselineEndDate is { } baseline
+                ? baseline.ToString("MMMM yyyy", TurkishCulture)
+                : "—";
+            var installment = impact.ScenarioMonthlyPayment is decimal payment &&
+                              payment != impact.BaselineMonthlyPayment
+                ? $" · taksit {Money(impact.BaselineMonthlyPayment)} → {Money(payment)}"
+                : string.Empty;
+            LoanImpacts.Add(new LoanImpactLine(
+                impact.LoanName,
+                $"Ödenecek {Money(impact.PrepaidAmount)} · son ödeme {baselineEnd} → {end}{installment}",
+                Money(impact.InterestSaving)));
+        }
+
+        HasLoanImpacts = LoanImpacts.Count > 0;
     }
 
     private static string PeriodTitle(DateOnly salaryDate) =>

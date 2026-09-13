@@ -15,6 +15,15 @@ public sealed record LoanPayoffOverview(
         LoanPayoffService.DescribeIssue(Analysis.Issue);
 }
 
+/// <param name="Amount">
+/// Ödenecek tutar; kredi o tarihe kadar bitiyorsa ya da hesaplanamıyorsa null.
+/// </param>
+public sealed record PlannedLoanPrepayment(
+    Loan Loan,
+    LoanPrepayment Prepayment,
+    decimal? Amount,
+    bool IsUnquotable);
+
 /// <summary>
 /// Kredi erken kapama ve ara ödemenin uygulama katmanı.
 /// </summary>
@@ -25,7 +34,8 @@ public sealed record LoanPayoffOverview(
 /// </remarks>
 public sealed class LoanPayoffService(
     IClock clock,
-    LoanAmortizationCalculator calculator)
+    LoanAmortizationCalculator calculator,
+    LoanPaymentScheduleBuilder scheduleBuilder)
 {
     private static readonly CultureInfo TurkishCulture =
         CultureInfo.GetCultureInfo("tr-TR");
@@ -43,6 +53,31 @@ public sealed class LoanPayoffService(
             : null;
         return new LoanPayoffOverview(loan, analysis, today);
     }
+
+    /// <summary>
+    /// Uygulanmış erken ödemeler, her biri o günkü kredi durumundan hesaplanan
+    /// tutarıyla. Tam kapamanın tutarı saklanmaz; anapara değiştikçe yeniden
+    /// hesaplanır.
+    /// </summary>
+    public IReadOnlyList<PlannedLoanPrepayment> DescribePrepayments(
+        FinancialPlan plan) =>
+        plan.Loans
+            .SelectMany(loan =>
+            {
+                var replay = scheduleBuilder.Replay(loan, plan.LoanPrepayments);
+                return plan.LoanPrepayments
+                    .Where(x => x.LoanId == loan.Id)
+                    .Select(prepayment => new PlannedLoanPrepayment(
+                        loan,
+                        prepayment,
+                        replay.Payments
+                            .Where(x => x.SourceId == prepayment.Id)
+                            .Select(x => (decimal?)x.Amount)
+                            .FirstOrDefault(),
+                        replay.IgnoredBecauseUnquotable));
+            })
+            .OrderBy(x => x.Prepayment.Date)
+            .ToArray();
 
     /// <summary>
     /// Kaydetmeden önce kredi verisini doğrular. Banka tutarı verilmişse
@@ -109,7 +144,7 @@ public sealed class LoanPayoffService(
             LoanAnalysisIssue.PrincipalNotBelowInstallments =>
                 throw new InvalidOperationException(
                     "Kalan anapara, kalan taksitlerin toplamından " +
-                    $"({Money(loan.MonthlyPayment * loan.RemainingInstallmentCount)}) " +
+                    $"({Money(loan.RemainingInstallmentTotal)}) " +
                     "küçük olmalı. Bankanın gösterdiği kalan borç taksitlerin " +
                     "toplamıysa bu alanı boş bırakıp kapatma tutarını gir."),
             LoanAnalysisIssue.ImplausibleRate =>

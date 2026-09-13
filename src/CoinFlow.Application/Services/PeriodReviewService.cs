@@ -182,7 +182,10 @@ public sealed class PeriodReviewService(
             Loans = instruments.Loans,
             PaymentPlans = instruments.PaymentPlans,
             CreditCards = instruments.CreditCards,
-            PlannedLargeExpenses = instruments.LargeExpenses
+            PlannedLargeExpenses = instruments.LargeExpenses,
+            LoanPrepayments = financialPlan.LoanPrepayments
+                .Where(x => !instruments.RemovedLoanPrepaymentIds.Contains(x.Id))
+                .ToArray()
         };
         var newBundle = snapshotService.Build(
             updatedPlan,
@@ -211,7 +214,8 @@ public sealed class PeriodReviewService(
                 instruments.Loans,
                 instruments.PaymentPlans,
                 instruments.CreditCards,
-                instruments.LargeExpenses),
+                instruments.LargeExpenses,
+                instruments.RemovedLoanPrepaymentIds),
             cancellationToken);
 
         return new FinancialReviewResult(

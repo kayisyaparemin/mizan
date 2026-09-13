@@ -13,7 +13,7 @@ public sealed class SqliteCoinFlowStore : ICoinFlowStore, IAsyncDisposable
     // v12: kaydedilmiş simülasyon taslakları.
     // v13: açık dönemin gözlem defteri (I14/I15). Her ikisi de yalnız yeni
     // tablo ekler; mevcut tabloların hiçbirine dokunmaz, veri taşınmaz.
-    private const int CurrentSchemaVersion = 14;
+    private const int CurrentSchemaVersion = 15;
     private const int CurrentCardStatementModelVersion = 7;
     private const decimal DefaultPlanningInterestRate = 0.05m;
     private static readonly Guid LegacyInitialAssignmentStrategyId =
@@ -66,6 +66,7 @@ public sealed class SqliteCoinFlowStore : ICoinFlowStore, IAsyncDisposable
             await _database.CreateTableAsync<SalaryRow>();
             await _database.CreateTableAsync<OtherIncomeRow>();
             await _database.CreateTableAsync<LoanRow>();
+            await _database.CreateTableAsync<LoanPrepaymentRow>();
             await _database.CreateTableAsync<PaymentPlanRow>();
             await _database.CreateTableAsync<PaymentInstallmentRow>();
             await _database.CreateTableAsync<CreditCardRow>();
@@ -167,6 +168,7 @@ public sealed class SqliteCoinFlowStore : ICoinFlowStore, IAsyncDisposable
             connection.DeleteAll<PlannedLargeExpenseRow>();
             connection.DeleteAll<OtherIncomeRow>();
             connection.DeleteAll<SalaryRow>();
+            connection.DeleteAll<LoanPrepaymentRow>();
             connection.DeleteAll<LoanRow>();
             connection.DeleteAll<PaymentAssignmentStrategyRow>();
             connection.DeleteAll<SimulationDraftConditionRow>();
@@ -372,8 +374,33 @@ public sealed class SqliteCoinFlowStore : ICoinFlowStore, IAsyncDisposable
         CancellationToken cancellationToken = default)
     {
         await InitializeAsync(cancellationToken);
+        await _database.RunInTransactionAsync(connection =>
+        {
+            // Kredisi olmayan erken ödeme anlamsızdır.
+            connection.Execute(
+                "DELETE FROM loan_prepayments WHERE LoanId = ?",
+                Key(id));
+            connection.Execute("DELETE FROM loans WHERE Id = ?", Key(id));
+        });
+    }
+
+    public async Task<IReadOnlyList<LoanPrepayment>> GetLoanPrepaymentsAsync(
+        CancellationToken cancellationToken = default)
+    {
+        await InitializeAsync(cancellationToken);
+        return (await _database.Table<LoanPrepaymentRow>().ToListAsync())
+            .Select(FromRow)
+            .OrderBy(x => x.Date)
+            .ToArray();
+    }
+
+    public async Task DeleteLoanPrepaymentAsync(
+        Guid id,
+        CancellationToken cancellationToken = default)
+    {
+        await InitializeAsync(cancellationToken);
         await _database.ExecuteAsync(
-            "DELETE FROM loans WHERE Id = ?",
+            "DELETE FROM loan_prepayments WHERE Id = ?",
             Key(id));
     }
 
@@ -817,7 +844,11 @@ public sealed class SqliteCoinFlowStore : ICoinFlowStore, IAsyncDisposable
             CardPaymentType = request.CardPaymentType is { } cardPaymentType
                 ? (int)cardPaymentType
                 : null,
-            AppliesToAllStatements = request.AppliesToAllStatements
+            AppliesToAllStatements = request.AppliesToAllStatements,
+            LoanId = request.LoanId is { } loanId ? Key(loanId) : null,
+            PrepaymentMode = request.PrepaymentMode is { } prepaymentMode
+                ? (int)prepaymentMode
+                : null
         };
     }
 
@@ -843,7 +874,13 @@ public sealed class SqliteCoinFlowStore : ICoinFlowStore, IAsyncDisposable
                 row.CardPaymentType is { } cardPaymentType
                     ? (CreditCardPaymentType)cardPaymentType
                     : null,
-                row.AppliesToAllStatements),
+                row.AppliesToAllStatements,
+                string.IsNullOrWhiteSpace(row.LoanId)
+                    ? null
+                    : ParseKey(row.LoanId),
+                row.PrepaymentMode is { } prepaymentMode
+                    ? (LoanPrepaymentMode)prepaymentMode
+                    : null),
             row.IsEnabled);
 
     private static string Timestamp(DateTimeOffset value) =>
@@ -910,6 +947,11 @@ public sealed class SqliteCoinFlowStore : ICoinFlowStore, IAsyncDisposable
             foreach (var strategy in batch.PaymentAssignmentStrategies)
             {
                 connection.InsertOrReplace(ToRow(strategy));
+            }
+
+            foreach (var prepayment in batch.LoanPrepayments)
+            {
+                connection.InsertOrReplace(ToRow(prepayment));
             }
         });
     }
@@ -1166,6 +1208,12 @@ public sealed class SqliteCoinFlowStore : ICoinFlowStore, IAsyncDisposable
             {
                 connection.InsertOrReplace(ToRow(expense));
             }
+            foreach (var prepaymentId in commit.RemovedLoanPrepaymentIds)
+            {
+                connection.Execute(
+                    "DELETE FROM loan_prepayments WHERE Id = ?",
+                    Key(prepaymentId));
+            }
             UpdateSettings(connection, commit.UpdatedSettings);
             connection.Execute("UPDATE financial_snapshots SET IsCurrent = 0 WHERE IsCurrent = 1");
             connection.Insert(ToRow(commit.NewSnapshot with { IsCurrent = true }));
@@ -1259,6 +1307,26 @@ public sealed class SqliteCoinFlowStore : ICoinFlowStore, IAsyncDisposable
         Description = row.Description
     };
 
+    internal static LoanPrepaymentRow ToRow(LoanPrepayment value) => new()
+    {
+        Id = Key(value.Id),
+        LoanId = Key(value.LoanId),
+        Date = FormatDate(value.Date),
+        Mode = (int)value.Mode,
+        PrincipalAmount = value.PrincipalAmount
+    };
+
+    private static LoanPrepayment FromRow(LoanPrepaymentRow row) => new()
+    {
+        Id = ParseKey(row.Id),
+        LoanId = ParseKey(row.LoanId),
+        Date = ParseDate(row.Date),
+        Mode = Enum.IsDefined(typeof(LoanPrepaymentMode), row.Mode)
+            ? (LoanPrepaymentMode)row.Mode
+            : LoanPrepaymentMode.FullClosure,
+        PrincipalAmount = row.PrincipalAmount
+    };
+
     internal static LoanRow ToRow(Loan value) => new()
     {
         Id = Key(value.Id),
@@ -1269,6 +1337,7 @@ public sealed class SqliteCoinFlowStore : ICoinFlowStore, IAsyncDisposable
         StartDate = FormatDate(value.NextPaymentDate),
         EndDate = null,
         InstallmentCount = value.RemainingInstallmentCount,
+        FinalPaymentAmount = value.FinalPaymentAmount,
         RemainingDebt = value.RemainingDebt,
         EarlyClosureAmount = value.EarlyClosureAmount,
         EarlyClosureAmountAsOf = value.EarlyClosureAmountAsOf is DateOnly asOf
@@ -1287,6 +1356,7 @@ public sealed class SqliteCoinFlowStore : ICoinFlowStore, IAsyncDisposable
         PaymentDay = row.PaymentDay,
         NextPaymentDate = ParseDate(row.StartDate),
         RemainingInstallmentCount = row.InstallmentCount.GetValueOrDefault(),
+        FinalPaymentAmount = row.FinalPaymentAmount,
         RemainingDebt = row.RemainingDebt,
         EarlyClosureAmount = row.EarlyClosureAmount,
         EarlyClosureAmountAsOf = ParseNullableDate(row.EarlyClosureAmountAsOf),

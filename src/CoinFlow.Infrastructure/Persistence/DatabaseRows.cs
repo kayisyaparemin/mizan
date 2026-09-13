@@ -31,11 +31,22 @@ internal sealed class LoanRow
     public string StartDate { get; set; } = string.Empty;
     public string? EndDate { get; set; }
     public int? InstallmentCount { get; set; }
+    public decimal? FinalPaymentAmount { get; set; }
     public decimal? RemainingDebt { get; set; }
     public decimal? EarlyClosureAmount { get; set; }
     public string? EarlyClosureAmountAsOf { get; set; }
     public int Kind { get; set; }
     public bool IsActive { get; set; }
+}
+
+[Table("loan_prepayments")]
+internal sealed class LoanPrepaymentRow
+{
+    [PrimaryKey] public string Id { get; set; } = string.Empty;
+    [Indexed] public string LoanId { get; set; } = string.Empty;
+    public string Date { get; set; } = string.Empty;
+    public int Mode { get; set; }
+    public decimal? PrincipalAmount { get; set; }
 }
 
 [Table("payment_plans")]
@@ -377,6 +388,8 @@ internal sealed class SimulationDraftConditionRow
     public string? EffectiveSalaryDate { get; set; }
     public int? CardPaymentType { get; set; }
     public bool AppliesToAllStatements { get; set; }
+    public string? LoanId { get; set; }
+    public int? PrepaymentMode { get; set; }
 }
 
 [Table("period_observations")]

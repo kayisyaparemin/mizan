@@ -362,6 +362,7 @@
                                     </Label>
                                     <HorizontalStackLayout Grid.Row="3" Grid.ColumnSpan="2" Spacing="8">
                                         <Button Text="Düzenle"
+                                                IsVisible="{Binding CanEditLoan}"
                                                 CommandParameter="{Binding .}"
                                                 Clicked="OnEditLoanClicked" />
                                         <Button Text="Sil"

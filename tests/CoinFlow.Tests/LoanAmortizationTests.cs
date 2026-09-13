@@ -442,7 +442,7 @@ public sealed class LoanAmortizationTests
     }
 
     private static LoanPayoffService PayoffService(DateOnly today) =>
-        new(new FixedClock(today), Calculator);
+        new(new FixedClock(today), Calculator, TestFactory.LoanScheduleBuilder());
 
     private sealed class FixedClock(DateOnly today)
         : Application.Abstractions.IClock

@@ -86,7 +86,7 @@ public sealed class LoanAndObligationTests
             Plan(Guid.NewGuid(), PaymentPlanKind.OtherScheduled, 4_000m)
         };
         var calculator = new MandatoryPaymentCalculator(
-            new LoanScheduleCalculator(),
+            TestFactory.LoanScheduleBuilder(),
             new ScheduledPaymentCalculator());
 
         var obligations = calculator.BuildObligations(

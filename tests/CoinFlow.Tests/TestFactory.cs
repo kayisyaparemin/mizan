@@ -14,9 +14,10 @@ internal static class TestFactory
             salaryPeriods);
         var fundingPlanner = new SalaryFundingPlanner(strategyResolver);
         var income = new IncomeProjectionCalculator(new SalaryResolver());
-        var loans = new LoanScheduleCalculator();
         var scheduled = new ScheduledPaymentCalculator();
-        var mandatory = new MandatoryPaymentCalculator(loans, scheduled);
+        var mandatory = new MandatoryPaymentCalculator(
+            LoanScheduleBuilder(),
+            scheduled);
         return new FinancialProjectionCalculator(
             salaryPeriods,
             income,
@@ -24,6 +25,14 @@ internal static class TestFactory
             mandatory,
             fundingPlanner,
             strategyResolver);
+    }
+
+    public static LoanPaymentScheduleBuilder LoanScheduleBuilder()
+    {
+        var schedule = new LoanScheduleCalculator();
+        return new LoanPaymentScheduleBuilder(
+            schedule,
+            new LoanAmortizationCalculator(schedule));
     }
 
     public static CoinFlowService Service(
@@ -67,7 +76,8 @@ internal static class TestFactory
             new FinancialInstrumentReconciliationService(
                 new CreditCardActualPaymentReconciler(
                     new CreditCardStatementCalculator()),
-                new LoanAmortizationCalculator(new LoanScheduleCalculator())),
+                new LoanAmortizationCalculator(new LoanScheduleCalculator()),
+                LoanScheduleBuilder()),
             comparison);
         return new CoinFlowService(
             store,
@@ -93,7 +103,8 @@ internal static class TestFactory
             new HistoryQueryService(store, comparison),
             new LoanPayoffService(
                 clock,
-                new LoanAmortizationCalculator(new LoanScheduleCalculator())));
+                new LoanAmortizationCalculator(new LoanScheduleCalculator()),
+                LoanScheduleBuilder()));
     }
 
     public static FinancialPlan CanonicalPlan() => new()

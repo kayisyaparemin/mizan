@@ -7,11 +7,13 @@ public sealed record ReconciledFinancialInstruments(
     IReadOnlyList<Loan> Loans,
     IReadOnlyList<TemporaryPaymentPlan> PaymentPlans,
     IReadOnlyList<CreditCard> CreditCards,
-    IReadOnlyList<PlannedLargeExpense> LargeExpenses);
+    IReadOnlyList<PlannedLargeExpense> LargeExpenses,
+    IReadOnlyList<Guid> RemovedLoanPrepaymentIds);
 
 public sealed class FinancialInstrumentReconciliationService(
     CreditCardActualPaymentReconciler cardReconciler,
-    LoanAmortizationCalculator loanCalculator)
+    LoanAmortizationCalculator loanCalculator,
+    LoanPaymentScheduleBuilder loanScheduleBuilder)
 {
     public ReconciledFinancialInstruments Apply(
         FinancialPlan data,
@@ -26,8 +28,18 @@ public sealed class FinancialInstrumentReconciliationService(
         var cards = data.CreditCards.ToDictionary(x => x.Id);
         var largeExpenses = data.PlannedLargeExpenses.ToDictionary(x => x.Id);
         var unpaidLoanIds = new HashSet<Guid>();
+        var prepayments = data.LoanPrepayments.ToDictionary(x => x.Id);
+        var removedPrepaymentIds = new HashSet<Guid>();
 
-        foreach (var actual in actualPayments.OrderBy(x => x.PlannedDate))
+        // Aynı gün önce taksit, sonra erken ödeme: erken ödeme o günün
+        // taksiti ödenmiş kredinin üstüne işlenir.
+        foreach (var actual in actualPayments
+                     .OrderBy(x => x.PlannedDate)
+                     .ThenBy(x => lines.TryGetValue(
+                                      x.PeriodPlanPaymentLineId,
+                                      out var candidate) &&
+                                  prepayments.ContainsKey(
+                                      candidate.SourceEntityId)))
         {
             if (!lines.TryGetValue(
                     actual.PeriodPlanPaymentLineId,
@@ -43,9 +55,33 @@ public sealed class FinancialInstrumentReconciliationService(
             {
                 case PlanPaymentSourceType.Loan:
                     {
-                        var loan = loans.GetValueOrDefault(line.SourceEntityId)
-                            ?? throw new InvalidOperationException(
-                                "Kredi kaydı bulunamadı.");
+                        if (prepayments.TryGetValue(
+                                line.SourceEntityId,
+                                out var prepayment))
+                        {
+                            // Ödendiyse kanonik krediye işlenir; ödenmediyse
+                            // gönüllü bir karardı ve iptal olur (K6). İkisinde
+                            // de olay tüketilir.
+                            removedPrepaymentIds.Add(prepayment.Id);
+                            if (paid &&
+                                loans.TryGetValue(prepayment.LoanId, out var owner) &&
+                                loanScheduleBuilder
+                                    .Replay(owner, [prepayment])
+                                    .StateAfterEvent
+                                    .TryGetValue(prepayment.Id, out var closed))
+                            {
+                                loans[owner.Id] = closed;
+                            }
+
+                            break;
+                        }
+
+                        if (!loans.TryGetValue(line.SourceEntityId, out var loan))
+                        {
+                            // Plan donduktan sonra geri alınmış bir erken ödeme:
+                            // kanonik kayda işlenecek bir şey kalmadı.
+                            break;
+                        }
                         if (paid)
                         {
                             var remaining = Math.Max(
@@ -162,11 +198,20 @@ public sealed class FinancialInstrumentReconciliationService(
                 ? x.Value with { ExactDate = newAnchor }
                 : x.Value);
 
+        // Checkpoint'i geçmiş ama plan satırına hiç düşmemiş erken ödeme de
+        // gerçekleşmemiş bir karardır.
+        foreach (var stale in data.LoanPrepayments.Where(x =>
+                     x.Date <= newAnchor))
+        {
+            removedPrepaymentIds.Add(stale.Id);
+        }
+
         return new ReconciledFinancialInstruments(
             loans.Values.OrderBy(x => x.NextPaymentDate).ToArray(),
             paymentPlans.Values.OrderBy(x => x.Name).ToArray(),
             cards.Values.OrderBy(x => x.Name).ToArray(),
-            largeExpenses.Values.OrderBy(x => x.ExactDate).ToArray());
+            largeExpenses.Values.OrderBy(x => x.ExactDate).ToArray(),
+            removedPrepaymentIds.ToArray());
     }
 
     private static DateOnly ResolveOutstandingDate(

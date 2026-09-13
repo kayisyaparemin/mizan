@@ -43,11 +43,13 @@ public sealed record LoanAmortization(
     decimal Principal,
     int RemainingInstallments,
     decimal MonthlyPayment,
+    decimal FinalPayment,
     DateOnly PreviousDueDate,
     LoanRateSource Source)
 {
-    public decimal RemainingInstallmentTotal =>
-        MonthlyPayment * RemainingInstallments;
+    public decimal RemainingInstallmentTotal => RemainingInstallments < 1
+        ? 0m
+        : MonthlyPayment * (RemainingInstallments - 1) + FinalPayment;
 
     public decimal RemainingInterest =>
         Math.Max(0m, RemainingInstallmentTotal - Principal);
@@ -126,7 +128,7 @@ public sealed class LoanAmortizationCalculator(
                 LoanAnalysisIssue.MissingPrincipal);
         }
 
-        if (principal >= loan.MonthlyPayment * loan.RemainingInstallmentCount)
+        if (principal >= loan.RemainingInstallmentTotal)
         {
             return new LoanAnalysis(
                 loan,
@@ -137,7 +139,8 @@ public sealed class LoanAmortizationCalculator(
         var rate = SolveMonthlyRate(
             principal,
             loan.MonthlyPayment,
-            loan.RemainingInstallmentCount);
+            loan.RemainingInstallmentCount,
+            loan.FinalPaymentAmount);
         if (rate > MaxPlausibleMonthlyRate)
         {
             return new LoanAnalysis(
@@ -153,6 +156,7 @@ public sealed class LoanAmortizationCalculator(
                 principal,
                 loan.RemainingInstallmentCount,
                 loan.MonthlyPayment,
+                loan.LastInstallmentAmount,
                 previousDue,
                 LoanRateSource.RemainingPrincipal),
             LoanAnalysisIssue.None);
@@ -227,7 +231,8 @@ public sealed class LoanAmortizationCalculator(
             accrued,
             fee,
             removed,
-            amortization.MonthlyPayment * removed);
+            amortization.MonthlyPayment * (removed - 1) +
+            amortization.FinalPayment);
     }
 
     /// <summary>6502 md. 27 ve md. 37'deki tavanlar.</summary>
@@ -263,8 +268,10 @@ public sealed class LoanAmortizationCalculator(
         var dates = scheduleCalculator.GetPaymentDates(loan);
         var paidBefore = dates.Count(x => x <= asOf);
         var remaining = loan.RemainingInstallmentCount - paidBefore;
+        var final = (double)loan.LastInstallmentAmount;
         if (remaining < 1 ||
-            amount >= loan.MonthlyPayment * remaining)
+            amount >= loan.MonthlyPayment * (remaining - 1) +
+                      loan.LastInstallmentAmount)
         {
             return null;
         }
@@ -274,20 +281,24 @@ public sealed class LoanAmortizationCalculator(
         var payment = (double)loan.MonthlyPayment;
         var rate = Bisect(
             (double)amount,
-            r => payment * Annuity(r, remaining) * (1d + r * days / 30d));
+            r => Valuation(r, remaining, payment, final) *
+                 (1d + r * days / 30d));
         if (rate > MaxPlausibleMonthlyRate)
         {
             return null;
         }
 
-        var principal = RoundMoney(
-            loan.MonthlyPayment *
-            (decimal)Annuity((double)rate, loan.RemainingInstallmentCount));
+        var principal = RoundMoney((decimal)Valuation(
+            (double)rate,
+            loan.RemainingInstallmentCount,
+            payment,
+            final));
         return new LoanAmortization(
             rate,
             principal,
             loan.RemainingInstallmentCount,
             loan.MonthlyPayment,
+            loan.LastInstallmentAmount,
             previousDue,
             LoanRateSource.BankQuote);
     }
@@ -295,13 +306,29 @@ public sealed class LoanAmortizationCalculator(
     public static decimal SolveMonthlyRate(
         decimal principal,
         decimal payment,
-        int count)
+        int count,
+        decimal? finalPayment = null)
     {
         var monthly = (double)payment;
+        var final = (double)(finalPayment ?? payment);
         return Bisect(
             (double)principal,
-            r => monthly * Annuity(r, count));
+            r => Valuation(r, count, monthly, final));
     }
+
+    /// <summary>
+    /// Kalan taksitlerin bugünkü değeri: <paramref name="count"/> − 1 eşit
+    /// taksit ve farklı olabilecek son taksit.
+    /// </summary>
+    public static double Valuation(
+        double rate,
+        int count,
+        double payment,
+        double finalPayment) =>
+        count < 1
+            ? 0d
+            : payment * Annuity(rate, count - 1) +
+              finalPayment * Math.Pow(1d + rate, -count);
 
     /// <summary>
     /// <paramref name="value"/>(r) = <paramref name="target"/> denkleminin

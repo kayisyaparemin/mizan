@@ -23,7 +23,8 @@ public enum FinancialRecordKind
     CreditCard,
     TemporaryPlan,
     InstallmentPlan,
-    LargeExpense
+    LargeExpense,
+    LoanPrepayment
 }
 
 public sealed record FinancialRecordLine(
@@ -202,3 +203,12 @@ public sealed record CardProgressLine(
     string DueDate,
     string Planned,
     string Current);
+
+/// <summary>
+/// Simülatörde bir kredinin erken ödeme sonucu: ne ödenir, kredi ne zaman
+/// biter, ömrü boyunca ne kadar faiz ödenmez.
+/// </summary>
+public sealed record LoanImpactLine(
+    string Title,
+    string Detail,
+    string Saving);

@@ -45,6 +45,7 @@ public static class MauiProgram
         builder.Services.AddSingleton<IncomeProjectionCalculator>();
         builder.Services.AddSingleton<LoanScheduleCalculator>();
         builder.Services.AddSingleton<LoanAmortizationCalculator>();
+        builder.Services.AddSingleton<LoanPaymentScheduleBuilder>();
         builder.Services.AddSingleton<InstallmentScheduleCalculator>();
         builder.Services.AddSingleton<ScheduledPaymentCalculator>();
         builder.Services.AddSingleton<CreditCardStatementCalculator>();

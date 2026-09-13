@@ -191,7 +191,10 @@ public sealed record FinancialReviewCommit(
     IReadOnlyList<Loan> UpdatedLoans,
     IReadOnlyList<TemporaryPaymentPlan> UpdatedPaymentPlans,
     IReadOnlyList<CreditCard> UpdatedCreditCards,
-    IReadOnlyList<PlannedLargeExpense> UpdatedLargeExpenses);
+    IReadOnlyList<PlannedLargeExpense> UpdatedLargeExpenses,
+    // Checkpoint'te tüketilen (ödendi) ya da iptal olan (ödenmedi) erken
+    // ödemeler.
+    IReadOnlyList<Guid> RemovedLoanPrepaymentIds);
 
 /// <summary>
 /// Açık dönemin gözlem defteri: dönem içinde gerçekte ne olduğu, henüz

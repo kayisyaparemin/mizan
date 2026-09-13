@@ -15,7 +15,9 @@ public enum SimulationScenarioType
     FutureIncome,
     SalaryChange,
     PaymentStrategyChange,
-    CreditCardPaymentMode
+    CreditCardPaymentMode,
+    LoanEarlyClosure,
+    LoanPartialPrepayment
 }
 
 public sealed record SimulationRequest(
@@ -34,7 +36,29 @@ public sealed record SimulationRequest(
     // Kapsam false ise yalnızca StartDate'teki ekstre, true ise kartın genel
     // ödeme şekli değişir.
     CreditCardPaymentType? CardPaymentType = null,
-    bool AppliesToAllStatements = false);
+    bool AppliesToAllStatements = false,
+    // Kredi erken kapama ve ara ödeme için: hangi kredi ve ara ödemede vade mi
+    // taksit mi azalacak. Ara ödemede Amount anaparadan düşecek tutardır.
+    Guid? LoanId = null,
+    LoanPrepaymentMode? PrepaymentMode = null);
+
+/// <summary>
+/// Senaryodaki erken ödemelerin bir krediye etkisi.
+/// </summary>
+/// <param name="PrepaidAmount">Senaryonun eklediği erken ödemelerin toplamı.</param>
+/// <param name="InterestSaving">
+/// Kredinin ömrü boyunca ödenecek toplamdaki düşüş — 12 dönemle sınırlı
+/// değildir. Ödenmeyecek taksitler eksi erken ödeme.
+/// </param>
+public sealed record LoanPrepaymentImpact(
+    Guid LoanId,
+    string LoanName,
+    decimal PrepaidAmount,
+    decimal InterestSaving,
+    DateOnly? BaselineEndDate,
+    DateOnly? ScenarioEndDate,
+    decimal BaselineMonthlyPayment,
+    decimal? ScenarioMonthlyPayment);
 
 public sealed record SimulationImpactRow(
     SalaryPeriodProjection Baseline,
@@ -85,12 +109,30 @@ public sealed record SimulationResult(
         BaselineInterest.TotalInterestCost;
     public decimal InterestSaving =>
         Math.Max(0m, -AdditionalInterestCost);
+
+    public IReadOnlyList<LoanPrepaymentImpact> LoanImpacts { get; init; } = [];
+
+    public decimal LoanInterestSaving => LoanImpacts.Sum(x => x.InterestSaving);
 }
 
 public sealed class SimulationCalculator(
     FinancialProjectionCalculator projectionCalculator,
-    InstallmentScheduleCalculator installmentScheduleCalculator)
+    InstallmentScheduleCalculator installmentScheduleCalculator,
+    LoanPaymentScheduleBuilder? loanScheduleBuilder = null)
 {
+    // Saf hesaplayıcı; verilmezse kendi örneği kurulur ki mevcut çağıranlar
+    // değişmesin.
+    private readonly LoanPaymentScheduleBuilder _loanScheduleBuilder =
+        loanScheduleBuilder ?? DefaultLoanScheduleBuilder();
+
+    private static LoanPaymentScheduleBuilder DefaultLoanScheduleBuilder()
+    {
+        var schedule = new LoanScheduleCalculator();
+        return new LoanPaymentScheduleBuilder(
+            schedule,
+            new LoanAmortizationCalculator(schedule));
+    }
+
     private static readonly CultureInfo TurkishCulture =
         CultureInfo.GetCultureInfo("tr-TR");
 
@@ -144,7 +186,9 @@ public sealed class SimulationCalculator(
             .Max();
         var recovery = scenario.FirstOrDefault(x =>
             x.HasCarryOverDeficit && x.EndingProjectedSavings >= 0m);
-        var totalCost = requests.Sum(ResolveTotalCost);
+        var loanImpacts = BuildLoanImpacts(currentPlan, scenarioPlan);
+        var totalCost = requests.Sum(ResolveTotalCost) +
+                        loanImpacts.Sum(x => x.PrepaidAmount);
         var financingCosts = requests
             .Where(x => x.Type == SimulationScenarioType.FinancingLoan)
             .Select(x => (x.TotalRepaymentAmount ?? x.Amount) - x.Amount)
@@ -177,7 +221,10 @@ public sealed class SimulationCalculator(
                 risk,
                 interestDifference,
                 scenario[^1].EndingProjectedSavings -
-                baseline[^1].EndingProjectedSavings));
+                baseline[^1].EndingProjectedSavings))
+        {
+            LoanImpacts = loanImpacts
+        };
     }
 
     public FinancialPlan BuildScenarioPlan(
@@ -257,6 +304,9 @@ public sealed class SimulationCalculator(
                 AddPaymentStrategy(plan, request),
             SimulationScenarioType.CreditCardPaymentMode =>
                 AddCardPaymentMode(plan, request),
+            SimulationScenarioType.LoanEarlyClosure or
+                SimulationScenarioType.LoanPartialPrepayment =>
+                AddLoanPrepayment(plan, request),
             _ => throw new ArgumentOutOfRangeException(nameof(request.Type))
         };
 
@@ -410,6 +460,85 @@ public sealed class SimulationCalculator(
         };
     }
 
+    // Erken ödeme krediyi değiştirmez, ona bir olay ekler; ödeme listesi
+    // olayları oynatarak üretilir. Kimlik ScenarioId'dir ki uygulama idempotent
+    // olsun.
+    private FinancialPlan AddLoanPrepayment(
+        FinancialPlan plan,
+        SimulationRequest request)
+    {
+        var loan = plan.Loans.SingleOrDefault(x => x.Id == request.LoanId);
+        var prepayment = new LoanPrepayment
+        {
+            Id = request.ScenarioId,
+            LoanId = request.LoanId.GetValueOrDefault(),
+            Date = request.StartDate,
+            Mode = request.Type == SimulationScenarioType.LoanEarlyClosure
+                ? LoanPrepaymentMode.FullClosure
+                : request.PrepaymentMode ?? LoanPrepaymentMode.ReduceTerm,
+            PrincipalAmount =
+                request.Type == SimulationScenarioType.LoanEarlyClosure
+                    ? null
+                    : request.Amount
+        };
+        _loanScheduleBuilder.Validate(loan, plan.LoanPrepayments, prepayment);
+        return plan with
+        {
+            LoanPrepayments = plan.LoanPrepayments
+                .Append(prepayment)
+                .ToArray()
+        };
+    }
+
+    private IReadOnlyList<LoanPrepaymentImpact> BuildLoanImpacts(
+        FinancialPlan baselinePlan,
+        FinancialPlan scenarioPlan)
+    {
+        var existing = baselinePlan.LoanPrepayments
+            .Select(x => x.Id)
+            .ToHashSet();
+        var added = scenarioPlan.LoanPrepayments
+            .Where(x => !existing.Contains(x.Id))
+            .ToArray();
+        return scenarioPlan.Loans
+            .Where(loan => added.Any(x => x.LoanId == loan.Id))
+            .Select(loan =>
+            {
+                var baseline = _loanScheduleBuilder.Replay(
+                    loan,
+                    baselinePlan.LoanPrepayments);
+                var scenario = _loanScheduleBuilder.Replay(
+                    loan,
+                    scenarioPlan.LoanPrepayments);
+                var addedIds = added
+                    .Where(x => x.LoanId == loan.Id)
+                    .Select(x => x.Id)
+                    .ToHashSet();
+                var lastAdded = added
+                    .Where(x => x.LoanId == loan.Id)
+                    .OrderBy(x => x.Date)
+                    .Last();
+                decimal? newPayment =
+                    scenario.StateAfterEvent.TryGetValue(
+                        lastAdded.Id,
+                        out var state) && state.IsActive
+                        ? state.MonthlyPayment
+                        : null;
+                return new LoanPrepaymentImpact(
+                    loan.Id,
+                    $"{loan.Bank} {loan.Name}".Trim(),
+                    scenario.Payments
+                        .Where(x => addedIds.Contains(x.SourceId))
+                        .Sum(x => x.Amount),
+                    baseline.Total - scenario.Total,
+                    baseline.LastPaymentDate,
+                    scenario.LastPaymentDate,
+                    loan.MonthlyPayment,
+                    newPayment);
+            })
+            .ToArray();
+    }
+
     private static CreditCardPaymentStrategy ToStrategy(
         CreditCardPaymentType paymentType) => paymentType switch
     {
@@ -558,6 +687,10 @@ public sealed class SimulationCalculator(
                 SimulationScenarioType.SalaryChange or
             SimulationScenarioType.PaymentStrategyChange => 0m,
             SimulationScenarioType.CreditCardPaymentMode => 0m,
+            // Erken ödemenin tutarı kredinin o günkü durumundan hesaplanır;
+            // senaryo maliyetine BuildLoanImpacts'tan eklenir.
+            SimulationScenarioType.LoanEarlyClosure or
+                SimulationScenarioType.LoanPartialPrepayment => 0m,
             SimulationScenarioType.FinancingLoan =>
                 request.TotalRepaymentAmount ?? request.Amount,
             SimulationScenarioType.RecurringPayment =>
@@ -641,8 +774,25 @@ public sealed class SimulationCalculator(
                 "dahil olmalı; onu güncelle.");
         }
 
+        if (request.Type is SimulationScenarioType.LoanEarlyClosure or
+                SimulationScenarioType.LoanPartialPrepayment &&
+            request.LoanId is null)
+        {
+            throw new InvalidOperationException(
+                "Erken ödeme için bir kredi seçmelisin.");
+        }
+
+        if (request.Type == SimulationScenarioType.LoanPartialPrepayment &&
+            request.PrepaymentMode is not (LoanPrepaymentMode.ReduceTerm or
+                LoanPrepaymentMode.ReduceInstallment))
+        {
+            throw new InvalidOperationException(
+                "Ara ödemede vadenin mi taksitin mi azalacağını seçmelisin.");
+        }
+
         if (request.Type is not SimulationScenarioType.PaymentStrategyChange and
-            not SimulationScenarioType.CreditCardPaymentMode &&
+            not SimulationScenarioType.CreditCardPaymentMode and
+            not SimulationScenarioType.LoanEarlyClosure &&
             request.Amount <= 0m)
         {
             throw new ArgumentOutOfRangeException(

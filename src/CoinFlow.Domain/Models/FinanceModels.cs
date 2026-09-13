@@ -106,6 +106,11 @@ public sealed record Loan
     public DateOnly NextPaymentDate { get; init; }
     public int RemainingInstallmentCount { get; init; }
     /// <summary>
+    /// Son taksit eşit değilse tutarı. Vade kısaltan ara ödeme son taksiti
+    /// küçültür; null ise son taksit de <see cref="MonthlyPayment"/>'tır.
+    /// </summary>
+    public decimal? FinalPaymentAmount { get; init; }
+    /// <summary>
     /// Kalan <b>anapara</b> — <see cref="NextPaymentDate"/>'teki taksitten
     /// hemen önceki hâli. Kalan taksitlerin toplamı değildir.
     /// </summary>
@@ -118,6 +123,42 @@ public sealed record Loan
     public DateOnly? EarlyClosureAmountAsOf { get; init; }
     public LoanKind Kind { get; init; } = LoanKind.Consumer;
     public bool IsActive { get; init; } = true;
+
+    public decimal LastInstallmentAmount =>
+        FinalPaymentAmount ?? MonthlyPayment;
+
+    public decimal RemainingInstallmentTotal => RemainingInstallmentCount < 1
+        ? 0m
+        : MonthlyPayment * (RemainingInstallmentCount - 1) +
+          LastInstallmentAmount;
+}
+
+public enum LoanPrepaymentMode
+{
+    /// <summary>Kalan anaparanın tamamı ödenir, kredi kapanır.</summary>
+    FullClosure = 0,
+    /// <summary>Taksit aynı kalır, vade kısalır; son taksit küçülebilir.</summary>
+    ReduceTerm = 1,
+    /// <summary>Vade aynı kalır, taksit küçülür.</summary>
+    ReduceInstallment = 2
+}
+
+/// <summary>
+/// Bir krediye planlanmış erken ödeme. Kredinin kendisini değiştirmez; ödeme
+/// listesi kredinin üstüne bu olayları oynatarak üretilir. Checkpoint'te
+/// ödendiyse kanonik krediye işlenip tüketilir, ödenmediyse iptal olur.
+/// </summary>
+public sealed record LoanPrepayment
+{
+    public Guid Id { get; init; } = Guid.NewGuid();
+    public Guid LoanId { get; init; }
+    public DateOnly Date { get; init; }
+    public LoanPrepaymentMode Mode { get; init; }
+    /// <summary>
+    /// Ara ödemede anaparadan düşecek tutar. Tam kapamada null: tutar o günkü
+    /// kredi durumundan her seferinde yeniden hesaplanır.
+    /// </summary>
+    public decimal? PrincipalAmount { get; init; }
 }
 
 public sealed record TemporaryPaymentPlan
@@ -263,6 +304,7 @@ public sealed record FinancialPlan
     public IReadOnlyList<SalaryScheduleEntry> Salaries { get; init; } = [];
     public IReadOnlyList<OneTimeIncome> OtherIncomes { get; init; } = [];
     public IReadOnlyList<Loan> Loans { get; init; } = [];
+    public IReadOnlyList<LoanPrepayment> LoanPrepayments { get; init; } = [];
     public IReadOnlyList<TemporaryPaymentPlan> PaymentPlans { get; init; } = [];
     public IReadOnlyList<CreditCard> CreditCards { get; init; } = [];
     public IReadOnlyList<PlannedLargeExpense> PlannedLargeExpenses { get; init; } = [];

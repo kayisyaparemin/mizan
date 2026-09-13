@@ -66,9 +66,11 @@ public sealed record SimulationPersistenceBatch(
     IReadOnlyList<CreditCard> CreditCards,
     IReadOnlyList<OneTimeIncome> OtherIncomes,
     IReadOnlyList<SalaryScheduleEntry> Salaries,
-    IReadOnlyList<PaymentAssignmentStrategy> PaymentAssignmentStrategies)
+    IReadOnlyList<PaymentAssignmentStrategy> PaymentAssignmentStrategies,
+    IReadOnlyList<LoanPrepayment> LoanPrepayments)
 {
     public static readonly SimulationPersistenceBatch Empty = new(
+        [],
         [],
         [],
         [],
