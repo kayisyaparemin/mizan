@@ -127,10 +127,12 @@ public sealed class CreditCardStatementImportWorkflowTests
             importer,
             new StubPicker(selection),
             timeout: TimeSpan.FromSeconds(10));
-        using var cancellation = new CancellationTokenSource(
-            TimeSpan.FromMilliseconds(75));
+        using var cancellation = new CancellationTokenSource();
 
-        var attempt = await workflow.RunAsync(cancellation.Token);
+        var run = workflow.RunAsync(cancellation.Token);
+        await importer.Entered.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        cancellation.Cancel();
+        var attempt = await run.WaitAsync(TimeSpan.FromSeconds(2));
 
         Assert.Equal(
             CreditCardStatementImportOutcome.Cancelled,
@@ -226,6 +228,8 @@ public sealed class CreditCardStatementImportWorkflowTests
         ICreditCardStatementImporter
     {
         public int CallCount { get; private set; }
+        public TaskCompletionSource Entered { get; } = new(
+            TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource<CreditCardStatementImportResult> Release
             { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -234,6 +238,7 @@ public sealed class CreditCardStatementImportWorkflowTests
             CancellationToken cancellationToken = default)
         {
             CallCount++;
+            Entered.TrySetResult();
             return Release.Task;
         }
     }
