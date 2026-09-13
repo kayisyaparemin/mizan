@@ -71,7 +71,7 @@ Faiz, bir bakiyenin devrettiği anda değil, devrettiği bakiyenin girdiği ekst
 
 `LoanAmortizationCalculator` faizi girdi olarak almaz, **türetir**: `anapara = taksit × (1 − (1+r)^−n) / r` denkleminin (0, 1] aralığında bisection çözümü. Faiz gerçek taksitten türediği için BSMV ve KKDF zaten içindedir. Faizin iki kaynağı vardır, öncelik sırasıyla:
 
-1. **Bankanın tarihli kapatma tutarı** (`EarlyClosureAmount` + `EarlyClosureAmountAsOf`). `tutar = kalan anapara × (1 + r × gün ÷ 30)` ile birlikte çözülür; o güne kadar vadesi gelen taksitlerin ödendiği varsayılır. Tarihi son ödenen taksitten eskiyse bayattır, yok sayılır ve reconciliation kanonik kayıttan siler. Kaydedilirken anapara bu çözümden `RemainingDebt`'e yazılır.
+1. **Bankanın kapatma tutarı** (`EarlyClosureAmount` + `EarlyClosureAmountAsOf`). Form tarih sormaz: tutar yalnız görüldüğü gün geçerli olduğu için `LoanPayoffService.PrepareForSave` onu bugünün tarihiyle damgalar; değiştirilmeden yeniden kaydedilen tutar kendi tarihini korur. (v1.11.1 öncesi "Tutarı aldığın gün" alanı kredinin çekildiği gün diye okunuyordu.) `tutar = kalan anapara × (1 + r × gün ÷ 30)` ile birlikte çözülür; o güne kadar vadesi gelen taksitlerin ödendiği varsayılır. Tarihi son ödenen taksitten eskiyse bayattır, yok sayılır ve reconciliation kanonik kayıttan siler. Kaydedilirken anapara bu çözümden `RemainingDebt`'e yazılır.
 2. **Kalan anapara** (`RemainingDebt`).
 
 Korkuluklar (`LoanAnalysisIssue`): anapara ≥ kalan taksitlerin toplamıysa faiz ≤ 0 çıkar (alana toplam borç girilmiştir); türetilen faiz aylık `MaxPlausibleMonthlyRate` (%8) üstündeyse anapara güncel değildir. İkisinde de kapatma tutarı **üretilmez**, kullanıcıya bankadan tutar girmesi söylenir. Kaydederken ikisi de reddedilir.

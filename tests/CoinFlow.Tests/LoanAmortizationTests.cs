@@ -356,6 +356,54 @@ public sealed class LoanAmortizationTests
             }));
 
         Assert.Contains("son ödenen taksitten", error.Message);
+        Assert.Contains("bugünkü tutarı", error.Message);
+    }
+
+    /// <summary>
+    /// Kullanıcı ekranından (v1.11.0): Burgan 7.375 × 9, sonraki taksit
+    /// 18.09.2026, bankanın kapatma tutarı 57.529. Form "Tutarı aldığın gün"
+    /// diye tarih soruyordu; kredinin çekildiği gün (18.11.2025) girildi ve
+    /// kayıt reddedildi. Artık tarih sorulmuyor: tutar bugünün tarihiyle
+    /// saklanır ve faiz Burgan'ın gerçek faizine (~%3,63) oturur.
+    /// </summary>
+    [Fact]
+    public void Saving_ABankQuoteWithoutADate_StampsTodayAndCalibrates()
+    {
+        var service = PayoffService(new DateOnly(2026, 9, 13));
+        var burgan = new Loan
+        {
+            Name = "On Dijital",
+            Bank = "Burgan",
+            MonthlyPayment = 7_375m,
+            PaymentDay = 18,
+            NextPaymentDate = new DateOnly(2026, 9, 18),
+            RemainingInstallmentCount = 9,
+            RemainingDebt = 57_529m,
+            EarlyClosureAmount = 57_529m
+        };
+
+        var saved = service.PrepareForSave(burgan);
+
+        Assert.Equal(new DateOnly(2026, 9, 13), saved.EarlyClosureAmountAsOf);
+        var amortization = Calculator.Analyze(saved).Amortization!;
+        Assert.Equal(LoanRateSource.BankQuote, amortization.Source);
+        Assert.Equal(0.036m, amortization.MonthlyRate, 3);
+        // Tutar 26 günlük işleyen faizi içerdiği için anapara ondan küçük.
+        Assert.True(saved.RemainingDebt < 57_529m);
+    }
+
+    [Fact]
+    public void Saving_WhenTheNextPaymentIsMoreThanAMonthAhead_PointsAtThatDate()
+    {
+        var service = PayoffService(new DateOnly(2026, 7, 1));
+
+        var error = Assert.Throws<InvalidOperationException>(() =>
+            service.PrepareForSave(ReferenceLoan() with
+            {
+                EarlyClosureAmount = 93_883.33m
+            }));
+
+        Assert.Contains("Sonraki ödeme tarihi", error.Message);
     }
 
     [Fact]

@@ -78,6 +78,7 @@ public partial class CommitmentsViewModel(
     private readonly Dictionary<Guid, string> _cardChargeDescriptions = [];
     private Guid? _editingCardId;
     private Guid? _editingLoanId;
+    private (decimal Amount, DateOnly AsOf)? _editingQuote;
     private DateOnly? _editingCardBalanceDate;
     private CreditCardStatement? _editingCardStatement;
     private string? _cardStatementFingerprint;
@@ -119,7 +120,10 @@ public partial class CommitmentsViewModel(
     [ObservableProperty] private string installmentCount = "12";
     [ObservableProperty] private string remainingDebt = string.Empty;
     [ObservableProperty] private string earlyClosureAmount = string.Empty;
-    [ObservableProperty] private DateTime earlyClosureDate = DateTime.Today;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasEarlyClosureNote))]
+    private string earlyClosureNote = string.Empty;
+    public bool HasEarlyClosureNote => EarlyClosureNote.Length > 0;
     [ObservableProperty] private SelectionOption<LoanKind>? selectedLoanKind;
 
     [ObservableProperty] private DateTime planPaymentDate = DateTime.Today.AddMonths(1);
@@ -913,9 +917,15 @@ public partial class CommitmentsViewModel(
             RemainingInstallmentCount = count,
             RemainingDebt = ParseOptionalMoney(RemainingDebt),
             EarlyClosureAmount = closureAmount,
-            EarlyClosureAmountAsOf = closureAmount is null
-                ? null
-                : DateOnly.FromDateTime(EarlyClosureDate),
+            // Banka tutarı yalnız görüldüğü gün geçerlidir. Kayıtlı tutar
+            // değişmediyse kendi tarihi korunur; yeni tutarı servis bugünün
+            // tarihiyle damgalar.
+            EarlyClosureAmountAsOf =
+                closureAmount is decimal entered &&
+                _editingQuote is { } stored &&
+                stored.Amount == entered
+                    ? stored.AsOf
+                    : null,
             Kind = SelectedLoanKind?.Value ?? LoanKind.Consumer
         };
     }
@@ -954,9 +964,13 @@ public partial class CommitmentsViewModel(
         EarlyClosureAmount = quoteIsCurrent
             ? loan.EarlyClosureAmount!.Value.ToString("N2", TurkishCulture)
             : string.Empty;
-        EarlyClosureDate = quoteIsCurrent
-            ? loan.EarlyClosureAmountAsOf!.Value.ToDateTime(TimeOnly.MinValue)
-            : DateTime.Today;
+        _editingQuote = quoteIsCurrent
+            ? (loan.EarlyClosureAmount!.Value, loan.EarlyClosureAmountAsOf!.Value)
+            : null;
+        EarlyClosureNote = quoteIsCurrent
+            ? $"Kayıtlı tutar {loan.EarlyClosureAmountAsOf!.Value:dd.MM.yyyy} tarihli. " +
+              "Değiştirirsen bugünün tarihiyle saklanır."
+            : string.Empty;
     }
 
     private static string LoanInsight(LoanPayoffOverview overview)
@@ -1202,7 +1216,8 @@ public partial class CommitmentsViewModel(
         Note = string.Empty;
         RemainingDebt = string.Empty;
         EarlyClosureAmount = string.Empty;
-        EarlyClosureDate = DateTime.Today;
+        EarlyClosureNote = string.Empty;
+        _editingQuote = null;
         SelectedLoanKind = LoanKinds[0];
         PlanInstallments.Clear();
         CardFutureCharges.Clear();

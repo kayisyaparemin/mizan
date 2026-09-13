@@ -96,12 +96,11 @@ public sealed class LoanPayoffService(
             return ValidatePrincipal(loan);
         }
 
-        if (loan.EarlyClosureAmountAsOf is not DateOnly asOf)
-        {
-            throw new InvalidOperationException(
-                "Bankanın kapatma tutarını hangi gün aldığını seç.");
-        }
-
+        // Tarih sorulmaz: banka tutarı yalnız görüldüğü gün geçerlidir ve
+        // kullanıcı onu gördüğü gün girer. Değişmemiş kayıtlı tutar kendi
+        // tarihini taşır.
+        var asOf = loan.EarlyClosureAmountAsOf ?? clock.Today;
+        loan = loan with { EarlyClosureAmountAsOf = asOf };
         if (asOf > clock.Today)
         {
             throw new InvalidOperationException(
@@ -111,10 +110,15 @@ public sealed class LoanPayoffService(
         var previousDue = LoanAmortizationCalculator.PreviousDueDate(loan);
         if (asOf < previousDue)
         {
-            throw new InvalidOperationException(
-                $"Kapatma tutarı son ödenen taksitten " +
-                $"({previousDue.ToString("dd.MM.yyyy", TurkishCulture)}) " +
-                "sonra alınmış olmalı. Güncel tutarı bankandan al.");
+            throw new InvalidOperationException(asOf == clock.Today
+                ? "Sonraki ödeme tarihi " +
+                  $"({loan.NextPaymentDate.ToString("dd.MM.yyyy", TurkishCulture)}) " +
+                  "bugünden bir aydan fazla ileride; bu durumda son ödenen " +
+                  "taksit bugünden sonra görünüyor ve kapatma tutarı " +
+                  "hesaplanamıyor. Sonraki ödeme tarihini kontrol et."
+                : "Kayıtlı kapatma tutarı son ödenen taksitten " +
+                  $"({previousDue.ToString("dd.MM.yyyy", TurkishCulture)}) " +
+                  "önce alınmış. Bankadan bugünkü tutarı gir.");
         }
 
         var analysis = calculator.Analyze(loan);

@@ -66,11 +66,16 @@
                         <Label Text="Bankanın gösterdiği kalan anapara — kalan taksitlerin toplamı değil."
                                Style="{StaticResource MutedText}"
                                FontSize="12" />
-                        <Label Text="Bankanın kapatma tutarı (isteğe bağlı)" Style="{StaticResource FieldLabel}" />
+                        <!-- Tarih sorulmaz: "tutarı aldığın gün" kredinin çekildiği gün
+                             diye okunuyordu. Banka tutarı yalnız görüldüğü gün geçerli;
+                             bugünün tarihiyle saklanır. -->
+                        <Label Text="Bankanın bugünkü erken kapama tutarı (isteğe bağlı)" Style="{StaticResource FieldLabel}" />
                         <Entry Text="{Binding EarlyClosureAmount}" Keyboard="Numeric" />
-                        <Label Text="Tutarı aldığın gün" Style="{StaticResource FieldLabel}" />
-                        <DatePicker Date="{Binding EarlyClosureDate}" />
-                        <Label Text="Girersen faiz ve anapara bu tutardan hesaplanır; kalan anaparadan daha güvenilirdir."
+                        <Label Text="{Binding EarlyClosureNote}"
+                               IsVisible="{Binding HasEarlyClosureNote}"
+                               Style="{StaticResource MutedText}"
+                               FontSize="12" />
+                        <Label Text="Banka uygulamasında bugün gördüğün erken kapama tutarı. Girersen faiz ve anapara bu tutardan hesaplanır; kalan anaparadan daha güvenilirdir."
                                Style="{StaticResource MutedText}"
                                FontSize="12" />
                     </VerticalStackLayout>
