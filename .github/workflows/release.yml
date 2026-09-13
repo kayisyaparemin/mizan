@@ -201,41 +201,36 @@ jobs:
           cat > release-notes.md <<NOTES
           # Mizan $version
 
-          Yaşam gideri artık bir **havuz**. 20.000 planladıysan ve 15.000
-          harcadıysan 5.000 bakiyen var — önceki sürüm bunu günlere bölüyor ve
-          plana tam uyan kullanıcıya yoktan sapma uyduruyordu.
+          Kredi erken kapama özelliğinin **zemini**. Bu sürümde kredilerin
+          faizini, gerçek anaparasını ve bugün kapatsan ne ödeyeceğini
+          görüyorsun. "Şu ayda kapatabilirsin" önerisi sonraki sürümlerde.
 
-          ### Gidişat bloğu baştan yazıldı
+          ### Önemli düzeltme: kalan anapara yanlış düşülüyordu
 
-          \`\`\`
-          Yaşam gideri   PLANLANAN   HARCANAN   KALAN
-                            20.000      15.000   5.000
+          Dönem kapatınca ödenen taksitin **tamamı** kalan borçtan
+          düşülüyordu. Oysa taksitin bir kısmı faiz. 22 taksitli bir
+          kredide 12 taksit sonra gerçek anapara 111.758 TL iken uygulama
+          16.173 TL gösterecekti. Artık yalnız anapara payı düşüyor.
 
-          Kredi kartları             PLANLANAN   MEVCUT
-            Axess · 05 Eki              38.594   41.027
+          **Önceki dönemleri kapattıysan** kredilerinin anaparası zaten
+          fazla düşmüş olabilir. Kredi satırında *"anaparası güncel
+          görünmüyor"* uyarısı görürsen bankandan kapatma tutarını al ve
+          krediyi düzenleyerek tarihiyle gir.
 
-          KMH faizi                  PLANLANAN   MEVCUT
-                                       7.536      7.536
+          ### Finansal Yapı → Krediler
 
-          Dönem sonu                 PLANLANAN   MEVCUT
-                                    -158.257   -158.257
-          \`\`\`
-
-          Her satır planlananı bugünkü hâliyle yan yana koyuyor. KMH satırı
-          yalnız gerçekten açık varsa açılıyor; sıfır yazmak için alan
-          ayrılmıyor.
-
-          ### Kart harcaması yaşam gideri değil
-
-          Kart harcamaları kartın içinde ekstre tarihiyle yönetiliyor, yaşam
-          gideri havuzundan düşmüyor. Kartlar kendi bölümünde duruyor: plandaki
-          ödeme ile kartın bugünkü hâli.
-
-          ### Vadesi geçen ödeme kendiliğinden ödenmiş sayılıyor
-
-          Karta ekstre kesilmeden ödeme yapılmıyor, vade günü gelen ödeme de
-          yapılıyor. Artık her satır için "ödedim" demen gerekmiyor — o kayıt
-          zaten sonraki maaş döneminin değerlendirmesinde tutuluyor.
+          - Her kredide: **kalan anapara · aylık faiz · bugün kapatma
+            tutarı · kapatınca ödemeyeceğin faiz**.
+          - Faizi girmen gerekmiyor; taksitten hesaplanıyor (BSMV ve KKDF
+            dahil).
+          - Krediler artık **düzenlenebiliyor**.
+          - **Bankanın kapatma tutarını** tarihiyle girersen hesap ondan
+            yapılıyor; en güvenilir kaynak bu.
+          - **Kredi türü:** tüketici kredisinde erken kapama ücreti yok;
+            sabit faizli konut kredisinde kalan vadeye göre %1 / %2
+            (6502 sayılı Kanun md. 27 ve 37).
+          - Kalan anapara yerine kalan taksitlerin toplamını girersen
+            uygulama bunu fark edip uyarıyor.
           NOTES
 
       - name: Upload signed APK artifact

@@ -896,6 +896,36 @@ public sealed class FinancialSnapshotReviewTests
         });
     }
 
+    /// <summary>
+    /// I17 — ödenen taksitin yalnız anapara payı düşer. Garanti: 190.188
+    /// anapara, aylık %5,04 → 9.585,21 faiz, 4.916,02 anapara. Eski kod
+    /// taksitin tamamını düşüp 175.686,77 yazıyordu.
+    /// </summary>
+    [Fact]
+    public async Task PaidLoanInstallment_ReducesOnlyItsPrincipalPortion()
+    {
+        await WithStore(async store =>
+        {
+            var initial = TestFactory.Service(store, InitialDate);
+            await initial.LoadCanonicalDevelopmentDataAsync();
+            await initial.GetFinancialPlanAsync();
+            var review = TestFactory.Service(store, FirstReviewDate);
+            var context = await review.GetPeriodReviewContextAsync();
+            var garanti = (await review.GetFinancialPlanAsync()).Loans
+                .Single(x => x.Bank == "Garanti BBVA");
+            Assert.Contains(context.OriginalPlan.PaymentLines, x =>
+                x.SourceType == PlanPaymentSourceType.Loan &&
+                x.SourceEntityId == garanti.Id);
+
+            await review.FinalizePeriodReviewAsync(
+                DefaultDraft(context, 30_000m));
+
+            var after = (await review.GetFinancialPlanAsync()).Loans
+                .Single(x => x.Id == garanti.Id);
+            Assert.Equal(185_271.98m, after.RemainingDebt!.Value, 0);
+        });
+    }
+
     [Fact]
     public async Task SalaryDay31_SnapshotUsesCalendarResolvedReviewDate()
     {

@@ -10,7 +10,8 @@ public sealed record ReconciledFinancialInstruments(
     IReadOnlyList<PlannedLargeExpense> LargeExpenses);
 
 public sealed class FinancialInstrumentReconciliationService(
-    CreditCardActualPaymentReconciler cardReconciler)
+    CreditCardActualPaymentReconciler cardReconciler,
+    LoanAmortizationCalculator loanCalculator)
 {
     public ReconciledFinancialInstruments Apply(
         FinancialPlan data,
@@ -50,7 +51,7 @@ public sealed class FinancialInstrumentReconciliationService(
                             var remaining = Math.Max(
                                 0,
                                 loan.RemainingInstallmentCount - 1);
-                            loans[loan.Id] = loan with
+                            var paidLoan = loan with
                             {
                                 NextPaymentDate = ResolveOutstandingDate(
                                     CalendarRules.AddMonthsKeepingDay(
@@ -59,22 +60,21 @@ public sealed class FinancialInstrumentReconciliationService(
                                         loan.PaymentDay),
                                     newAnchor),
                                 RemainingInstallmentCount = remaining,
-                                RemainingDebt = loan.RemainingDebt is null
-                                    ? null
-                                    : Math.Max(
-                                        0m,
-                                        loan.RemainingDebt.Value -
-                                        actual.ActualAmount),
+                                RemainingDebt = RemainingPrincipalAfter(
+                                    loan,
+                                    actual.ActualAmount,
+                                    remaining),
                                 IsActive = remaining > 0
                             };
+                            loans[loan.Id] = DropStaleClosureQuote(paidLoan);
                         }
                         else if (loan.NextPaymentDate < newAnchor)
                         {
                             // Ödenmeyen yükümlülük gelecek plandan kaybolmaz.
-                            loans[loan.Id] = loan with
+                            loans[loan.Id] = DropStaleClosureQuote(loan with
                             {
                                 NextPaymentDate = newAnchor
-                            };
+                            });
                         }
                         if (!paid)
                         {
@@ -172,4 +172,47 @@ public sealed class FinancialInstrumentReconciliationService(
     private static DateOnly ResolveOutstandingDate(
         DateOnly date,
         DateOnly newAnchor) => date < newAnchor ? newAnchor : date;
+
+    /// <summary>
+    /// I17 — taksit ödenince kalan anaparadan yalnız anapara payı düşer.
+    /// v1.9.0 öncesi taksitin tamamı düşülüyordu; 22 taksitli bir kredide
+    /// 12 taksit sonra anapara 111.758 yerine 16.173 görünüyordu.
+    /// </summary>
+    /// <remarks>
+    /// Faiz türetilemiyorsa (anapara yok ya da güncel değil) anaparaya
+    /// dokunulmaz: yanlış düşmektense bırakmak, kullanıcıya uyarı olarak
+    /// görünür ve bankadan düzeltilir.
+    /// </remarks>
+    private decimal? RemainingPrincipalAfter(
+        Loan loan,
+        decimal paidAmount,
+        int remainingInstallments)
+    {
+        if (remainingInstallments == 0)
+        {
+            return loan.RemainingDebt is null ? null : 0m;
+        }
+
+        var analysis = loanCalculator.Analyze(loan);
+        return analysis.Amortization is { } amortization
+            ? LoanAmortizationCalculator.PrincipalAfterPayment(
+                amortization,
+                paidAmount)
+            : loan.RemainingDebt;
+    }
+
+    /// <summary>
+    /// Banka kapatma tutarı yalnız alındığı gün için geçerlidir. Son ödenen
+    /// taksit o günü geçtiyse tutar artık hiçbir şeyi kalibre etmez; kanonik
+    /// kayıtta bayat bir rakam bırakılmaz.
+    /// </summary>
+    private static Loan DropStaleClosureQuote(Loan loan) =>
+        loan.EarlyClosureAmountAsOf is DateOnly asOf &&
+        asOf < LoanAmortizationCalculator.PreviousDueDate(loan)
+            ? loan with
+            {
+                EarlyClosureAmount = null,
+                EarlyClosureAmountAsOf = null
+            }
+            : loan;
 }

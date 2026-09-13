@@ -33,9 +33,13 @@ public sealed record FinancialRecordLine(
     string Title,
     string Subtitle,
     string Amount,
-    string Badge = "")
+    string Badge = "",
+    string Insight = "",
+    bool IsWarning = false)
 {
     public bool CanEditCard => Kind == FinancialRecordKind.CreditCard;
+    public bool CanEditLoan => Kind == FinancialRecordKind.Loan;
+    public bool HasInsight => !string.IsNullOrWhiteSpace(Insight);
 }
 
 public sealed record DatedAmountLine(

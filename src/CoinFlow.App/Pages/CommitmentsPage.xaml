@@ -59,10 +59,20 @@
                         </Grid>
                         <Label Text="İlk / sonraki ödeme tarihi" Style="{StaticResource FieldLabel}" />
                         <DatePicker Date="{Binding NextPaymentDate}" />
-                        <Label Text="Kalan borç" Style="{StaticResource FieldLabel}" />
+                        <Label Text="Kredi türü" Style="{StaticResource FieldLabel}" />
+                        <Picker ItemsSource="{Binding LoanKinds}" SelectedItem="{Binding SelectedLoanKind}" />
+                        <Label Text="Kalan anapara" Style="{StaticResource FieldLabel}" />
                         <Entry Text="{Binding RemainingDebt}" Keyboard="Numeric" />
-                        <Label Text="Erken kapama" Style="{StaticResource FieldLabel}" />
+                        <Label Text="Bankanın gösterdiği kalan anapara — kalan taksitlerin toplamı değil."
+                               Style="{StaticResource MutedText}"
+                               FontSize="12" />
+                        <Label Text="Bankanın kapatma tutarı (isteğe bağlı)" Style="{StaticResource FieldLabel}" />
                         <Entry Text="{Binding EarlyClosureAmount}" Keyboard="Numeric" />
+                        <Label Text="Tutarı aldığın gün" Style="{StaticResource FieldLabel}" />
+                        <DatePicker Date="{Binding EarlyClosureDate}" />
+                        <Label Text="Girersen faiz ve anapara bu tutardan hesaplanır; kalan anaparadan daha güvenilirdir."
+                               Style="{StaticResource MutedText}"
+                               FontSize="12" />
                     </VerticalStackLayout>
 
                     <VerticalStackLayout IsVisible="{Binding IsPlan}" Spacing="8">
@@ -331,16 +341,34 @@
                     <VerticalStackLayout BindableLayout.ItemsSource="{Binding LoanItems}" Spacing="8">
                         <BindableLayout.ItemTemplate>
                             <DataTemplate>
-                                <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto" Padding="8">
+                                <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="4" Padding="8">
                                     <Label Text="{Binding Title}" FontFamily="OpenSansSemibold" FontSize="16" />
                                     <Label Grid.Column="1" Text="{Binding Amount}" FontFamily="OpenSansSemibold" />
                                     <Label Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding Subtitle}" Style="{StaticResource MutedText}" />
-                                    <Button Grid.Row="2"
-                                            Grid.ColumnSpan="2"
-                                            Text="Sil"
-                                            CommandParameter="{Binding .}"
-                                            Clicked="OnDeleteClicked"
-                                            Style="{StaticResource SecondaryButton}" />
+                                    <Label Grid.Row="2"
+                                           Grid.ColumnSpan="2"
+                                           Text="{Binding Insight}"
+                                           IsVisible="{Binding HasInsight}"
+                                           FontSize="13"
+                                           TextColor="{StaticResource PositiveText}">
+                                        <Label.Triggers>
+                                            <DataTrigger TargetType="Label"
+                                                         Binding="{Binding IsWarning}"
+                                                         Value="True">
+                                                <Setter Property="TextColor"
+                                                        Value="{StaticResource WarningText}" />
+                                            </DataTrigger>
+                                        </Label.Triggers>
+                                    </Label>
+                                    <HorizontalStackLayout Grid.Row="3" Grid.ColumnSpan="2" Spacing="8">
+                                        <Button Text="Düzenle"
+                                                CommandParameter="{Binding .}"
+                                                Clicked="OnEditLoanClicked" />
+                                        <Button Text="Sil"
+                                                CommandParameter="{Binding .}"
+                                                Clicked="OnDeleteClicked"
+                                                Style="{StaticResource SecondaryButton}" />
+                                    </HorizontalStackLayout>
                                 </Grid>
                             </DataTemplate>
                         </BindableLayout.ItemTemplate>

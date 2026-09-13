@@ -33,6 +33,8 @@ internal sealed class LoanRow
     public int? InstallmentCount { get; set; }
     public decimal? RemainingDebt { get; set; }
     public decimal? EarlyClosureAmount { get; set; }
+    public string? EarlyClosureAmountAsOf { get; set; }
+    public int Kind { get; set; }
     public bool IsActive { get; set; }
 }
 

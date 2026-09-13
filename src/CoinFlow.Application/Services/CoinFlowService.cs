@@ -19,7 +19,8 @@ public sealed class CoinFlowService(
     HistoricalPlanRevisionService historicalPlanRevisionService,
     PeriodReviewService reviewService,
     PeriodProgressService periodProgressService,
-    HistoryQueryService historyService)
+    HistoryQueryService historyService,
+    LoanPayoffService loanPayoffService)
 {
     public Task InitializeAsync(CancellationToken cancellationToken = default) =>
         store.InitializeAsync(cancellationToken);
@@ -738,6 +739,7 @@ public sealed class CoinFlowService(
         }
 
         CalendarRules.ValidateDay(loan.PaymentDay);
+        loan = loanPayoffService.PrepareForSave(loan);
         await store.UpsertLoanAsync(loan, cancellationToken);
         await CapturePlanningChangeAsync(
             "Kredi planı değişti",

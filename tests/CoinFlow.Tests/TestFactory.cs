@@ -66,7 +66,8 @@ internal static class TestFactory
             new FinancialStateReconciliationService(),
             new FinancialInstrumentReconciliationService(
                 new CreditCardActualPaymentReconciler(
-                    new CreditCardStatementCalculator())),
+                    new CreditCardStatementCalculator()),
+                new LoanAmortizationCalculator(new LoanScheduleCalculator())),
             comparison);
         return new CoinFlowService(
             store,
@@ -89,7 +90,10 @@ internal static class TestFactory
                 store,
                 clock,
                 new CreditCardStatementCalculator()),
-            new HistoryQueryService(store, comparison));
+            new HistoryQueryService(store, comparison),
+            new LoanPayoffService(
+                clock,
+                new LoanAmortizationCalculator(new LoanScheduleCalculator())));
     }
 
     public static FinancialPlan CanonicalPlan() => new()

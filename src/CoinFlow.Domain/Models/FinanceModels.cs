@@ -57,6 +57,19 @@ public enum PaymentAssignmentMode
     PreviousPeriod = 1
 }
 
+/// <summary>
+/// Erken ödeme ücretini belirleyen kredi türü (6502 sayılı Kanun).
+/// </summary>
+public enum LoanKind
+{
+    /// <summary>İhtiyaç, taşıt — md. 27: erken ödeme ücreti alınamaz.</summary>
+    Consumer = 0,
+    /// <summary>Sabit faizli konut — md. 37: kalan vade ≤36 ay %1, üstü %2.</summary>
+    HousingFixed = 1,
+    /// <summary>Değişken faizli konut — md. 37: ücret alınamaz.</summary>
+    HousingVariable = 2
+}
+
 public sealed record PaymentAssignmentStrategy
 {
     public Guid Id { get; init; } = Guid.NewGuid();
@@ -92,8 +105,18 @@ public sealed record Loan
     public int PaymentDay { get; init; }
     public DateOnly NextPaymentDate { get; init; }
     public int RemainingInstallmentCount { get; init; }
+    /// <summary>
+    /// Kalan <b>anapara</b> — <see cref="NextPaymentDate"/>'teki taksitten
+    /// hemen önceki hâli. Kalan taksitlerin toplamı değildir.
+    /// </summary>
     public decimal? RemainingDebt { get; init; }
+    /// <summary>
+    /// Bankanın verdiği kapatma tutarı. Yalnız <see cref="EarlyClosureAmountAsOf"/>
+    /// ile birlikte anlamlıdır; o gün için geçerlidir.
+    /// </summary>
     public decimal? EarlyClosureAmount { get; init; }
+    public DateOnly? EarlyClosureAmountAsOf { get; init; }
+    public LoanKind Kind { get; init; } = LoanKind.Consumer;
     public bool IsActive { get; init; } = true;
 }
 

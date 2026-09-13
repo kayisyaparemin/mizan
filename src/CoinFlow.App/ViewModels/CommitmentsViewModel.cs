@@ -16,6 +16,7 @@ public partial class CommitmentsViewModel(
     CoinFlowService service,
     CreditCardStatementCalculator cardCalculator,
     CreditCardStatementImportWorkflow statementImportWorkflow,
+    LoanPayoffService loanPayoffService,
     IUserFeedbackService feedback) : ViewModelBase
 {
     public event Action<InitialPaymentStrategySetup>?
@@ -48,6 +49,13 @@ public partial class CommitmentsViewModel(
         new("Özel tutar", CreditCardPaymentType.FixedAmount)
     ];
 
+    public ObservableCollection<SelectionOption<LoanKind>> LoanKinds { get; } =
+    [
+        new("Tüketici kredisi (ihtiyaç, taşıt)", LoanKind.Consumer),
+        new("Konut kredisi — sabit faiz", LoanKind.HousingFixed),
+        new("Konut kredisi — değişken faiz", LoanKind.HousingVariable)
+    ];
+
     public ObservableCollection<SelectionOption<CurrentStatementPaymentMode>>
         CurrentStatementPaymentModes { get; } =
     [
@@ -69,6 +77,7 @@ public partial class CommitmentsViewModel(
     private readonly List<FinancialRecordLine> _allItems = [];
     private readonly Dictionary<Guid, string> _cardChargeDescriptions = [];
     private Guid? _editingCardId;
+    private Guid? _editingLoanId;
     private DateOnly? _editingCardBalanceDate;
     private CreditCardStatement? _editingCardStatement;
     private string? _cardStatementFingerprint;
@@ -110,6 +119,8 @@ public partial class CommitmentsViewModel(
     [ObservableProperty] private string installmentCount = "12";
     [ObservableProperty] private string remainingDebt = string.Empty;
     [ObservableProperty] private string earlyClosureAmount = string.Empty;
+    [ObservableProperty] private DateTime earlyClosureDate = DateTime.Today;
+    [ObservableProperty] private SelectionOption<LoanKind>? selectedLoanKind;
 
     [ObservableProperty] private DateTime planPaymentDate = DateTime.Today.AddMonths(1);
     [ObservableProperty] private string planPaymentAmount = string.Empty;
@@ -200,8 +211,9 @@ public partial class CommitmentsViewModel(
                 "Tek seferlik gelir"));
         }
 
-        foreach (var loan in plan.Loans)
+        foreach (var overview in loanPayoffService.Describe(plan.Loans))
         {
+            var loan = overview.Loan;
             _allItems.Add(new FinancialRecordLine(
                 loan.Id,
                 ManagementSection.Payment,
@@ -209,9 +221,9 @@ public partial class CommitmentsViewModel(
                 $"{loan.Bank} {loan.Name}".Trim(),
                 $"Sonraki: {loan.NextPaymentDate:dd.MM.yyyy} • {loan.RemainingInstallmentCount} ödeme",
                 Money(loan.MonthlyPayment),
-                loan.RemainingDebt is decimal debt
-                    ? $"Kalan borç: {Money(debt)}"
-                    : "Kredi"));
+                "Kredi",
+                LoanInsight(overview),
+                overview.IssueMessage is not null));
         }
 
         foreach (var paymentPlan in plan.PaymentPlans)
@@ -836,6 +848,7 @@ public partial class CommitmentsViewModel(
     private void CancelEditingCard()
     {
         _editingCardId = null;
+        _editingLoanId = null;
         _editingCardBalanceDate = null;
         _editingCardStatement = null;
         _cardStatementFingerprint = null;
@@ -862,8 +875,10 @@ public partial class CommitmentsViewModel(
             throw new InvalidOperationException("Kalan taksit sayısı geçerli olmalıdır.");
         }
 
+        var closureAmount = ParseOptionalMoney(EarlyClosureAmount);
         return new Loan
         {
+            Id = _editingLoanId ?? Guid.NewGuid(),
             Name = RequireName(),
             Bank = Bank.Trim(),
             MonthlyPayment = RequirePositive(ParseMoney(Amount, "Aylık ödeme"), "Aylık ödeme"),
@@ -871,8 +886,83 @@ public partial class CommitmentsViewModel(
             NextPaymentDate = DateOnly.FromDateTime(NextPaymentDate),
             RemainingInstallmentCount = count,
             RemainingDebt = ParseOptionalMoney(RemainingDebt),
-            EarlyClosureAmount = ParseOptionalMoney(EarlyClosureAmount)
+            EarlyClosureAmount = closureAmount,
+            EarlyClosureAmountAsOf = closureAmount is null
+                ? null
+                : DateOnly.FromDateTime(EarlyClosureDate),
+            Kind = SelectedLoanKind?.Value ?? LoanKind.Consumer
         };
+    }
+
+    public async Task EditLoanAsync(Guid loanId)
+    {
+        var loan = (await service.GetFinancialPlanAsync()).Loans
+            .Single(x => x.Id == loanId);
+        ResetForm();
+        _editingLoanId = loan.Id;
+        IsIncomeSection = false;
+        IsPaymentSection = true;
+        RefreshRecordTypes();
+        SelectedRecordType = RecordTypes.Single(x => x.Value == "loan");
+        HasActiveForm = true;
+        FormTitle = "Krediyi Düzenle";
+        FormLead = "Kalan anaparayı ya da bankadan aldığın kapatma tutarını " +
+                   "güncel tut; erken kapama hesabı bunlardan yapılır.";
+        SaveButtonText = "Değişiklikleri Kaydet";
+        Name = loan.Name;
+        Bank = loan.Bank;
+        Amount = loan.MonthlyPayment.ToString("N2", TurkishCulture);
+        PaymentDay = loan.PaymentDay.ToString(TurkishCulture);
+        InstallmentCount =
+            loan.RemainingInstallmentCount.ToString(TurkishCulture);
+        NextPaymentDate = loan.NextPaymentDate.ToDateTime(TimeOnly.MinValue);
+        RemainingDebt = loan.RemainingDebt?.ToString("N2", TurkishCulture) ??
+                        string.Empty;
+        SelectedLoanKind = LoanKinds.Single(x => x.Value == loan.Kind);
+        // Bayat banka tutarı forma geri gelmez: tarihi son ödenen taksitten
+        // eskiyse artık hiçbir şeyi kalibre etmez ve kaydederken reddedilir.
+        var quoteIsCurrent =
+            loan.EarlyClosureAmount is not null &&
+            loan.EarlyClosureAmountAsOf is DateOnly asOf &&
+            asOf >= LoanAmortizationCalculator.PreviousDueDate(loan);
+        EarlyClosureAmount = quoteIsCurrent
+            ? loan.EarlyClosureAmount!.Value.ToString("N2", TurkishCulture)
+            : string.Empty;
+        EarlyClosureDate = quoteIsCurrent
+            ? loan.EarlyClosureAmountAsOf!.Value.ToDateTime(TimeOnly.MinValue)
+            : DateTime.Today;
+    }
+
+    private static string LoanInsight(LoanPayoffOverview overview)
+    {
+        if (overview.IssueMessage is { } issue)
+        {
+            return issue;
+        }
+
+        if (overview.Analysis.Amortization is not { } amortization ||
+            overview.Today is not { } today)
+        {
+            return string.Empty;
+        }
+
+        var rate =
+            $"aylık %{(amortization.MonthlyRate * 100m).ToString("N2", TurkishCulture)}";
+        var source = amortization.Source == LoanRateSource.BankQuote
+            ? " · banka tutarından"
+            : string.Empty;
+        var head =
+            $"Kalan anapara {Money(amortization.Principal)} · {rate}{source}";
+        if (!today.HasAnythingToClose)
+        {
+            return head;
+        }
+
+        var fee = today.Fee > 0m
+            ? $" ({Money(today.Fee)} erken ödeme ücreti dahil)"
+            : string.Empty;
+        return $"{head}\nBugün kapatma ≈ {Money(today.Amount)}{fee} · " +
+               $"{Money(today.InterestSaving)} faiz ödemezsin";
     }
 
     private TemporaryPaymentPlan BuildPlan()
@@ -1086,6 +1176,8 @@ public partial class CommitmentsViewModel(
         Note = string.Empty;
         RemainingDebt = string.Empty;
         EarlyClosureAmount = string.Empty;
+        EarlyClosureDate = DateTime.Today;
+        SelectedLoanKind = LoanKinds[0];
         PlanInstallments.Clear();
         CardFutureCharges.Clear();
         CardPaymentPlans.Clear();

@@ -214,6 +214,23 @@ public partial class CommitmentsPage : ContentPage, IQueryAttributable
         await OpenCardControlAsync(item.Id);
     }
 
+    private async void OnEditLoanClicked(
+        object? sender,
+        EventArgs eventArgs)
+    {
+        if (sender is not Button
+            {
+                CommandParameter: FinancialRecordLine item
+            } ||
+            !item.CanEditLoan)
+        {
+            return;
+        }
+
+        await _viewModel.EditLoanAsync(item.Id);
+        await PageScroll.ScrollToAsync(0, 0, true);
+    }
+
     private Task OpenCardControlAsync(Guid cardId) =>
         Shell.Current.GoToAsync(
             AppShell.CardControlRoute,

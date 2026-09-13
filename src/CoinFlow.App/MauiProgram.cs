@@ -44,6 +44,7 @@ public static class MauiProgram
         builder.Services.AddSingleton<SalaryResolver>();
         builder.Services.AddSingleton<IncomeProjectionCalculator>();
         builder.Services.AddSingleton<LoanScheduleCalculator>();
+        builder.Services.AddSingleton<LoanAmortizationCalculator>();
         builder.Services.AddSingleton<InstallmentScheduleCalculator>();
         builder.Services.AddSingleton<ScheduledPaymentCalculator>();
         builder.Services.AddSingleton<CreditCardStatementCalculator>();
@@ -61,6 +62,7 @@ public static class MauiProgram
         builder.Services.AddSingleton<PeriodReviewService>();
         builder.Services.AddSingleton<PeriodProgressService>();
         builder.Services.AddSingleton<HistoryQueryService>();
+        builder.Services.AddSingleton<LoanPayoffService>();
         builder.Services.AddSingleton<IPdfTextExtractor, PdfPigPdfTextExtractor>();
         builder.Services.AddSingleton<ICreditCardStatementParser, AkbankAxessStatementParser>();
         builder.Services.AddSingleton<ICreditCardStatementParser, GarantiBonusStatementParser>();

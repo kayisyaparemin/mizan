@@ -13,7 +13,7 @@ public sealed class SqliteCoinFlowStore : ICoinFlowStore, IAsyncDisposable
     // v12: kaydedilmiş simülasyon taslakları.
     // v13: açık dönemin gözlem defteri (I14/I15). Her ikisi de yalnız yeni
     // tablo ekler; mevcut tabloların hiçbirine dokunmaz, veri taşınmaz.
-    private const int CurrentSchemaVersion = 13;
+    private const int CurrentSchemaVersion = 14;
     private const int CurrentCardStatementModelVersion = 7;
     private const decimal DefaultPlanningInterestRate = 0.05m;
     private static readonly Guid LegacyInitialAssignmentStrategyId =
@@ -1271,6 +1271,10 @@ public sealed class SqliteCoinFlowStore : ICoinFlowStore, IAsyncDisposable
         InstallmentCount = value.RemainingInstallmentCount,
         RemainingDebt = value.RemainingDebt,
         EarlyClosureAmount = value.EarlyClosureAmount,
+        EarlyClosureAmountAsOf = value.EarlyClosureAmountAsOf is DateOnly asOf
+            ? FormatDate(asOf)
+            : null,
+        Kind = (int)value.Kind,
         IsActive = value.IsActive
     };
 
@@ -1285,6 +1289,10 @@ public sealed class SqliteCoinFlowStore : ICoinFlowStore, IAsyncDisposable
         RemainingInstallmentCount = row.InstallmentCount.GetValueOrDefault(),
         RemainingDebt = row.RemainingDebt,
         EarlyClosureAmount = row.EarlyClosureAmount,
+        EarlyClosureAmountAsOf = ParseNullableDate(row.EarlyClosureAmountAsOf),
+        Kind = Enum.IsDefined(typeof(LoanKind), row.Kind)
+            ? (LoanKind)row.Kind
+            : LoanKind.Consumer,
         IsActive = row.IsActive
     };
 

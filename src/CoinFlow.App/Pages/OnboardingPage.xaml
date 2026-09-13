@@ -282,7 +282,7 @@
                         </Grid>
                         <Label Text="Sonraki ödeme tarihi" Style="{StaticResource FieldLabel}" />
                         <DatePicker Date="{Binding LoanNextPaymentDate}" />
-                        <Label Text="Kalan borç" Style="{StaticResource FieldLabel}" />
+                        <Label Text="Kalan anapara" Style="{StaticResource FieldLabel}" />
                         <Entry Text="{Binding LoanRemainingDebt}" Keyboard="Numeric" />
                         <Button Text="Kredi Ekle"
                                 Command="{Binding AddLoanCommand}" />
