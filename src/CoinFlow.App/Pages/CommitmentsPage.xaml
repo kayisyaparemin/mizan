@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:controls="clr-namespace:CoinFlow.App.Controls"
              x:Class="CoinFlow.App.Pages.CommitmentsPage"
              Title="Finansal Yapı">
     <ScrollView x:Name="PageScroll">
@@ -25,20 +26,20 @@
                     <Label Text="{Binding FormTitle}" Style="{StaticResource SectionTitle}" />
                     <Label Text="{Binding FormLead}" Style="{StaticResource MutedText}" />
 
-                    <Label Text="Ad / açıklama" Style="{StaticResource FieldLabel}" />
-                    <Entry Text="{Binding Name}" Placeholder="Kayıt adı" />
+                    <!-- Simülatörün koşul formu: harcama, borç ve tek seferlik gelir
+                         buradan doğrudan kaydedilir. BindingContext alt elemanda;
+                         görünürlük sayfanın kendi bağlamından okunur. -->
+                    <ContentView IsVisible="{Binding IsScenarioEntry}">
+                        <controls:ScenarioConditionFormView BindingContext="{Binding EntryForm}" />
+                    </ContentView>
+
+                    <Label Text="Ad / açıklama" Style="{StaticResource FieldLabel}" IsVisible="{Binding IsRecordForm}" />
+                    <Entry Text="{Binding Name}" Placeholder="Kayıt adı" IsVisible="{Binding IsRecordForm}" />
 
                     <VerticalStackLayout IsVisible="{Binding IsSalary}" Spacing="7">
                         <Label Text="Gelir tutarı" Style="{StaticResource FieldLabel}" />
                         <Entry Text="{Binding Amount}" Keyboard="Numeric" />
                         <Label Text="Geçerlilik tarihi" Style="{StaticResource FieldLabel}" />
-                        <DatePicker Date="{Binding EffectiveDate}" />
-                    </VerticalStackLayout>
-
-                    <VerticalStackLayout IsVisible="{Binding IsOtherIncome}" Spacing="7">
-                        <Label Text="Gelir tutarı" Style="{StaticResource FieldLabel}" />
-                        <Entry Text="{Binding Amount}" Keyboard="Numeric" />
-                        <Label Text="Gelir tarihi" Style="{StaticResource FieldLabel}" />
                         <DatePicker Date="{Binding EffectiveDate}" />
                     </VerticalStackLayout>
 
@@ -264,15 +265,6 @@
                                 </DataTemplate>
                             </BindableLayout.ItemTemplate>
                         </VerticalStackLayout>
-                    </VerticalStackLayout>
-
-                    <VerticalStackLayout IsVisible="{Binding IsLargeExpense}" Spacing="7">
-                        <Label Text="Tutar" Style="{StaticResource FieldLabel}" />
-                        <Entry Text="{Binding Amount}" Keyboard="Numeric" />
-                        <Label Text="Ödeme tarihi" Style="{StaticResource FieldLabel}" />
-                        <DatePicker Date="{Binding EffectiveDate}" />
-                        <Label Text="Not" Style="{StaticResource FieldLabel}" />
-                        <Editor Text="{Binding Note}" AutoSize="TextChanges" />
                     </VerticalStackLayout>
 
                     <Button Text="{Binding SaveButtonText}"

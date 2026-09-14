@@ -23,6 +23,20 @@ public partial class CommitmentsViewModel(
         InitialStrategySetupRequested;
     public ObservableCollection<SelectionOption<string>> RecordTypes { get; } = [];
 
+    /// <summary>
+    /// Simülatörle aynı koşul formu. Simüle edilebilen bir harcama, borç ya da
+    /// gelir buradan doğrudan girilir; eskiden yalnız Simülatör → Planı Uygula
+    /// yoluyla girilebiliyordu.
+    /// </summary>
+    public ScenarioConditionForm EntryForm { get; } = new(directEntryOnly: true);
+
+    /// <summary>
+    /// Açık formun kimliği. Form açılınca üretilir, kayıt başarılı olunca
+    /// yenilenir; hızlı çift dokunuş aynı kimlikle gider ve ikinci kayıt
+    /// oluşturmaz.
+    /// </summary>
+    private Guid _pendingEntryId = Guid.NewGuid();
+
     public ObservableCollection<SelectionOption<CreditCardPaymentStrategy>>
         PaymentStrategies { get; } =
     [
@@ -92,11 +106,15 @@ public partial class CommitmentsViewModel(
     [ObservableProperty] private bool isPaymentSection;
     [ObservableProperty] private SelectionOption<string>? selectedRecordType;
     [ObservableProperty] private bool isSalary;
-    [ObservableProperty] private bool isOtherIncome;
     [ObservableProperty] private bool isLoan;
     [ObservableProperty] private bool isPlan;
     [ObservableProperty] private bool isCard;
-    [ObservableProperty] private bool isLargeExpense;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsRecordForm))]
+    private bool isScenarioEntry;
+
+    /// <summary>Kayda özel formlar (gelir, kredi, kart, ödeme planı).</summary>
+    public bool IsRecordForm => !IsScenarioEntry;
     [ObservableProperty] private bool hasNoSalary;
     [ObservableProperty] private bool hasActiveForm;
     [ObservableProperty] private string formTitle = "Yeni kayıt";
@@ -317,6 +335,7 @@ public partial class CommitmentsViewModel(
         RefreshGroupedItems();
         RefreshRecordTypes();
         RefreshVisibleItems();
+        EntryForm.SetLookups(plan);
         SelectedPaymentStrategy ??= PaymentStrategies[0];
         SelectedProjectionFallbackStrategy ??=
             ProjectionFallbackStrategies[0];
@@ -372,7 +391,7 @@ public partial class CommitmentsViewModel(
     public void StartAdd(string recordType)
     {
         ResetForm();
-        IsIncomeSection = recordType is "salary" or "income";
+        IsIncomeSection = recordType == "salary";
         IsPaymentSection = !IsIncomeSection;
         RefreshRecordTypes();
         SelectedRecordType = RecordTypes.SingleOrDefault(x =>
@@ -381,39 +400,66 @@ public partial class CommitmentsViewModel(
         FormTitle = recordType switch
         {
             "salary" => "Gelir Ekle",
-            "income" => "Tek Seferlik Gelir Ekle",
             "loan" => "Kredi Ekle",
             "card" => "Kredi Kartı Ekle",
-            "temporary" => "Geçici Ödeme Ekle",
-            "recurring" => "Düzenli Ödeme Ekle",
-            "installment" => "Taksit / Finansman Ekle",
-            "large" => "Tek Seferlik Ödeme Ekle",
+            "temporary" => "Ödeme Planı Ekle",
             _ => "Yeni Kayıt"
         };
         FormLead = recordType switch
         {
             "salary" => "Düzenli gelir veya gelir değişikliği.",
-            "income" => "Belirli tarihte gelecek tek seferlik gelir.",
-            "loan" => "Aylık kredi taksitleri.",
+            "loan" => "Bankada zaten devam eden kredinin taksitleri.",
             "card" => "Kart limiti, borç ve ödeme tercihleri.",
-            "temporary" => "Tarihleri belli geçici ödemeler.",
-            "recurring" => "Tekrarlayan düzenli ödemeler.",
-            "installment" => "Taksit veya finansman planı.",
-            "large" => "Belirli tarihte ödenecek tek seferlik tutar.",
+            "temporary" => "Tutarı ya da tarihi aydan aya değişen ödemeler; her ödemeyi tarihiyle ekle.",
             _ => string.Empty
         };
         SaveButtonText = "Kaydet";
     }
 
-    partial void OnSelectedRecordTypeChanged(
-        SelectionOption<string>? value)
+    /// <summary>
+    /// Simülatördeki formu açar. Kaydet, simülasyonu uygulamakla aynı yoldan
+    /// yazar; burada girilen kayıt simülasyonda görülen sonucu üretir.
+    /// </summary>
+    public void StartScenarioEntry(ScenarioGroup group)
     {
-        IsSalary = value?.Value == "salary";
-        IsOtherIncome = value?.Value == "income";
-        IsLoan = value?.Value == "loan";
-        IsPlan = value?.Value is "temporary" or "installment" or "recurring";
-        IsCard = value?.Value == "card";
-        IsLargeExpense = value?.Value == "large";
+        ResetForm();
+        SelectedRecordType = null;
+        EntryForm.Reset();
+        EntryForm.SelectGroup(group);
+        _pendingEntryId = Guid.NewGuid();
+        IsScenarioEntry = true;
+        IsIncomeSection = group == ScenarioGroup.Income;
+        IsPaymentSection = !IsIncomeSection;
+        HasActiveForm = true;
+        FormTitle = group switch
+        {
+            ScenarioGroup.Spending => "Harcama Ekle",
+            ScenarioGroup.Debt => "Borç veya Kredi Ekle",
+            ScenarioGroup.Income => "Tek Seferlik Gelir Ekle",
+            _ => "Yeni Kayıt"
+        };
+        FormLead = "Simülatördeki formun aynısı. Kaydettiğinde doğrudan finans planına eklenir; önce denemek istersen Simülatör'ü kullan.";
+        SaveButtonText = "Kaydet";
+    }
+
+    partial void OnSelectedRecordTypeChanged(
+        SelectionOption<string>? value) =>
+        RefreshRecordFormFlags();
+
+    partial void OnIsScenarioEntryChanged(bool value) =>
+        RefreshRecordFormFlags();
+
+    /// <summary>
+    /// Ortak form açıkken kayda özel alanlar görünmez; sayfa yeniden
+    /// yüklenince kayıt türü listesi varsayılana dönse bile.
+    /// </summary>
+    private void RefreshRecordFormFlags()
+    {
+        var type = IsScenarioEntry ? null : SelectedRecordType?.Value;
+        IsSalary = type == "salary";
+        IsLoan = type == "loan";
+        IsPlan = type == "temporary";
+        IsCard = type == "card";
     }
 
     partial void OnSelectedPaymentStrategyChanged(
@@ -726,6 +772,12 @@ public partial class CommitmentsViewModel(
             return;
         }
 
+        if (IsScenarioEntry)
+        {
+            await SaveScenarioEntryAsync();
+            return;
+        }
+
         Func<Task> persist;
         string successMessage;
         try
@@ -746,6 +798,43 @@ public partial class CommitmentsViewModel(
             SetStatus(string.Empty);
             await feedback.ShowSuccessAsync(successMessage);
             ResetForm();
+            await LoadAsync();
+        }
+        catch (Exception exception)
+        {
+            var message = UserFacingMessages.FromException(exception);
+            SetStatus(message);
+            await feedback.ShowErrorAsync(message);
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    private async Task SaveScenarioEntryAsync()
+    {
+        SimulationRequest request;
+        try
+        {
+            request = EntryForm.BuildRequest(_pendingEntryId);
+        }
+        catch (Exception exception)
+        {
+            SetStatus(UserFacingMessages.FromException(exception));
+            return;
+        }
+
+        try
+        {
+            IsBusy = true;
+            SetStatus(string.Empty);
+            var result = await service.AddRecordFromScenarioAsync(request);
+            await feedback.ShowSuccessAsync(result.AlreadyApplied
+                ? "Bu kayıt zaten eklenmişti."
+                : $"{SimulationScenarioCatalog.TypeText(request.Type)} kaydedildi.");
+            ResetForm();
+            _pendingEntryId = Guid.NewGuid();
             await LoadAsync();
         }
         catch (Exception exception)
@@ -826,31 +915,13 @@ public partial class CommitmentsViewModel(
                 };
                 successMessage = "Gelir kaydedildi.";
                 return () => service.SaveSalaryAsync(salary);
-            case "income":
-                var income = new OneTimeIncome
-                {
-                    Amount = RequirePositive(ParseMoney(Amount, "Gelir"), "Gelir"),
-                    ExactDate = DateOnly.FromDateTime(EffectiveDate),
-                    Description = string.IsNullOrWhiteSpace(Name)
-                        ? "Diğer gelir"
-                        : Name.Trim()
-                };
-                successMessage = "Gelir kaydedildi.";
-                return () => service.SaveOtherIncomeAsync(income);
             case "loan":
                 var loan = BuildLoan();
                 successMessage = "Kredi kaydedildi.";
                 return () => service.SaveLoanAsync(loan);
             case "temporary":
-            case "installment":
-            case "recurring":
                 var plan = BuildPlan();
-                successMessage = plan.Kind switch
-                {
-                    PaymentPlanKind.Installment => "Taksit planı kaydedildi.",
-                    PaymentPlanKind.Recurring => "Düzenli ödeme kaydedildi.",
-                    _ => "Geçici ödeme planı kaydedildi."
-                };
+                successMessage = "Ödeme planı kaydedildi.";
                 return () => service.SavePaymentPlanAsync(plan);
             case "card":
                 var wasEditingCard = IsEditingCard;
@@ -859,16 +930,6 @@ public partial class CommitmentsViewModel(
                     ? "Kredi kartı güncellendi."
                     : "Kredi kartı kaydedildi.";
                 return () => service.SaveCreditCardAsync(card);
-            case "large":
-                var expense = new PlannedLargeExpense
-                {
-                    Name = RequireName(),
-                    Amount = RequirePositive(ParseMoney(Amount, "Tutar"), "Tutar"),
-                    ExactDate = DateOnly.FromDateTime(EffectiveDate),
-                    Note = Note.Trim()
-                };
-                successMessage = "Planlı ödeme kaydedildi.";
-                return () => service.SavePlannedLargeExpenseAsync(expense);
             default:
                 throw new InvalidOperationException("Kayıt türü seçilmelidir.");
         }
@@ -886,6 +947,7 @@ public partial class CommitmentsViewModel(
         _cardExactNextStatementDate = null;
         _cardExactNextDueDate = null;
         IsEditingCard = false;
+        IsScenarioEntry = false;
         HasActiveForm = false;
         SaveButtonText = "Kaydet";
         CardFutureCharges.Clear();
@@ -1017,12 +1079,9 @@ public partial class CommitmentsViewModel(
         {
             Id = id,
             Name = RequireName(),
-            Kind = SelectedRecordType?.Value switch
-            {
-                "temporary" => PaymentPlanKind.Temporary,
-                "recurring" => PaymentPlanKind.Recurring,
-                _ => PaymentPlanKind.Installment
-            },
+            // Eşit tutarlı taksit, düzenli ödeme ve finansman ortak formdan
+            // girilir; buradaki elle takvim yalnız düzensiz planlar içindir.
+            Kind = PaymentPlanKind.Temporary,
             Installments = PlanInstallments
                 .OrderBy(x => x.Date)
                 .Select(x => new TemporaryPaymentInstallment
@@ -1179,16 +1238,12 @@ public partial class CommitmentsViewModel(
         if (IsIncomeSection)
         {
             RecordTypes.Add(new SelectionOption<string>("Gelir / Gelir değişikliği", "salary"));
-            RecordTypes.Add(new SelectionOption<string>("Tek seferlik gelir", "income"));
         }
         else
         {
             RecordTypes.Add(new SelectionOption<string>("Kredi", "loan"));
             RecordTypes.Add(new SelectionOption<string>("Kredi kartı", "card"));
-            RecordTypes.Add(new SelectionOption<string>("Geçici ödeme planı", "temporary"));
-            RecordTypes.Add(new SelectionOption<string>("Düzenli ödeme", "recurring"));
-            RecordTypes.Add(new SelectionOption<string>("Taksit / finansman", "installment"));
-            RecordTypes.Add(new SelectionOption<string>("Tek seferlik ödeme", "large"));
+            RecordTypes.Add(new SelectionOption<string>("Ödeme planı", "temporary"));
         }
 
         SelectedRecordType =

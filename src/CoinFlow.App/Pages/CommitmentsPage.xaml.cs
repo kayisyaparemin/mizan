@@ -1,11 +1,16 @@
 using CoinFlow.App.Models;
 using CoinFlow.App.Services;
 using CoinFlow.App.ViewModels;
+using CoinFlow.Application.Models;
 
 namespace CoinFlow.App.Pages;
 
 public partial class CommitmentsPage : ContentPage, IQueryAttributable
 {
+    private const string SpendingChoice = "Harcama";
+    private const string DebtChoice = "Borç / Kredi";
+    private const string OneTimeIncomeChoice = "Tek Seferlik Gelir";
+
     private readonly CommitmentsViewModel _viewModel;
     private bool _isShowingInitialStrategySetup;
     private string? _requestedSection;
@@ -99,66 +104,42 @@ public partial class CommitmentsPage : ContentPage, IQueryAttributable
 
     private async void OnAddClicked(object? sender, EventArgs eventArgs)
     {
-        var options = new List<string>
-        {
-            "Gelir",
-            "Kredi Kartı",
-            "Kredi",
-            "Tek Seferlik Ödeme",
-            "Düzenli Ödeme"
-        };
-        if (_viewModel.FirstCardId is not null)
-        {
-            options.Add("Kart Harcaması");
-        }
-
+        // İlk üçü simülatörün formunu açar: simüle edilebilen her harcama,
+        // borç ve gelir burada da girilebilir. Kart harcaması, tek seferlik ve
+        // düzenli ödeme "Harcama" altında.
         var choice = await DisplayActionSheet(
             "Ne eklemek istiyorsun?",
             "Vazgeç",
             null,
-            options.ToArray());
+            SpendingChoice,
+            DebtChoice,
+            OneTimeIncomeChoice,
+            "Maaş / Gelir Değişikliği",
+            "Bankadaki Kredimi Ekle",
+            "Kredi Kartı",
+            "Tarihleri Farklı Ödeme Planı");
         switch (choice)
         {
-            case "Gelir":
+            case SpendingChoice:
+                _viewModel.StartScenarioEntry(ScenarioGroup.Spending);
+                break;
+            case DebtChoice:
+                _viewModel.StartScenarioEntry(ScenarioGroup.Debt);
+                break;
+            case OneTimeIncomeChoice:
+                _viewModel.StartScenarioEntry(ScenarioGroup.Income);
+                break;
+            case "Maaş / Gelir Değişikliği":
                 _viewModel.StartAdd("salary");
                 break;
             case "Kredi Kartı":
                 _viewModel.StartAdd("card");
                 break;
-            case "Kredi":
+            case "Bankadaki Kredimi Ekle":
                 _viewModel.StartAdd("loan");
                 break;
-            case "Tek Seferlik Ödeme":
-                _viewModel.StartAdd("large");
-                break;
-            case "Düzenli Ödeme":
-                _viewModel.StartAdd("recurring");
-                break;
-            case "Kart Harcaması":
-                var cards = _viewModel.CreditCardItems.ToArray();
-                if (cards.Length == 1)
-                {
-                    await OpenCardControlAsync(cards[0].Id);
-                    return;
-                }
-
-                if (cards.Length > 1)
-                {
-                    var cardChoice = await DisplayActionSheet(
-                        "Kart seç",
-                        "Vazgeç",
-                        null,
-                        cards.Select(x => x.Title).ToArray());
-                    var selectedCard = cards.FirstOrDefault(x =>
-                        x.Title == cardChoice);
-                    if (selectedCard is not null)
-                    {
-                        await OpenCardControlAsync(selectedCard.Id);
-                    }
-
-                    return;
-                }
-
+            case "Tarihleri Farklı Ödeme Planı":
+                _viewModel.StartAdd("temporary");
                 break;
         }
 

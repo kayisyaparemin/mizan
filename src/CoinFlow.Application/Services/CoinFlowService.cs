@@ -409,6 +409,45 @@ public sealed class CoinFlowService(
                 "Plan, açık kullanıcı onayı olmadan uygulanamaz.");
         }
 
+        return await ApplyScenarioRequestsAsync(
+            requests,
+            "Simülasyon planı uygulandı",
+            cancellationToken);
+    }
+
+    /// <summary>
+    /// Finansal Yapı'dan simülatörle aynı formla girilen kayıt. Simüle edip
+    /// uygulamakla aynı yoldan yazılır; böylece doğrudan girilen kayıt,
+    /// simülasyonda görülen sonucu birebir üretir. Onay kaydet butonunun
+    /// kendisidir. Kendi ekranı olan türler (gelir değişikliği, kart ödeme
+    /// şekli, düzen değişikliği) bu yoldan kabul edilmez.
+    /// </summary>
+    public async Task<SimulationApplyResult> AddRecordFromScenarioAsync(
+        SimulationRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        if (!SimulationScenarioCatalog.IsDirectEntry(request.Type))
+        {
+            throw new InvalidOperationException(
+                $"{SimulationScenarioCatalog.TypeText(request.Type)} Finansal Yapı'dan bu formla girilemez.");
+        }
+
+        var anchor = (await store.GetSettingsAsync(cancellationToken))
+            .ProjectionAnchorDate;
+        SimulationCalculator.Validate(
+            request,
+            anchor == default ? null : anchor);
+        return await ApplyScenarioRequestsAsync(
+            [request],
+            "Finansal Yapı'dan eklendi",
+            cancellationToken);
+    }
+
+    private async Task<SimulationApplyResult> ApplyScenarioRequestsAsync(
+        IReadOnlyList<SimulationRequest> requests,
+        string trigger,
+        CancellationToken cancellationToken)
+    {
         SimulationCalculator.Validate(requests);
         if (requests.Any(x => x.ScenarioId == Guid.Empty))
         {
@@ -444,9 +483,7 @@ public sealed class CoinFlowService(
         var batch = BuildSimulationPersistenceBatch(scenario, requests);
         await store.ApplySimulationBatchAsync(batch, cancellationToken);
 
-        await CapturePlanningChangeAsync(
-            "Simülasyon planı uygulandı",
-            cancellationToken);
+        await CapturePlanningChangeAsync(trigger, cancellationToken);
         return AppliedResult(requests, batch);
     }
 
