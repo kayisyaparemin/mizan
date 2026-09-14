@@ -20,12 +20,19 @@ public interface IProfileBackupArchive
         Stream destination,
         CancellationToken cancellationToken = default);
 
-    /// <summary>
-    /// Yedeği doğrular ve profilleri geri kurar. Yalnız hiç profil yokken
-    /// çalışır; doğrulamadan geçmeyen yedek hiçbir iz bırakmaz.
-    /// </summary>
-    Task<BackupSummary> RestoreAsync(
+    /// <summary>Yedeğin içindeki profilleri okur; dosya Mizan yedeği değilse hata verir.</summary>
+    Task<BackupSummary> ReadSummaryAsync(
         Stream source,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Seçilen profilleri doğrular ve verilen kimlik/adla telefona açar.
+    /// Hepsi doğrulanmadan hiçbiri eklenmez; hedef kimlik zaten varsa hata
+    /// verir, mevcut hiçbir profile dokunmaz.
+    /// </summary>
+    Task ImportAsync(
+        Stream source,
+        IReadOnlyList<ProfileImport> imports,
         CancellationToken cancellationToken = default);
 
     Task<BackupState?> GetStateAsync(

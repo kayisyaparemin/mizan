@@ -163,14 +163,27 @@ public sealed class ProfileBackupArchive(
         }
     }
 
-    public async Task<BackupSummary> RestoreAsync(
+    public async Task<BackupSummary> ReadSummaryAsync(
         Stream source,
         CancellationToken cancellationToken = default)
     {
-        if ((await repository.GetProfilesAsync(cancellationToken)).Count > 0)
+        using var zip = OpenArchive(source);
+        return Summary(await ReadManifestAsync(zip, cancellationToken));
+    }
+
+    public async Task ImportAsync(
+        Stream source,
+        IReadOnlyList<ProfileImport> imports,
+        CancellationToken cancellationToken = default)
+    {
+        if (imports.Count == 0)
         {
-            throw new InvalidOperationException(
-                "Yedek yalnız hiç profil yokken geri yüklenebilir.");
+            throw new InvalidOperationException("Eklenecek profil seçilmedi.");
+        }
+
+        if (imports.Select(import => import.Target.Id).Distinct().Count() != imports.Count)
+        {
+            throw new InvalidOperationException("Aynı profil iki kez eklenemez.");
         }
 
         var stagingRoot = Path.Combine(
@@ -180,45 +193,46 @@ public sealed class ProfileBackupArchive(
         try
         {
             var staging = new FileSystemProfileRepository(stagingRoot);
-            BackupManifest manifest;
             using (var zip = OpenArchive(source))
             {
-                manifest = await ReadManifestAsync(zip, cancellationToken);
-                foreach (var profile in manifest.Profiles)
+                var manifest = await ReadManifestAsync(zip, cancellationToken);
+                foreach (var import in imports)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
+                    var profile = manifest.Profiles.FirstOrDefault(
+                                      candidate => candidate.Id == import.SourceId) ??
+                                  throw Corrupt("Seçilen profil yedekte yok.");
                     if (profile.HasData)
                     {
-                        var target = staging.GetDatabasePath(profile.Id);
+                        var target = staging.GetDatabasePath(import.Target.Id);
                         Directory.CreateDirectory(Path.GetDirectoryName(target)!);
                         ExtractDatabase(zip, profile, target);
                         ValidateDatabase(target, profile.Name);
                     }
 
-                    await staging.SaveProfileAsync(
-                        new UserProfile
-                        {
-                            Id = profile.Id,
-                            Name = profile.Name,
-                            CreatedAt = profile.CreatedAt,
-                            LastOpenedAt = profile.LastOpenedAt
-                        },
-                        cancellationToken);
+                    await staging.SaveProfileAsync(import.Target, cancellationToken);
                 }
             }
 
-            // Her şey doğrulandıktan sonra yerine taşınır; taşıma yarıda
-            // kalırsa taşınanlar geri alınır.
-            foreach (var profile in manifest.Profiles)
+            // Her şey doğrulandıktan sonra yerine taşınır. Hedef klasör varsa
+            // hiçbir şeyin üzerine yazılmaz; taşıma yarıda kalırsa taşınanlar
+            // geri alınır.
+            if (imports.Any(import => Directory.Exists(
+                    repository.GetProfileDirectory(import.Target.Id))))
             {
-                var target = repository.GetProfileDirectory(profile.Id);
+                throw new InvalidOperationException(
+                    "Eklenecek profil telefonda zaten var.");
+            }
+
+            foreach (var import in imports)
+            {
+                var target = repository.GetProfileDirectory(import.Target.Id);
                 Directory.CreateDirectory(Path.GetDirectoryName(target)!);
-                Directory.Move(staging.GetProfileDirectory(profile.Id), target);
+                Directory.Move(staging.GetProfileDirectory(import.Target.Id), target);
                 moved.Add(target);
             }
 
             moved.Clear();
-            return Summary(manifest);
         }
         finally
         {
@@ -391,7 +405,15 @@ public sealed class ProfileBackupArchive(
     }
 
     private static BackupSummary Summary(BackupManifest manifest) =>
-        new(manifest.CreatedAt, manifest.Profiles.Select(profile => profile.Name).ToArray());
+        new(
+            manifest.CreatedAt,
+            manifest.Profiles
+                .Select(profile => new BackupProfile(
+                    profile.Id,
+                    profile.Name,
+                    profile.CreatedAt,
+                    profile.LastOpenedAt))
+                .ToArray());
 
     private static string DatabaseEntryName(Guid profileId) =>
         $"profiles/{profileId:N}/{FileSystemProfileRepository.DatabaseFileName}";

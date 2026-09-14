@@ -16,6 +16,7 @@ public sealed class ProfileSelectionViewModel(
     private const long MaxBackupBytes = 1024L * 1024 * 1024;
     private const string AccessPromptShownKey = "backup.access-prompt-shown";
     private bool _loaded;
+    private string? _pendingPath;
 
     public ObservableCollection<ProfileCardItem> Profiles { get; } = [];
 
@@ -102,64 +103,108 @@ public sealed class ProfileSelectionViewModel(
     public static string BackupLabel(StoredBackup stored) =>
         stored.ModifiedAt.ToLocalTime().ToString("d MMMM yyyy, HH:mm", TurkishCulture);
 
-    public async Task<BackupSummary?> RestoreAsync(StoredBackup stored)
-    {
-        BackupSummary? summary = null;
-        await RunAsync(async () =>
-        {
-            summary = await backup.RestoreAsync(stored.FileName);
-            await ReloadAsync();
-        });
-
-        return summary;
-    }
+    /// <summary>Profil telefonda zaten var mı (yedekten eklenirse kopya olur).</summary>
+    public bool IsOnDevice(Guid profileId) =>
+        Profiles.Any(profile => profile.Id == profileId);
 
     /// <summary>
-    /// Yedek başka bir yerdeyse dosyayı kullanıcı seçer. Vazgeçilir ya da
-    /// hata olursa <c>null</c> döner (hata durum satırına yazılır).
+    /// Yedeği yerel bir kopyaya alır ve içindeki profilleri okur.
+    /// <paramref name="stored"/> <c>null</c> ise dosyayı kullanıcı seçer.
+    /// Vazgeçilir ya da hata olursa <c>null</c> döner (hata durum satırına
+    /// yazılır). Kopya <see cref="RestorePendingAsync"/>,
+    /// <see cref="AddPendingAsync"/> ya da <see cref="DiscardPending"/> ile biter.
     /// </summary>
-    public async Task<BackupSummary?> RestoreFromPickedFileAsync()
+    public async Task<BackupSummary?> InspectAsync(StoredBackup? stored)
     {
+        DiscardPending();
         BackupSummary? summary = null;
         await RunAsync(async () =>
         {
-            await using var source = await filePicker.PickAndOpenAsync();
+            await using var source = stored is null
+                ? await filePicker.PickAndOpenAsync()
+                : await backup.OpenBackupAsync(stored.FileName);
             if (source is null)
             {
                 return;
             }
 
-            // Seçiciden gelen akış konumlanamayabilir; zip okumak için önce
-            // yerel bir kopyaya alınır.
+            // Seçiciden gelen akış konumlanamayabilir ve yedek iki kez okunur
+            // (özet, sonra ekleme); önce yerel bir kopyaya alınır.
             var localPath = Path.Combine(
                 FileSystem.CacheDirectory,
                 $"restore-{Guid.NewGuid():N}.zip");
-            try
+            _pendingPath = localPath;
+            await using (var destination = File.Create(localPath))
             {
-                await using (var destination = File.Create(localPath))
+                await source.CopyToAsync(destination);
+                if (destination.Length > MaxBackupBytes)
                 {
-                    await source.CopyToAsync(destination);
-                    if (destination.Length > MaxBackupBytes)
-                    {
-                        throw new InvalidOperationException(
-                            "Bu dosya bir Mizan yedeği olamayacak kadar büyük.");
-                    }
+                    throw new InvalidOperationException(
+                        "Bu dosya bir Mizan yedeği olamayacak kadar büyük.");
                 }
+            }
 
-                await using var backupStream = File.OpenRead(localPath);
-                summary = await backup.RestoreAsync(backupStream);
-                await ReloadAsync();
-            }
-            finally
-            {
-                if (File.Exists(localPath))
-                {
-                    File.Delete(localPath);
-                }
-            }
+            await using var local = File.OpenRead(localPath);
+            summary = await backup.ReadBackupAsync(local);
         });
 
+        if (summary is null)
+        {
+            DiscardPending();
+        }
+
         return summary;
+    }
+
+    /// <summary>İlk kurulum: incelenen yedekteki bütün profilleri geri yükler.</summary>
+    public async Task<BackupSummary?> RestorePendingAsync()
+    {
+        BackupSummary? summary = null;
+        await WithPendingAsync(async local =>
+        {
+            summary = await backup.RestoreAsync(local);
+            await ReloadAsync();
+        });
+        return summary;
+    }
+
+    /// <summary>Profil varken: seçilen profilleri ekler; <c>null</c> hepsi.</summary>
+    public async Task<BackupImportResult?> AddPendingAsync(IReadOnlyCollection<Guid>? profileIds)
+    {
+        BackupImportResult? result = null;
+        await WithPendingAsync(async local =>
+        {
+            result = await backup.AddFromBackupAsync(local, profileIds);
+            await ReloadAsync();
+        });
+        return result;
+    }
+
+    public void DiscardPending()
+    {
+        var path = Interlocked.Exchange(ref _pendingPath, null);
+        if (path is not null && File.Exists(path))
+        {
+            File.Delete(path);
+        }
+    }
+
+    private async Task WithPendingAsync(Func<Stream, Task> action)
+    {
+        try
+        {
+            await RunAsync(async () =>
+            {
+                var path = _pendingPath ??
+                           throw new InvalidOperationException("Önce bir yedek seç.");
+                await using var local = File.OpenRead(path);
+                await action(local);
+            });
+        }
+        finally
+        {
+            DiscardPending();
+        }
     }
 
     private async Task ReloadAsync()

@@ -44,7 +44,9 @@ public sealed class ProfileService(
                 await repository.AdoptLegacyDatabaseAsync(
                     new UserProfile
                     {
-                        Name = UniqueName(UserProfile.DefaultName, existing),
+                        Name = UniqueName(
+                            UserProfile.DefaultName,
+                            existing.Select(profile => profile.Name)),
                         CreatedAt = clock.UtcNow
                     },
                     cancellationToken);
@@ -219,13 +221,18 @@ public sealed class ProfileService(
         return trimmed;
     }
 
-    private static string UniqueName(
+    /// <summary>
+    /// <paramref name="name"/> alınmışsa sonuna 2, 3… eklenir; Türkçe büyük/küçük
+    /// harf kuralıyla karşılaştırılır.
+    /// </summary>
+    internal static string UniqueName(
         string name,
-        IReadOnlyList<UserProfile> profiles)
+        IEnumerable<string> takenNames)
     {
+        var taken = takenNames.ToArray();
         var candidate = name;
         for (var suffix = 2;
-             profiles.Any(profile => SameName(profile.Name, candidate));
+             taken.Any(existing => SameName(existing, candidate));
              suffix++)
         {
             candidate = $"{name} {suffix}";

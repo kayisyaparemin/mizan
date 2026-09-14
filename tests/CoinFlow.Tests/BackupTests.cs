@@ -129,6 +129,126 @@ public sealed class BackupTests
         });
     }
 
+    /// <summary>
+    /// "Eski hâline bakmak" senaryosu: yedek alındıktan sonra profil
+    /// değişti. Yedekten eklemek mevcut profili değiştirmez; yedekteki hâli
+    /// ayrı bir profil olarak gelir.
+    /// </summary>
+    [Fact]
+    public async Task AddFromBackup_WhenTheProfileExists_AddsACopy_AndLeavesTheCurrentOneAlone()
+    {
+        await WithRoots(async (source, _) =>
+        {
+            var clock = new MutableClock(Today);
+            await using var app = Installation.Create(source, clock);
+            var ayse = await app.Profiles.CreateAsync("Ayşe");
+            await app.Profiles.CreateAsync("Mehmet");
+            await app.Profiles.OpenAsync(ayse.Id);
+            var service = TestFactory.Service(app.Store, Today);
+            await service.LoadCanonicalDevelopmentDataAsync();
+            using var backup = new MemoryStream();
+            var written = await app.Archive.WriteAsync(backup);
+
+            var settings = await app.Store.GetSettingsAsync();
+            await app.Store.SaveSettingsAsync(settings with { MonthlyLivingBudget = 99_999m });
+            await app.Profiles.CloseAsync();
+
+            var result = await app.Backup.AddFromBackupAsync(backup, [ayse.Id]);
+
+            var copy = Assert.Single(result.Added);
+            Assert.True(copy.IsCopy);
+            Assert.NotEqual(ayse.Id, copy.Profile.Id);
+            Assert.Equal(BackupService.CopyName("Ayşe", written.CreatedAt), copy.Profile.Name);
+            Assert.EndsWith("yedeği)", copy.Profile.Name);
+            Assert.Equal(3, (await app.Profiles.GetProfilesAsync()).Count);
+
+            await app.Profiles.OpenAsync(ayse.Id);
+            Assert.Equal(99_999m, (await app.Store.GetSettingsAsync()).MonthlyLivingBudget);
+            await app.Profiles.OpenAsync(copy.Profile.Id);
+            Assert.Equal(30_000m, (await app.Store.GetSettingsAsync()).MonthlyLivingBudget);
+        });
+    }
+
+    /// <summary>
+    /// Yeniden kurulumda yanlışlıkla profil açılmış: yedekteki profiller
+    /// kendi kimlikleriyle gelir; aynı adı taşıyan başka bir profil varsa ad
+    /// numaralanır.
+    /// </summary>
+    [Fact]
+    public async Task AddFromBackup_OnAnotherInstallation_KeepsIdentities_AndNumbersClashingNames()
+    {
+        await WithRoots(async (source, target) =>
+        {
+            var clock = new MutableClock(Today);
+            await using var app = Installation.Create(source, clock);
+            var ayse = await app.Profiles.CreateAsync("Ayşe");
+            var mehmet = await app.Profiles.CreateAsync("Mehmet");
+            await app.Profiles.OpenAsync(mehmet.Id);
+            await app.Profiles.CloseAsync();
+            using var backup = new MemoryStream();
+            await app.Archive.WriteAsync(backup);
+
+            await using var reinstalled = Installation.Create(target, clock);
+            var accidental = await reinstalled.Profiles.CreateAsync("ayşe");
+
+            var result = await reinstalled.Backup.AddFromBackupAsync(backup, profileIds: null);
+
+            Assert.All(result.Added, added => Assert.False(added.IsCopy));
+            Assert.Equal(
+                [(ayse.Id, "Ayşe 2"), (mehmet.Id, "Mehmet")],
+                result.Added.Select(added => (added.Profile.Id, added.Profile.Name)));
+            var profiles = await reinstalled.Profiles.GetProfilesAsync();
+            Assert.Equal(3, profiles.Count);
+            Assert.Contains(profiles, profile => profile.Id == accidental.Id && profile.Name == "ayşe");
+            await reinstalled.Profiles.OpenAsync(mehmet.Id);
+        });
+    }
+
+    [Fact]
+    public async Task AddFromBackup_RejectsUnknownSelections_AndDamagedData_WithoutAddingAnything()
+    {
+        await WithRoots(async (source, _) =>
+        {
+            var clock = new MutableClock(Today);
+            await using var app = Installation.Create(source, clock);
+            var ayse = await app.Profiles.CreateAsync("Ayşe");
+            await app.Profiles.OpenAsync(ayse.Id);
+            await app.Profiles.CloseAsync();
+            using var valid = new MemoryStream();
+            await app.Archive.WriteAsync(valid);
+            var damaged = Rewrite(valid, (archive, entryName) =>
+            {
+                if (entryName.EndsWith(".db3", StringComparison.Ordinal))
+                {
+                    using var stream = archive.CreateEntry(entryName).Open();
+                    stream.Write(new byte[8192]);
+                    return true;
+                }
+
+                return false;
+            });
+
+            await Assert.ThrowsAsync<InvalidOperationException>(
+                () => app.Backup.AddFromBackupAsync(valid, [Guid.NewGuid()]));
+            await Assert.ThrowsAsync<InvalidOperationException>(
+                () => app.Backup.AddFromBackupAsync(damaged, profileIds: null));
+
+            Assert.Single(await app.Profiles.GetProfilesAsync());
+            Assert.Empty(Directory.GetDirectories(source, ".restore-*"));
+        });
+    }
+
+    [Fact]
+    public void CopyName_FitsTheNameLimit()
+    {
+        var at = new DateTimeOffset(2026, 9, 14, 12, 0, 0, TimeSpan.Zero);
+
+        Assert.Equal("Ayşe (14 Eylül yedeği)", BackupService.CopyName("Ayşe", at));
+        var longName = BackupService.CopyName("Ailenin ortak bütçe profili", at);
+        Assert.True(longName.Length <= UserProfile.MaxNameLength, longName);
+        Assert.EndsWith("… (14 Eylül yedeği)", longName);
+    }
+
     [Fact]
     public async Task Restore_RejectsABackupFromANewerSchema()
     {

@@ -53,6 +53,17 @@ public sealed class BackupService(
             .ThenByDescending(backup => backup.FileName, StringComparer.Ordinal)
             .ToArray();
 
+    public Task<Stream> OpenBackupAsync(
+        string fileName,
+        CancellationToken cancellationToken = default) =>
+        storage.OpenReadAsync(fileName, cancellationToken);
+
+    /// <summary>Yedeğin içindeki profiller; dosya Mizan yedeği değilse hata.</summary>
+    public Task<BackupSummary> ReadBackupAsync(
+        Stream source,
+        CancellationToken cancellationToken = default) =>
+        archive.ReadSummaryAsync(Rewound(source), cancellationToken);
+
     /// <summary>Klasördeki bir yedeği geri yükler.</summary>
     public async Task<BackupSummary> RestoreAsync(
         string fileName,
@@ -63,7 +74,8 @@ public sealed class BackupService(
     }
 
     /// <summary>
-    /// Uygulama yeni kurulmuşken, hiç profil yokken yedeği geri yükler.
+    /// Uygulama yeni kurulmuşken, hiç profil yokken yedekteki bütün profilleri
+    /// olduğu gibi (aynı kimlik ve adla) geri yükler.
     /// </summary>
     public async Task<BackupSummary> RestoreAsync(
         Stream source,
@@ -79,12 +91,115 @@ public sealed class BackupService(
                     "Yedek yalnız hiç profil yokken geri yüklenebilir.");
             }
 
-            return await archive.RestoreAsync(source, cancellationToken);
+            var backup = await archive.ReadSummaryAsync(Rewound(source), cancellationToken);
+            await archive.ImportAsync(
+                Rewound(source),
+                backup.Profiles
+                    .Select(profile => new ProfileImport(profile.Id, AsProfile(profile)))
+                    .ToArray(),
+                cancellationToken);
+            return backup;
         }
         finally
         {
             _lock.Release();
         }
+    }
+
+    /// <summary>
+    /// Profil varken yedekten profil ekler. Mevcut hiçbir profile dokunulmaz:
+    /// yedekteki profil telefonda zaten varsa (aynı kimlik) yedekteki hâli
+    /// "Ad (14 Eylül yedeği)" adıyla ayrı bir profil olarak eklenir. Ad başka
+    /// bir profille çakışırsa sonuna 2, 3… eklenir.
+    /// </summary>
+    /// <param name="profileIds">Yedekteki profillerden eklenecekler; <c>null</c> hepsi.</param>
+    public async Task<BackupImportResult> AddFromBackupAsync(
+        Stream source,
+        IReadOnlyCollection<Guid>? profileIds,
+        CancellationToken cancellationToken = default)
+    {
+        await _lock.WaitAsync(cancellationToken);
+        try
+        {
+            var backup = await archive.ReadSummaryAsync(Rewound(source), cancellationToken);
+            var selected = profileIds is null
+                ? backup.Profiles
+                : backup.Profiles.Where(profile => profileIds.Contains(profile.Id)).ToArray();
+            if (selected.Count == 0 ||
+                (profileIds is not null && selected.Count != profileIds.Count))
+            {
+                throw new InvalidOperationException("Seçilen profil yedekte yok.");
+            }
+
+            var existing = await profiles.GetProfilesAsync(cancellationToken);
+            var takenNames = existing.Select(profile => profile.Name).ToList();
+            var added = new List<ImportedProfile>();
+            foreach (var profile in selected)
+            {
+                var isCopy = existing.Any(current => current.Id == profile.Id);
+                var name = ProfileService.UniqueName(
+                    isCopy ? CopyName(profile.Name, backup.CreatedAt) : profile.Name,
+                    takenNames);
+                takenNames.Add(name);
+                added.Add(new ImportedProfile(
+                    AsProfile(profile) with
+                    {
+                        Id = isCopy ? Guid.NewGuid() : profile.Id,
+                        Name = name,
+                        CreatedAt = isCopy ? clock.UtcNow : profile.CreatedAt,
+                        LastOpenedAt = isCopy ? null : profile.LastOpenedAt
+                    },
+                    isCopy));
+            }
+
+            await archive.ImportAsync(
+                Rewound(source),
+                selected
+                    .Zip(added, (profile, import) => new ProfileImport(profile.Id, import.Profile))
+                    .ToArray(),
+                cancellationToken);
+            return new BackupImportResult(backup, added);
+        }
+        finally
+        {
+            _lock.Release();
+        }
+    }
+
+    /// <summary>"Ayşe (14 Eylül yedeği)"; ad sınırına sığmazsa ad kısaltılır.</summary>
+    public static string CopyName(string name, DateTimeOffset backupCreatedAt)
+    {
+        var suffix =
+            $" ({backupCreatedAt.ToLocalTime().ToString("d MMMM", TurkishCulture)} yedeği)";
+        var room = UserProfile.MaxNameLength - suffix.Length;
+        var trimmed = name.Length <= room
+            ? name
+            : name[..Math.Max(room - 1, 1)].TrimEnd() + "…";
+        return trimmed + suffix;
+    }
+
+    private static readonly CultureInfo TurkishCulture = CultureInfo.GetCultureInfo("tr-TR");
+
+    private static UserProfile AsProfile(BackupProfile profile) => new()
+    {
+        Id = profile.Id,
+        Name = profile.Name,
+        CreatedAt = profile.CreatedAt,
+        LastOpenedAt = profile.LastOpenedAt
+    };
+
+    // Yedek iki kez okunur (özet, sonra içe aktarma); akış başa sarılabilmeli.
+    private static Stream Rewound(Stream source)
+    {
+        if (!source.CanSeek)
+        {
+            throw new ArgumentException(
+                "Yedek dosyası konumlanabilir bir akıştan okunmalı.",
+                nameof(source));
+        }
+
+        source.Position = 0;
+        return source;
     }
 
     public static string FileNameFor(DateOnly date) =>

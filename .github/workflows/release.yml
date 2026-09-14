@@ -201,32 +201,31 @@ jobs:
           cat > release-notes.md <<NOTES
           # Mizan $version
 
-          Yeni özellik: **otomatik yedek** ve yeniden kurulumda **geri yükleme**.
+          Yeni özellik: profil varken **yedekten ekleme**.
 
-          ### Her gece yedek
+          ### Yedekten Ekle
 
-          Mizan her gece 23:30 civarında bütün profillerini telefonun dahili
-          depolamasındaki **Mizan** klasörüne yedekler. O gün hiçbir şey
-          değişmediyse yeni dosya yazılmaz; son 7 yedek saklanır. Klasör
-          uygulamanın dışında olduğu için uygulamayı kaldırsan da yedeklerin
-          durur.
+          Profil seçim ekranında **Yeni Profil**'in altında artık **Yedekten
+          Ekle** var. Mizan klasöründeki yedekler tarihleriyle listelenir
+          (başka bir yerdeki yedek dosyası da seçilebilir). Yedekte birden
+          fazla profil varsa hangisinin ekleneceğini seçersin: tek bir profil
+          ya da **Hepsi**.
 
-          - Güncellemeden sonraki ilk açılışta bir kez **"Tüm dosyalara
-            erişim"** izni istenir. Açılan ekrandaki anahtarı aç, geri dön.
-            Vazgeçersen sonra **Ayarlar → Yedekleme → İzin Ver**.
-          - **Ayarlar → Yedekleme**'de son yedeğin tarihi ve **Şimdi
-            Yedekle** var. İlk yedeği o geceyi beklemeden hemen alabilirsin.
+          **Mevcut profillerine hiç dokunulmaz.** Yedekteki profil telefonda
+          zaten varsa, yedekteki hâli ayrı bir profil olarak eklenir; adı
+          *"Profilim (14 Eylül yedeği)"* gibi olur. Böylece bir profilin eski
+          hâline bakabilir, istemediğini silebilirsin. Aynı adda başka bir
+          profil varsa yeni gelenin adının sonuna numara eklenir.
 
-          ### Yeniden kurunca: yedekten dön ya da temiz başla
+          Kullanışlı olduğu durumlar:
 
-          Hiç profil yokken açılış ekranı iki seçenek sunar:
+          - Uygulamayı yeniden kurunca yanlışlıkla yeni profil açtıysan
+            yedeğindeki profilleri yine geri alabilirsin.
+          - Bir profilin birkaç gün önceki hâline bakmak istersen.
+          - Başka bir telefondaki yedeği bu telefona eklemek istersen.
 
-          - **Yedekten Geri Yükle** — Mizan klasöründeki yedekler tarihleriyle
-            listelenir, seçtiğin yedekteki bütün profiller geri gelir. Yedek
-            dosyan başka bir yerdeyse **Başka bir dosya seç…** ile seçebilirsin.
-            Mizan yedeği olmayan ya da bozuk bir dosya reddedilir, hiçbir şey
-            değişmez.
-          - **Temiz Başla** — yeni profil, ilk kurulum.
+          Bozuk ya da Mizan yedeği olmayan bir dosya reddedilir; hiçbir profil
+          eklenmez.
           NOTES
 
       - name: Upload signed APK artifact

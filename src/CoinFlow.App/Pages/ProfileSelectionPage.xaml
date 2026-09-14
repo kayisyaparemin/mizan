@@ -78,6 +78,11 @@
                     IsVisible="{Binding HasProfiles}"
                     IsEnabled="{Binding CanInteract}"
                     Clicked="OnCreateClicked" />
+            <Button Text="Yedekten Ekle"
+                    Style="{StaticResource SecondaryButton}"
+                    IsVisible="{Binding HasProfiles}"
+                    IsEnabled="{Binding CanInteract}"
+                    Clicked="OnAddFromBackupClicked" />
             <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" />
             <Label Text="{Binding StatusMessage}"
                    IsVisible="{Binding HasStatus}"

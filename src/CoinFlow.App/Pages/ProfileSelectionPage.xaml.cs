@@ -10,6 +10,7 @@ public partial class ProfileSelectionPage : ContentPage
 {
     private static readonly CultureInfo TurkishCulture = CultureInfo.GetCultureInfo("tr-TR");
     private const string OtherFileOption = "Başka bir dosya seç…";
+    private const string AllProfilesOption = "Hepsi";
     private const string RenameOption = "Adını Değiştir";
     private const string DeleteOption = "Sil";
     private readonly ProfileSelectionViewModel _viewModel;
@@ -90,14 +91,74 @@ public partial class ProfileSelectionPage : ContentPage
         }
     }
 
+    /// <summary>İlk kurulum: seçilen yedekteki bütün profiller geri gelir.</summary>
     private async void OnRestoreClicked(object? sender, EventArgs e)
     {
-        if (await _viewModel.FindBackupsAsync() is not { } backups)
+        if (await InspectChosenBackupAsync() is null)
         {
             return;
         }
 
-        BackupSummary? summary;
+        if (await _viewModel.RestorePendingAsync() is { } summary)
+        {
+            await _feedback.ShowSuccessAsync(
+                $"{BackupDate(summary)} tarihli yedekten " +
+                $"{summary.Profiles.Count} profil geri geldi: {string.Join(", ", summary.ProfileNames)}.",
+                "Geri Yüklendi");
+        }
+    }
+
+    /// <summary>
+    /// Profil varken: yedekten seçilen profil eklenir. Telefonda zaten olan
+    /// profile dokunulmaz, yedekteki hâli kopya olarak gelir.
+    /// </summary>
+    private async void OnAddFromBackupClicked(object? sender, EventArgs e)
+    {
+        if (await InspectChosenBackupAsync() is not { } backup)
+        {
+            return;
+        }
+
+        var (cancelled, profileIds) = await ChooseProfilesAsync(backup);
+        if (cancelled)
+        {
+            _viewModel.DiscardPending();
+            return;
+        }
+
+        if (await _viewModel.AddPendingAsync(profileIds) is not { } result)
+        {
+            return;
+        }
+
+        var names = string.Join(", ", result.Added.Select(added => added.Profile.Name));
+        var message = result.Added.Count == 1
+            ? $"{BackupDate(backup)} tarihli yedekten \"{names}\" profili eklendi."
+            : $"{BackupDate(backup)} tarihli yedekten {result.Added.Count} profil eklendi: {names}.";
+        var copies = result.Added.Count(added => added.IsCopy);
+        if (copies == 1 && result.Added.Count == 1)
+        {
+            message += " Bu profil telefonda zaten vardı; yedekteki hâli ayrı profil olarak eklendi, mevcut profile dokunulmadı.";
+        }
+        else if (copies > 0)
+        {
+            message += " Telefonda zaten olan profillerin yedekteki hâli ayrı profil olarak eklendi; mevcut profillere dokunulmadı.";
+        }
+
+        await _feedback.ShowSuccessAsync(message, "Yedekten Eklendi");
+    }
+
+    /// <summary>
+    /// Kullanıcıya yedeği seçtirir (klasördeki yedekler ya da başka bir dosya)
+    /// ve içindekileri okur. Vazgeçilirse <c>null</c>.
+    /// </summary>
+    private async Task<BackupSummary?> InspectChosenBackupAsync()
+    {
+        if (await _viewModel.FindBackupsAsync() is not { } backups)
+        {
+            return null;
+        }
+
         if (backups.Count == 0)
         {
             var pickFile = await _feedback.ConfirmAsync(
@@ -105,44 +166,60 @@ public partial class ProfileSelectionPage : ContentPage
                 $"{_viewModel.BackupLocation} klasöründe Mizan yedeği yok. Yedek dosyan başka bir yerdeyse kendin seçebilirsin.",
                 "Dosya Seç",
                 "Vazgeç");
-            summary = pickFile
-                ? await _viewModel.RestoreFromPickedFileAsync()
-                : null;
-        }
-        else
-        {
-            var labels = backups
-                .Select((backup, index) => index == 0
-                    ? $"{ProfileSelectionViewModel.BackupLabel(backup)} (en yeni)"
-                    : ProfileSelectionViewModel.BackupLabel(backup))
-                .ToList();
-            var choice = await _feedback.ChooseAsync(
-                "Hangi yedekten dönülsün?",
-                "Vazgeç",
-                null,
-                [.. labels, OtherFileOption]);
-            if (choice == OtherFileOption)
-            {
-                summary = await _viewModel.RestoreFromPickedFileAsync();
-            }
-            else if (choice is not null && labels.IndexOf(choice) is var index and >= 0)
-            {
-                summary = await _viewModel.RestoreAsync(backups[index]);
-            }
-            else
-            {
-                summary = null;
-            }
+            return pickFile ? await _viewModel.InspectAsync(stored: null) : null;
         }
 
-        if (summary is not null)
+        var labels = backups
+            .Select((backup, index) => index == 0
+                ? $"{ProfileSelectionViewModel.BackupLabel(backup)} (en yeni)"
+                : ProfileSelectionViewModel.BackupLabel(backup))
+            .ToList();
+        var choice = await _feedback.ChooseAsync(
+            "Hangi yedek?",
+            "Vazgeç",
+            null,
+            [.. labels, OtherFileOption]);
+        if (choice == OtherFileOption)
         {
-            await _feedback.ShowSuccessAsync(
-                $"{summary.CreatedAt.ToLocalTime().ToString("d MMMM yyyy HH:mm", TurkishCulture)} tarihli yedekten " +
-                $"{summary.ProfileNames.Count} profil geri geldi: {string.Join(", ", summary.ProfileNames)}.",
-                "Geri Yüklendi");
+            return await _viewModel.InspectAsync(stored: null);
         }
+
+        return choice is not null && labels.IndexOf(choice) is var index and >= 0
+            ? await _viewModel.InspectAsync(backups[index])
+            : null;
     }
+
+    /// <summary>Yedekte tek profil varsa sormadan o; birden fazlaysa biri ya da hepsi.</summary>
+    private async Task<(bool Cancelled, IReadOnlyCollection<Guid>? ProfileIds)> ChooseProfilesAsync(
+        BackupSummary backup)
+    {
+        if (backup.Profiles.Count == 1)
+        {
+            return (false, [backup.Profiles[0].Id]);
+        }
+
+        var labels = backup.Profiles
+            .Select(profile => _viewModel.IsOnDevice(profile.Id)
+                ? $"{profile.Name} (telefonda var, kopya eklenir)"
+                : profile.Name)
+            .ToList();
+        var choice = await _feedback.ChooseAsync(
+            "Hangi profil eklensin?",
+            "Vazgeç",
+            null,
+            [.. labels, AllProfilesOption]);
+        if (choice == AllProfilesOption)
+        {
+            return (false, null);
+        }
+
+        return choice is not null && labels.IndexOf(choice) is var index and >= 0
+            ? (false, [backup.Profiles[index].Id])
+            : (true, null);
+    }
+
+    private static string BackupDate(BackupSummary backup) =>
+        backup.CreatedAt.ToLocalTime().ToString("d MMMM yyyy HH:mm", TurkishCulture);
 
     private async void OnProfileOptionsClicked(object? sender, EventArgs e)
     {
