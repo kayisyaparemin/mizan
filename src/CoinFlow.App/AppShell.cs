@@ -1,4 +1,7 @@
 using CoinFlow.App.Pages;
+using CoinFlow.App.Services;
+using CoinFlow.Application.Services;
+using Microsoft.Maui.Controls.Shapes;
 
 namespace CoinFlow.App;
 
@@ -52,7 +55,53 @@ public sealed class AppShell : Shell
             "settings",
             "settings-content",
             () => services.GetRequiredService<SettingsPage>()));
+
+        FlyoutHeader = CreateProfileHeader(
+            services.GetRequiredService<ProfileService>().ActiveProfile?.Name ??
+            string.Empty);
+        Items.Add(new MenuItem
+        {
+            Text = "Profil Değiştir",
+            Command = new Command(async () =>
+                await services.GetRequiredService<ProfileNavigator>()
+                    .SwitchProfileAsync())
+        });
     }
+
+    private static View CreateProfileHeader(string profileName)
+    {
+        var resources = Microsoft.Maui.Controls.Application.Current?.Resources;
+        return new Border
+        {
+            BackgroundColor = Resource<Color>(resources, "FlyoutHeaderSurface"),
+            StrokeThickness = 0,
+            StrokeShape = new RoundRectangle { CornerRadius = 0 },
+            Padding = new Thickness(20, 28, 20, 18),
+            Content = new VerticalStackLayout
+            {
+                Spacing = 2,
+                Children =
+                {
+                    new Label
+                    {
+                        Text = "PROFİL",
+                        Style = Resource<Style>(resources, "Eyebrow")
+                    },
+                    new Label
+                    {
+                        Text = profileName,
+                        Style = Resource<Style>(resources, "SectionTitle")
+                    }
+                }
+            }
+        };
+    }
+
+    private static T? Resource<T>(ResourceDictionary? resources, string key)
+        where T : class =>
+        resources is not null && resources.TryGetValue(key, out var value)
+            ? value as T
+            : null;
 
     private static FlyoutItem CreateFlyoutItem(
         string title,

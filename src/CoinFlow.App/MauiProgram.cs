@@ -24,19 +24,31 @@ public static class MauiProgram
                 fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");
             });
 
-        builder.Services.AddSingleton<AppShell>();
+        // Her profil açılışında yeniden kurulur; bkz. ProfileNavigator.
+        builder.Services.AddTransient<AppShell>();
         builder.Services.AddSingleton<IClock, SystemClock>();
 #if COINFLOW_DEV_BUILD
         const bool developmentFeaturesEnabled = true;
 #else
         const bool developmentFeaturesEnabled = false;
 #endif
-        var databasePath = Path.Combine(FileSystem.AppDataDirectory, "coinflow.db3");
+        // Profil = ayrı veritabanı dosyası. Servisler tek bir store görür;
+        // o store çağrıları açık profilin veritabanına iletir.
+        var profileRepository = new FileSystemProfileRepository(
+            FileSystem.AppDataDirectory);
+        builder.Services.AddSingleton<IProfileRepository>(profileRepository);
+        builder.Services.AddSingleton(
+            services => new ProfileScopedCoinFlowStore(
+                profileId => new SqliteCoinFlowStore(
+                    profileRepository.GetDatabasePath(profileId),
+                    developmentFeaturesEnabled,
+                    services.GetRequiredService<IClock>().Today)));
         builder.Services.AddSingleton<ICoinFlowStore>(
-            services => new SqliteCoinFlowStore(
-                databasePath,
-                developmentFeaturesEnabled,
-                services.GetRequiredService<IClock>().Today));
+            services => services.GetRequiredService<ProfileScopedCoinFlowStore>());
+        builder.Services.AddSingleton<IProfileStoreSwitch>(
+            services => services.GetRequiredService<ProfileScopedCoinFlowStore>());
+        builder.Services.AddSingleton<ProfileService>();
+        builder.Services.AddSingleton<ProfileNavigator>();
         builder.Services.AddSingleton<SalaryPeriodCalculator>();
         builder.Services.AddSingleton<PaymentAssignmentStrategyResolver>();
         builder.Services.AddSingleton<CreditCardPaymentPreferenceResolver>();
@@ -87,6 +99,8 @@ public static class MauiProgram
         builder.Services.AddSingleton<CoinFlowService>();
         builder.Services.AddSingleton<IUserFeedbackService, UserFeedbackService>();
 
+        builder.Services.AddTransient<ProfileSelectionViewModel>();
+        builder.Services.AddTransient<ProfileSelectionPage>();
         builder.Services.AddTransient<DashboardViewModel>();
         builder.Services.AddTransient<OnboardingViewModel>();
         builder.Services.AddTransient<CommitmentsViewModel>();

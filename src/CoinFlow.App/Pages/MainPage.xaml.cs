@@ -1,12 +1,15 @@
 using CoinFlow.App.Services;
 using CoinFlow.App.ViewModels;
+using CoinFlow.Application.Services;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace CoinFlow.App.Pages;
 
 public partial class MainPage : ContentPage
 {
-    private static bool _reviewPromptHandled;
+    // Dönem güncelleme sorusu profil oturumu başına bir kez sorulur. Başka
+    // profile geçip geri dönmek yeni oturumdur; soru yeniden gelir.
+    private static Guid _reviewPromptSession;
     private bool _onboardingPromptHandled;
     private readonly DashboardViewModel _viewModel;
     private readonly IUserFeedbackService _feedback;
@@ -40,9 +43,10 @@ public partial class MainPage : ContentPage
             return;
         }
 
-        if (_viewModel.HasPendingReview && !_reviewPromptHandled)
+        var session = _services.GetRequiredService<ProfileService>().SessionId;
+        if (_viewModel.HasPendingReview && _reviewPromptSession != session)
         {
-            _reviewPromptHandled = true;
+            _reviewPromptSession = session;
             var start = await _feedback.ConfirmAsync(
                 "Geçen dönemi güncelleyelim mi?",
                 "Bu dönem için bir plan oluşturmuştuk. Ödemelerin ve dönem harcamaların netleştiyse gerçekte ne olduğunu kaydedebiliriz.",

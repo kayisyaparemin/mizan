@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:CoinFlow.App.ViewModels"
+             xmlns:models="clr-namespace:CoinFlow.App.Models"
+             x:Class="CoinFlow.App.Pages.ProfileSelectionPage"
+             x:DataType="vm:ProfileSelectionViewModel"
+             Title="Profil Seç">
+    <ScrollView>
+        <VerticalStackLayout Padding="20,56,20,40" Spacing="16">
+            <Label Text="MİZAN" Style="{StaticResource Eyebrow}" />
+            <Label Text="Profil Seç" Style="{StaticResource PageTitle}" />
+            <Label Text="Her profilin verisi ayrı tutulur. Bir profilde yaptığın hiçbir şey diğerlerini etkilemez."
+                   Style="{StaticResource MutedText}" />
+
+            <VerticalStackLayout BindableLayout.ItemsSource="{Binding Profiles}" Spacing="10">
+                <BindableLayout.ItemTemplate>
+                    <DataTemplate x:DataType="models:ProfileCardItem">
+                        <Border Padding="14,12">
+                            <Border.GestureRecognizers>
+                                <TapGestureRecognizer Tapped="OnProfileTapped" />
+                            </Border.GestureRecognizers>
+                            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                                <Border WidthRequest="46"
+                                        HeightRequest="46"
+                                        Padding="0"
+                                        StrokeThickness="0"
+                                        StrokeShape="RoundRectangle 23"
+                                        BackgroundColor="{StaticResource SoftLavender}"
+                                        VerticalOptions="Center">
+                                    <Label Text="{Binding Initial}"
+                                           FontFamily="OpenSansSemibold"
+                                           FontSize="19"
+                                           HorizontalOptions="Center"
+                                           VerticalOptions="Center" />
+                                </Border>
+                                <VerticalStackLayout Grid.Column="1" Spacing="2" VerticalOptions="Center">
+                                    <Label Text="{Binding Name}" Style="{StaticResource SectionTitle}" />
+                                    <Label Text="{Binding Detail}" Style="{StaticResource MutedText}" />
+                                </VerticalStackLayout>
+                                <Button Grid.Column="2"
+                                        Text="Düzenle"
+                                        Style="{StaticResource LinkButton}"
+                                        VerticalOptions="Center"
+                                        Clicked="OnProfileOptionsClicked" />
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </BindableLayout.ItemTemplate>
+            </VerticalStackLayout>
+
+            <Button Text="Yeni Profil"
+                    IsEnabled="{Binding CanInteract}"
+                    Clicked="OnCreateClicked" />
+            <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" />
+            <Label Text="{Binding StatusMessage}"
+                   IsVisible="{Binding HasStatus}"
+                   TextColor="{StaticResource Error}" />
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

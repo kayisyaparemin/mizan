@@ -103,7 +103,7 @@
                         <Border BackgroundColor="{StaticResource SoftPink}" Padding="12">
                             <VerticalStackLayout Spacing="7">
                                 <Label Text="Verileri Sil" FontFamily="OpenSansSemibold" />
-                                <Label Text="Tüm kullanıcı finans verilerini siler ve uygulamayı boş başlangıç durumuna döndürür."
+                                <Label Text="Bu profilin tüm finans verilerini siler ve profili boş başlangıç durumuna döndürür. Diğer profiller etkilenmez."
                                        Style="{StaticResource MutedText}" />
                                 <Button Text="Verileri Sil"
                                         Clicked="OnClearDevelopmentDataClicked"

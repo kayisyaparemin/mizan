@@ -17,4 +17,20 @@ public interface IUserFeedbackService
         string message,
         string accept,
         string cancel);
+
+    /// <summary>Tek satır metin ister; vazgeçilirse <c>null</c> döner.</summary>
+    Task<string?> PromptAsync(
+        string title,
+        string message,
+        string accept,
+        string cancel,
+        string initialValue = "",
+        int maxLength = -1);
+
+    /// <summary>Seçenek listesi gösterir; seçilen metni ya da <c>null</c> döner.</summary>
+    Task<string?> ChooseAsync(
+        string title,
+        string cancel,
+        string? destruction,
+        params string[] options);
 }

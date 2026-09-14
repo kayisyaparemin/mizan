@@ -29,7 +29,7 @@ public partial class SettingsPage : ContentPage
     {
         var confirmed = await _feedback.ConfirmAsync(
             "Verileri Sil",
-            "Tüm finans verileri silinecek. Devam etmek istiyor musun?",
+            "Bu profilin tüm finans verileri silinecek. Diğer profiller etkilenmez. Devam etmek istiyor musun?",
             "Verileri Sil",
             "Vazgeç");
         if (!confirmed)

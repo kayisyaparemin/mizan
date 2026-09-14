@@ -32,7 +32,7 @@ Current/future query'leri, latest current snapshot ve history üzerinden runtime
 |---|---|
 | `CoinFlow.Domain` | Saf modeller, tarih kuralları, projection ve simulation motorları |
 | `CoinFlow.Application` | Kullanım senaryoları, CRUD, açık onaylı scenario apply ve store sözleşmesi |
-| `CoinFlow.Infrastructure` | SQLite şema v9, legacy upgrade ve deterministik development seed |
+| `CoinFlow.Infrastructure` | SQLite şema v15, profil klasörleri, legacy upgrade ve deterministik development seed |
 | `CoinFlow.App` | .NET MAUI Android görünümü ve servis sonuçlarını sunan MVVM katmanı |
 | `CoinFlow.Tests` | Domain regression, kanonik veri ve SQLite entegrasyon testleri |
 
@@ -186,3 +186,21 @@ Normal veya gecikmiş finalization yeni snapshot'ı cihazın açıldığı güne
 ## Veri ve migration
 
 Store tüm entity'leri exact-date alanlarıyla round-trip eder. Şema v9; `financial_snapshots`, frozen plan/satırları, revision, actual, actual payment/flow ve optional living breakdown tablolarını additive olarak ekler. Existing kullanıcı ilk normal plan okumasında mevcut canonical durumundan initial current snapshot alır; geçmiş actual üretilmez. Şema v7'de eklenen iki global planlama faiz oranı ve eski strategy/card migration davranışları korunur. SQLite-net additive migration finansman planlarına ana tutar ve toplam geri ödeme alanlarını eski kayıtları bozmadan ekler. Legacy upgrade sırasında eksik `ProjectionAnchorDate` bir kez oluşturulur; fresh veritabanında ise ilk maaş planlamasına kadar boş kalır. Fresh development veritabanı otomatik seed edilmez. Clear aksiyonu yeni history tablolarını da temizler. Şema v14 `loans` tablosuna `Kind` (varsayılan tüketici kredisi) ve `EarlyClosureAmountAsOf` sütunlarını additive ekler; tarihsiz eski kapatma tutarları hiçbir şeyi kalibre etmez. Şema v15 `loan_prepayments` tablosunu, `loans.FinalPaymentAmount` ve simülasyon taslak koşullarına `LoanId` / `PrepaymentMode` sütunlarını additive ekler; bir kredi silinince olayları da silinir.
+
+## Profiller
+
+Profil = ayrı veritabanı dosyası. Finans verisinin tamamı zaten tek SQLite dosyasında durduğu için izolasyon şema değişikliği gerektirmez; hiçbir tabloya `ProfileId` sütunu eklenmez.
+
+```text
+AppDataDirectory/
+  profiles/
+    {profileId:N}/
+      coinflow.db3    ← o profilin bütün finans verisi (şema v15)
+      profile.json    ← ad, oluşturulma, son açılış
+```
+
+- **`FileSystemProfileRepository`** profilleri klasörlerden okur; merkezi bir liste yoktur, dolayısıyla "listede var ama verisi yok" durumu oluşamaz. Meta dosyası okunamayan ama veritabanı olan klasör `Profilim` adıyla yine listelenir.
+- **`ProfileScopedCoinFlowStore`** uygulamanın gördüğü tek `ICoinFlowStore`'dur ve her çağrıyı açık profilin `SqliteCoinFlowStore`'una iletir. Servisler singleton olduğu için yeniden kurulmaz; altlarındaki veritabanı değişir. Hiçbir profil açık değilken her çağrı hata verir — kapanmış bir ekrandan gelen geç çağrı başka profile yazamaz.
+- **`ProfileService`** kuralları taşır: ad boş olamaz, en fazla 30 karakter, Türkçe büyük/küçük harfe duyarsız benzersiz; son kalan ve açık olan profil silinemez. Her açılışta yeni bir `SessionId` üretir ("bu oturumda bir kez sor" kararları buna bağlıdır).
+- **`ProfileNavigator`** (App) kök sayfayı değiştirir. Uygulama her soğuk açılışta `ProfileSelectionPage` ile başlar; profil açılınca `AppShell` **her seferinde yeniden** kurulur (transient), böylece önceki profilin sayfa ve view model durumu taşınmaz. "Profil Değiştir" önce ekranı seçim sayfasına alır, sonra bağlantıyı kapatır. Arka plandan dönüşte kök sayfa değişmediği için profil yeniden sorulmaz.
+- **Profil öncesi sürümden geçiş.** Kökte `coinflow.db3` varsa ilk profil listelemesinde `Profilim` profiline taşınır (dosya kopyalanmaz, yerinden alınır; varsa SQLite yan dosyaları önce). Taşıma meta yazımından önce yapılır; ikisi arasında kesilirse klasör kurtarma kuralıyla yine listelenir.
