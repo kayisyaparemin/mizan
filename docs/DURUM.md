@@ -1,6 +1,6 @@
 # Mizan — Proje Durumu ve Devir Notu
 
-> Son güncelleme: 14.09.2026 · Son sürüm `v1.15.0`
+> Son güncelleme: 15.09.2026 · Son sürüm `v1.15.0`
 >
 > **Yeni bir sohbet/geliştirici buradan başlar.** Bu dosya tek devir
 > belgesidir; eski `HANDOFF.md` ve `TODO.md` kaldırıldı, hâlâ geçerli olan kısımları
@@ -22,12 +22,10 @@
 | Veri yeri | profil başına `files/profiles/{id:N}/coinflow.db3` (v1.12.0'dan beri) |
 | Yedek yeri | `/storage/emulated/0/Mizan/Mizan-yedek-YYYY-MM-DD.zip` (dev build: `Mizan Dev`), v1.13.0'dan beri |
 
-**Devralırken bekleyen tek konu:** GitHub'daki `v1.15.0` sürüm notu yanlışlıkla
-v1.14.0'ın metnini taşıyor. Sürüm notu `release.yml`'de elle yazılıyor ve
-v1.15.0 çıkarken güncellenmedi. Doğru metin repoda
-`.github/workflows/release.yml` → "Write stable release notes" adımında duruyor.
-Yayındaki notun `gh release edit v1.15.0 --notes-file …` ile düzeltilmesi
-kullanıcı onayı bekliyor.
+**Devralırken bekleyen iş yok.** `v1.15.0` önce v1.14.0'ın sürüm notuyla
+yayınlandı, çünkü not `release.yml`'de elle yazılıyor ve güncellenmemişti.
+15.09.2026'da `gh release edit` ile düzeltildi. Kontrol listesinin 3. adımı bu
+yüzden var.
 
 ### Kullanıcıyla çalışma biçimi
 
@@ -1014,8 +1012,6 @@ Bu projede sekizinci kez yalnız ekranda görülen kusur.
    girilse de olay plandaki tutarla işlenir.
 
 15. **v1.15.0'dan kalan küçükler.**
-   - Yayındaki `v1.15.0` sürüm notu v1.14.0'ın metni. Doğrusu `release.yml`'de;
-     `gh release edit` kullanıcı onayı bekliyor.
    - Ortak formdan girilen kayıtta eski formdaki "Not" alanı yok; açıklama plan
      adı.
    - Finansal Yapı formunda "Vazgeç" (`SecondaryButton`) `SoftSky` zeminde
