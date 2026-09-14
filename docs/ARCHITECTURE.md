@@ -96,6 +96,18 @@ Simülatör `LoanEarlyClosure` ve `LoanPartialPrepayment` koşullarıyla olayı 
 
 Senaryoyu kaydetmek ayrı bir işlemdir. `CoinFlowService.ApplySimulationAsync` açık `confirmed=true` olmadan kalıcı değişiklik yapmaz. Her hesaplanan scenario kalıcı bir application kimliği taşır; entity ve child charge/taksit kimlikleri bundan deterministik üretilir. Böylece hızlı çift tıklama veya retry aynı canonical kaydı ikinci kez oluşturmaz. Apply switch'i nakit gideri `PlannedLargeExpense`, finansmanı `TemporaryPaymentPlan`, kart alışverişini seçili `CreditCard` aggregate'ının charge'ları, gelecek geliri `OneTimeIncome`, maaş ve ödeme düzeni değişikliklerini yeni effective-dated history kayıtları olarak persist eder. Maaş/strategy geçmişi apply sırasında overwrite edilmez.
 
+**Tür kataloğu ve ortak form.** `SimulationScenarioCatalog` (Application), `SimulationScenarioType` değerlerini kullanıcıya görünen seçeneklere gruplar: Harcama, Borç / Kredi, Gelir, Ayar. Her grupta en fazla üç seçenek vardır. Bir seçenek birden fazla motor türünü kapsayabilir; `Resolve` türü formdaki değerden çözer:
+
+- "Kartla harcama": taksit sayısı 1 ise `CreditCardSinglePayment`, değilse `CreditCardInstallmentPurchase`.
+- "Krediye erken ödeme": `FullClosure` ise `LoanEarlyClosure`, değilse `LoanPartialPrepayment`.
+- "Nakit ödeme": yeni koşul `CashPurchase` olur; düzenlenen eski `FutureOneTimePayment` koşulu türünü korur, çünkü uygulanmış kimliğin türü değişirse `FindAppliedSimulation` onu tanımaz.
+
+Enum değişmez; kayıtlı taslak koşulları enum değerini sakladığı için şema etkilenmez. Her seçeneğin `EntryHome`'u türün simülatör dışında nereden girildiğini söyler: ortak form, gelir formu (ilk kaydı düzen kurulumunu başlatır), kart kontrol ya da Ayarlar.
+
+`ScenarioConditionForm` (App) alanları, görünürlük kurallarını ve `SimulationRequest` üretimini tutar; `ScenarioConditionFormView` onu çizer. Simülatör (`directEntryOnly: false`) ve Finansal Yapı (`true`, yalnız `SharedForm` seçenekleri) aynı formu kullanır.
+
+**Doğrudan giriş.** Finansal Yapı'da ortak formdan kaydedilen kayıt `CoinFlowService.AddRecordFromScenarioAsync` ile yazılır. Metot `ApplySimulationAsync` ile aynı `ApplyScenarioRequestsAsync` gövdesinden geçer: doğrulama (çapa kuralı dahil), idempotency, çakışma kontrolü, `BuildScenarioPlan` → persistence batch ve plan revizyonu; yalnız tetikleyici "Finansal Yapı'dan eklendi"dir. Böylece doğrudan girilen kayıt, simülasyonda görülen 12 dönemi birebir üretir (`ScenarioDirectEntryTests`). `SharedForm` dışındaki türler bu yoldan reddedilir. Formun kimliği form açılınca üretilir; çift dokunuş ikinci kayıt oluşturmaz. Tutarı ya da tarihi aydan aya değişen ödeme planı ise elle takvim giren `TemporaryPaymentPlan` formunda kalır.
+
 ### Üç zaman dilimi
 
 Uygulamanın üç amacı vardır ve her biri tek bir ekrana ve tek bir veri kaynağına sahiptir (I16):

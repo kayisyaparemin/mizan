@@ -5,10 +5,10 @@
 ## Şu anki durum
 
 - **Branch:** `main` (temiz, push edilmiş)
-- **Son commit:** `c962081`
-- **Testler:** 424/424
+- **Son commit:** `1eddf07` (+ bu doküman)
+- **Testler:** 454/454
 - **Android Release build:** 0 uyarı, 0 hata
-- **Son sürüm:** `v1.14.0` — yedekten ekle (`Mizan-1.14.0.apk`)
+- **Son sürüm:** `v1.15.0` — plan türleri gruplandı, Finansal Yapı'dan doğrudan giriş (`Mizan-1.15.0.apk`)
 - **Şema:** v15 (`loan_prepayments`, `loans.FinalPaymentAmount`, taslak koşulunda `LoanId`/`PrepaymentMode`)
 - **Veri yeri:** profil başına `profiles/{id}/coinflow.db3` (v1.12.0'dan beri)
 - **Yedek yeri:** `/storage/emulated/0/Mizan/Mizan-yedek-YYYY-MM-DD.zip` (dev: `Mizan Dev`), v1.13.0'dan beri
@@ -691,6 +691,89 @@ seçim ve bozuk veri reddi (hiçbir şey eklenmez), kopya adının sınıra sı�
 
 **Bilinen:** kopyanın kopyası uzun ad üretir (`Profilim (14 Eylül… (15
 Eylül yedeği)`); yedekten "üzerine yazma" bilinçli olarak yok.
+
+### v1.15.0 ne getirdi (plan türleri ve doğrudan giriş)
+
+Kullanıcı: *"Simülatördeki plan türü çok şişti, listeden bir şey bulmak
+zorlaşıyor"* ve *"bazı plan türleri finansal yapı tarafında yok; bir harcama
+girmek için simülatörde simülasyon yapıp planı uygula demek gerekiyor."*
+
+Kararlar (üçü de önerilen seçenek): **grup çipleri + açıklamalı kartlar** ·
+nakit satın alma ile tek seferlik ödeme **birleşir, planlı büyük gidere**
+yazılır · **ortak form**: Finansal Yapı simülatörün formunu ve uygulama yolunu
+kullanır.
+
+**Teşhis.**
+- Simülatörde tek `Picker`'da 13 tür vardı; açıklama ancak seçimden sonra
+  görünüyordu. İki çift aynı hesabı yapıyordu (`AddCardPurchase`: tek çekim ile
+  taksit arasındaki tek fark sayı; `AddLoanPrepayment`: kapama ile ara ödeme
+  arasındaki tek fark mod). "Nakit satın alma" `PlannedLargeExpense`'e, "Tek
+  seferlik ödeme" ise `OtherScheduled` ödeme planına yazılıyordu. İkincisi
+  uygulanınca Finansal Yapı'da "Düzenli Ödemeler" altında görünüyordu.
+- `89d7f90`'da (27.08) Finansal Yapı'nın kayıt türü `Picker`'ı 5 seçenekli bir
+  menüyle değiştirilmişti. `income`, `installment` ve `temporary` formları view
+  model'de kaldı ama **hiçbir yerden açılmıyordu**. Kartta taksitli harcama,
+  taksitli nakit borç, finansman ve krediye erken ödeme yalnız Simülatör →
+  Planı Uygula yoluyla girilebiliyordu.
+
+**Yapılan.**
+- **`SimulationScenarioCatalog`** (Application) grupları tanımlar: Harcama
+  (Nakit ödeme · Kartla harcama · Düzenli ödeme), Borç / Kredi (Kredi /
+  finansman çek · Taksitli nakit borç · Krediye erken ödeme), Gelir (Tek
+  seferlik gelir · Gelir değişikliği), Ayar (Kart ödeme şekli · Gelir kullanım
+  düzeni). Her grupta en fazla üç tür var. `Resolve` motor türünü taksit
+  sayısından ve moddan çözer.
+- **Enum ve şema değişmedi.** Eski "Tek seferlik ödeme" koşulları yüklenir;
+  düzenlenince türünü korur. Uygulanmış bir koşulun kimliği başka türe geçseydi
+  uygulama onu tanımaz, ikinci kez kaydederdi.
+- **`ScenarioConditionForm` + `ScenarioConditionFormView`**: alanlar, tür
+  seçimi ve `SimulationRequest` üretimi `SimulationViewModel`'den buraya
+  taşındı. Simülatör ve Finansal Yapı aynı formu kullanıyor.
+- **Finansal Yapı "+ Ekle":** Harcama · Borç / Kredi · Tek Seferlik Gelir
+  ortak formu açar. Maaş / Gelir Değişikliği · Bankadaki Kredimi Ekle · Kredi
+  Kartı · Tarihleri Farklı Ödeme Planı kendi formlarında kalır; sonuncusu gizli
+  kalmış `temporary` formudur. Ulaşılamayan ekleme dalları silindi.
+- **`CoinFlowService.AddRecordFromScenarioAsync`** `ApplySimulationAsync` ile
+  aynı gövdeden geçer (doğrulama, idempotency, çakışma, plan revizyonu;
+  tetikleyici "Finansal Yapı'dan eklendi"). Kendi ekranı olan türleri (gelir
+  değişikliği, kart ödeme şekli, düzen değişikliği) reddeder. Form açılınca
+  üretilen kimlik sayesinde çift dokunuş ikinci kayıt oluşturmaz.
+
+**Testler 424 → 454.**
+- `SimulationScenarioCatalogTests` (12): her enum değeri tam bir seçenekte,
+  grup başına en fazla 3 tür, çözüm kuralları, eski türün korunması.
+- `ScenarioDirectEntryTests` (15). Asıl test **parite**: her doğrudan giriş
+  türünde simülasyonun 12 dönemi (dönem sonu ve zorunlu ödeme), aynı koşul
+  doğrudan girildikten sonraki projeksiyonla birebir aynı. Servis bilerek
+  bozulunca (tutar +1.000) 9 durumun 8'i düştü; erken kapamada tutar
+  kullanılmadığı için dokuzuncunun geçmesi bekleniyordu.
+- `ScenarioEntrySourceTests` (3): "+ Ekle" menüsü her kayıt formuna ulaşıyor.
+  Bu, `89d7f90`'daki "kodda var, ekranda yok" durumunun korkuluğu.
+
+**Emülatörde doğrulandı.**
+- Çipler ve kartlar görünüyor. Grup değişiyor. Krediye erken ödeme seçilince
+  tarih bir sonraki taksit gününe (07.10.2026) kayıyor ve ad krediden
+  türüyor. Düzenle, koşulu grubu, türü ve moduyla geri yüklüyor.
+- Kartla harcama 30.000 · 3 taksit simülasyonda **12 ay sonu 675.437,55**. Aynı
+  koşul Finansal Yapı'dan girildi (çift dokunuşla); kart borcu
+  128.071 → 158.071 (tek kayıt). Simülatörde koşul kapatılınca baz çizgi de
+  **675.437,55**.
+- Tek seferlik gelir Gelirler'de görünüyor. Tarihleri Farklı Ödeme Planı eski
+  formla açılıyor.
+
+**Emülatörde yakalanan iki kusur.**
+1. Dört çip iki satıra taşıyordu; yatay iç boşluk azaltıldı.
+2. Finansal Yapı'nın mavi form zemininde seçili olmayan çipler ve seçili tür
+   kartı zeminle aynı renkteydi. Çipler açık lavanta, seçili kart lavanta
+   oldu.
+
+Bu projede sekizinci kez yalnız ekranda görülen kusur.
+
+**Bilinen.**
+- Doğrudan girilen kart harcamasının açıklaması plan adıdır; eski formdaki
+  "Not" alanı ortak formda yok.
+- Finansal Yapı formundaki "Vazgeç" butonu mavi zeminde zayıf görünüyor. Bu
+  sürümden önce de böyleydi, dokunulmadı.
 
 ## Açık işler
 
