@@ -201,31 +201,36 @@ jobs:
           cat > release-notes.md <<NOTES
           # Mizan $version
 
-          Yeni özellik: profil varken **yedekten ekleme**.
+          İki iyileştirme: Simülatörde plan türünü bulmak kolaylaştı ve
+          simüle edebildiğin her şeyi **Finansal Yapı'dan doğrudan**
+          girebiliyorsun.
 
-          ### Yedekten Ekle
+          ### Plan türleri gruplandı
 
-          Profil seçim ekranında **Yeni Profil**'in altında artık **Yedekten
-          Ekle** var. Mizan klasöründeki yedekler tarihleriyle listelenir
-          (başka bir yerdeki yedek dosyası da seçilebilir). Yedekte birden
-          fazla profil varsa hangisinin ekleneceğini seçersin: tek bir profil
-          ya da **Hepsi**.
+          Simülatördeki uzun tür listesi kalktı. Önce bir grup seçersin —
+          **Harcama**, **Borç / Kredi**, **Gelir**, **Ayar** — sonra o grubun
+          en fazla üç türü açıklamalarıyla kart olarak gelir.
 
-          **Mevcut profillerine hiç dokunulmaz.** Yedekteki profil telefonda
-          zaten varsa, yedekteki hâli ayrı bir profil olarak eklenir; adı
-          *"Profilim (14 Eylül yedeği)"* gibi olur. Böylece bir profilin eski
-          hâline bakabilir, istemediğini silebilirsin. Aynı adda başka bir
-          profil varsa yeni gelenin adının sonuna numara eklenir.
+          - **Kartla harcama:** taksit sayısını 1 yazarsan tek çekim olur.
+          - **Krediye erken ödeme:** "Tamamen kapat" ya da ara ödeme (vadeyi
+            kısalt / taksiti azalt) aynı yerden seçilir.
+          - **Nakit ödeme:** eski "Nakit satın alma" ve "Tek seferlik ödeme"
+            tek türde birleşti.
 
-          Kullanışlı olduğu durumlar:
+          Kaydettiğin geçici planlar olduğu gibi yüklenir.
 
-          - Uygulamayı yeniden kurunca yanlışlıkla yeni profil açtıysan
-            yedeğindeki profilleri yine geri alabilirsin.
-          - Bir profilin birkaç gün önceki hâline bakmak istersen.
-          - Başka bir telefondaki yedeği bu telefona eklemek istersen.
+          ### Finansal Yapı'dan doğrudan giriş
 
-          Bozuk ya da Mizan yedeği olmayan bir dosya reddedilir; hiçbir profil
-          eklenmez.
+          **+ Ekle** menüsünde artık **Harcama**, **Borç / Kredi** ve **Tek
+          Seferlik Gelir** var. Simülatördeki formun aynısı açılır; Kaydet
+          dediğinde kayıt doğrudan finans planına eklenir. Taksitli kart
+          harcaması, taksitli nakit borç, kredi / finansman çekme, krediye
+          erken ödeme ve tek seferlik gelir için artık simülasyon yapıp
+          "Planı Uygula" demen gerekmiyor. Doğrudan girdiğin kayıt,
+          simülasyonda gördüğün sonucun aynısını üretir.
+
+          Tutarı ya da tarihi aydan aya değişen ödemeler için **Tarihleri
+          Farklı Ödeme Planı** seçeneği geri geldi.
           NOTES
 
       - name: Upload signed APK artifact

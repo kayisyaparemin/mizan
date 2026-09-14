@@ -86,7 +86,7 @@ CoinFlow.sln
 └─ tests/CoinFlow.Tests         # Unit ve SQLite entegrasyon testleri
 ```
 
-Projection ve simulator aynı `FinancialProjectionCalculator` çekirdeğini kullanır. Ayrıntılar için [mimari belgeye](docs/ARCHITECTURE.md) bakın.
+Projection ve simulator aynı `FinancialProjectionCalculator` çekirdeğini kullanır. Ayrıntılar için [mimari belgeye](ARCHITECTURE.md), güncel durum ve devir notu için [DURUM.md](DURUM.md)'ye bakın.
 
 ## Development seed
 
@@ -125,7 +125,7 @@ dotnet publish src/CoinFlow.App/CoinFlow.App.csproj -f net8.0-android -c Release
 
 ## Migration
 
-SQLite şema sürümü 9'dur. v8 additive migration snapshot, frozen plan, revision, actual payment/flow ve living breakdown tablolarını ekler; mevcut finans tablolarını drop etmez. Upgrade olan kullanıcıda ilk plan okunurken mevcut canonical durumdan tek bir initial snapshot üretilir; geçmiş aylar için actual uydurulmaz. Önceki build'in 20 Ağustos snapshot'ını yanlışlıkla 10 Ekim'e bağlayan tamamlanmamış planı, ilk okumada 20 Ağustos–10 Eylül planıyla atomik olarak değiştirilir; canonical kullanıcı verileri ve tamamlanmış history değiştirilmez. v7 migration iki planlama faiz varsayımını `%5,00` ile başlatmaya devam eder. Eski global ödeme atama değeri bir kez ilk strategy history kaydına dönüştürülür ve runtime source of truth olmaktan çıkar. Eski kart aggregate alanları yeni kart modeline aktarılır. Kaldırılan mikro harcama, balance snapshot ve acil fon tabloları upgrade sırasında düşürülür.
+SQLite şema sürümü 15'tir (`SqliteCoinFlowStore.CurrentSchemaVersion`): v10 kesilmiş kart ekstresi içe aktarma, v11 kart ödeme tercihi geçmişi, v12 geçici planlar, v13 dönem gözlemi, v14 kredi türü ve tarihli kapatma tutarı, v15 kredi erken ödeme olayları. v12–v15 ayrıntıları [mimari belgede](ARCHITECTURE.md). Aşağısı v7–v9 tarihçesidir. v8 additive migration snapshot, frozen plan, revision, actual payment/flow ve living breakdown tablolarını ekler; mevcut finans tablolarını drop etmez. Upgrade olan kullanıcıda ilk plan okunurken mevcut canonical durumdan tek bir initial snapshot üretilir; geçmiş aylar için actual uydurulmaz. Önceki build'in 20 Ağustos snapshot'ını yanlışlıkla 10 Ekim'e bağlayan tamamlanmamış planı, ilk okumada 20 Ağustos–10 Eylül planıyla atomik olarak değiştirilir; canonical kullanıcı verileri ve tamamlanmış history değiştirilmez. v7 migration iki planlama faiz varsayımını `%5,00` ile başlatmaya devam eder. Eski global ödeme atama değeri bir kez ilk strategy history kaydına dönüştürülür ve runtime source of truth olmaktan çıkar. Eski kart aggregate alanları yeni kart modeline aktarılır. Kaldırılan mikro harcama, balance snapshot ve acil fon tabloları upgrade sırasında düşürülür.
 
 ## CI/CD
 

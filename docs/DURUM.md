@@ -1,21 +1,157 @@
-# Mizan — Proje Durumu
+# Mizan — Proje Durumu ve Devir Notu
 
-> Son güncelleme: 14.09.2026
+> Son güncelleme: 14.09.2026 · Son sürüm `v1.15.0`
+>
+> **Yeni bir sohbet/geliştirici buradan başlar.** Bu dosya tek devir
+> belgesidir; eski `HANDOFF.md` ve `TODO.md` kaldırıldı, hâlâ geçerli olan kısımları
+> burada (TODO tamamen bitmişti). Önce "Devir" bölümünü, sonra "Açık işler"i ve "Ürün invariant'ları"nı
+> oku. Sürüm bölümleri (v1.2.0 → v1.15.0) geriye dönük kayıttır; yalnız
+> dokunacağın alanın bölümünü oku.
 
-## Şu anki durum
+## Devir
 
-- **Branch:** `main` (temiz, push edilmiş)
-- **Son commit:** `1eddf07` (+ bu doküman)
-- **Testler:** 454/454
-- **Android Release build:** 0 uyarı, 0 hata
-- **Son sürüm:** `v1.15.0` — plan türleri gruplandı, Finansal Yapı'dan doğrudan giriş (`Mizan-1.15.0.apk`)
-- **Şema:** v15 (`loan_prepayments`, `loans.FinalPaymentAmount`, taslak koşulunda `LoanId`/`PrepaymentMode`)
-- **Veri yeri:** profil başına `profiles/{id}/coinflow.db3` (v1.12.0'dan beri)
-- **Yedek yeri:** `/storage/emulated/0/Mizan/Mizan-yedek-YYYY-MM-DD.zip` (dev: `Mizan Dev`), v1.13.0'dan beri
+### Şu anki durum
 
-## Ne yapıldı (06–07.09.2026 turu)
+| | |
+|---|---|
+| Branch | `main`, `origin/main` ile eşit, worktree yok (`git worktree list` yalnız `main`) |
+| Son sürüm | `v1.15.0` — plan türleri gruplandı, Finansal Yapı'dan doğrudan giriş (`Mizan-1.15.0.apk`, release iş akışı başarılı) |
+| Testler | 454/454 (`dotnet test`, ~8 sn) |
+| Android Release build | 0 uyarı, 0 hata |
+| Şema | v15 (`SqliteCoinFlowStore.CurrentSchemaVersion`) |
+| Veri yeri | profil başına `files/profiles/{id:N}/coinflow.db3` (v1.12.0'dan beri) |
+| Yedek yeri | `/storage/emulated/0/Mizan/Mizan-yedek-YYYY-MM-DD.zip` (dev build: `Mizan Dev`), v1.13.0'dan beri |
 
-`v1.0.3` → `v1.5.0`, 29 commit, 11 sürüm. Altı düzeltme, üç özellik, bir
+**Devralırken bekleyen tek konu:** GitHub'daki `v1.15.0` sürüm notu yanlışlıkla
+v1.14.0'ın metnini taşıyor. Sürüm notu `release.yml`'de elle yazılıyor ve
+v1.15.0 çıkarken güncellenmedi. Doğru metin repoda
+`.github/workflows/release.yml` → "Write stable release notes" adımında duruyor.
+Yayındaki notun `gh release edit v1.15.0 --notes-file …` ile düzeltilmesi
+kullanıcı onayı bekliyor.
+
+### Kullanıcıyla çalışma biçimi
+
+- **Dil Türkçe.** Kullanıcı 4 yıllık .NET backend geliştiricisi, MAUI/istemci
+  tarafında yeni. Kod AI ile üretildi; hedefi kodu kendi başına anlayıp
+  geliştirebilmek. Açıklamaları gerçek dosya yollarıyla bağla. "Bu ne?" diye
+  sorulduğunda kod yazma, anlat. Değişikliği ancak kullanıcı istediğinde yap.
+- **Özellik isteklerinde** önce ölç, sonra ürün kararlarını 2–4 seçenekli soru
+  olarak sor; önerdiğini ilk sıraya koy ve "(Önerilen)" yaz. Kullanıcı genelde
+  önerileni seçiyor ama kararı kendisi vermek istiyor.
+- **Tipik tur:** plan → onay → uygulama → test → emülatörde uçtan uca doğrulama
+  → DURUM'a "vX.Y.Z ne getirdi" bölümü → tag + push. Kullanıcı "yeni versiyon
+  çıkalım" dediyse sürüm çıkarmak işin parçası.
+- **Paralel sohbetler:** kullanıcı aynı anda başka Claude oturumları
+  çalıştırabiliyor. Onların düzeltmeleri `.claude/worktrees/<ad>` altında
+  commit'lenmemiş kalabiliyor (v1.11.1'de yaşandı). Sürümden önce
+  `git worktree list` çalıştır.
+- **Doküman otorite değil, ipucu.** Kod ile doküman çelişirse dört yollu triyaj
+  yap: kod bug'ı / doküman eski / kural değişti / karar eksik. Kullanıcıya farkı
+  söyle.
+
+### Ortam ve komutlar (Windows, doğrulanmış)
+
+Hepsini **repo kökünden** çalıştır. `global.json` SDK'yı 8.0.424'e sabitliyor;
+repo dışından çalıştırırsan makinedeki .NET 10 seçilir.
+
+```powershell
+dotnet test tests/CoinFlow.Tests/CoinFlow.Tests.csproj -c Release
+dotnet build src/CoinFlow.App/CoinFlow.App.csproj -c Release
+# Dev build'i açık emülatöre kur (paket: com.coinflow.mobile.dev, ad "Mizan Dev")
+dotnet build src/CoinFlow.App/CoinFlow.App.csproj -f net8.0-android -c Debug -p:CoinFlowDevBuild=true -t:Install
+emulator -avd mizan34
+adb shell monkey -p com.coinflow.mobile.dev -c android.intent.category.LAUNCHER 1
+```
+
+- Domain, Application, Infrastructure ve test projeleri düz `net8.0`; testler
+  Android araç zinciri gerektirmez. Yalnız `CoinFlow.App` `net8.0-android`.
+- Test projesi App'e referans vermez. App davranışı (XAML, menü seçenekleri)
+  **kaynak testleriyle** sabitlenir: `*SourceTests.cs` dosyaları repo kökünü
+  `CoinFlow.sln`'den bulup dosyayı metin olarak okur.
+- **Emülatör otomasyonu:**
+  - Ekran 1080×2400; ekran görüntüsü küçültülmüş gelir, koordinatı 1,2 ile çarp.
+  - Soğuk açılış sırası: profil seçim ekranı (kart ≈ 400,728) → varsa "Geçen dönemi
+    güncelleyelim mi?" (Daha Sonra ≈ 466,1364) → menü (≈ 72,202).
+  - Klavyeyi `adb shell input keyevent 4` kapatır; `111` kapatmaz ve sonraki
+    dokunuş klavyeye gider.
+  - Veritabanı: `adb shell "run-as com.coinflow.mobile.dev sqlite3 files/profiles/<id>/coinflow.db3 '…'"`.
+  - Emülatör anlık görüntüye dönebilir; önceki oturumun verisi kaybolmuş
+    olabilir. Şu an dev profilinde test için eklenmiş "Bilgisayar" kart
+    harcaması (30.000 · 3 taksit) ve "Prim" geliri (20.000) var.
+- Kanonik seed yalnız dev build'de, Ayarlar → Seed Data Yükle ile yüklenir.
+  Testler `TestFactory.Service(store, new DateOnly(2026, 8, 20))` ve
+  `LoadCanonicalDevelopmentDataAsync()` ile kurar.
+
+### Sürüm çıkarma kontrol listesi
+
+1. Tam test paketi yeşil ve Android Release build'de 0 uyarı.
+2. Değişikliği emülatörde gör. Bu projede sekiz kusur yalnız ekranda
+   yakalandı: kültürsüz tarih, taşan/görünmeyen kontrol, düşen diyalog.
+3. **`.github/workflows/release.yml` → "Write stable release notes" adımını
+   yeni sürüm için yeniden yaz.** Not metni sabit; unutulursa yayına bir önceki
+   sürümün notu çıkar (v1.0.4 ve v1.15.0'da oldu).
+4. `docs/DURUM.md`: bu tablo, sürüm tablosu ve "vX.Y.Z ne getirdi" bölümü.
+   Ekran/mimari değiştiyse `docs/README.md` ve `docs/ARCHITECTURE.md`.
+5. `git worktree list`: bekleyen paralel iş var mı?
+6. `git tag -a vX.Y.Z -m "Mizan X.Y.Z — …"` → `git push origin main` →
+   `git push origin vX.Y.Z`. Tag `release.yml`'i tetikler: test, imzalı APK,
+   GitHub Release. `main` push'u ayrıca `dev-build.yml` ile `dev-latest`
+   ön-sürümünü günceller.
+7. `gh run watch <id> --exit-status`, ardından
+   `gh release view vX.Y.Z --json assets,body` ile APK'yı ve notu kontrol et.
+
+Commit mesajları İngilizce özet satırı + Türkçe gövde biçiminde (`git log`'a bak).
+
+### Kod haritası
+
+| Nerede | Ne |
+|---|---|
+| `src/CoinFlow.Domain/Calculations/` | Saf motorlar: `FinancialProjectionCalculator` (tek projeksiyon, I1), `SimulationCalculator` (senaryo türleri + `Validate`), `CreditCardStatementCalculator`, `LoanAmortizationCalculator`, `LoanPaymentScheduleBuilder` |
+| `src/CoinFlow.Application/Services/CoinFlowService.cs` | UI'ın gördüğü cephe (~1.900 satır): plan okuma, projeksiyon, simüle/uygula, doğrudan giriş, review |
+| `src/CoinFlow.Application/Services/` | `PeriodProgressService` (Ana Sayfa), `PeriodReviewService`, `LoanPayoffService` / `LoanPayoffAdvisor`, `BackupService`, `ProfileService` |
+| `src/CoinFlow.Application/Models/SimulationScenarioCatalog.cs` | Plan türü grupları, tür çözümü, türün simülatör dışındaki yeri (v1.15.0) |
+| `src/CoinFlow.Infrastructure/Persistence/` | `SqliteCoinFlowStore` (şema + migration), `ProfileScopedCoinFlowStore` (açık profile iletir), `DevelopmentDataSeeder`, `FileSystemProfileRepository`, `ProfileBackupArchive` |
+| `src/CoinFlow.App/Pages` · `ViewModels` · `Controls` | MAUI sayfaları ve MVVM (CommunityToolkit). `Controls/ScenarioConditionFormView` Simülatör ile Finansal Yapı'nın ortak koşul formu |
+| `tests/CoinFlow.Tests/` | Domain, SQLite entegrasyon ve kaynak testleri. Sözleşme testleri: `ProductContractInvariantTests`, `CultureFormattingSourceTests`, `ScenarioDirectEntryTests` (parite) |
+
+### Tuzaklar (bu projede gerçekten yaşandı)
+
+- **Kültür:** kullanıcıya görünen her tarih/tutar `TurkishCulture` ile
+  biçimlenir. Varsayılan kültürde ay adı İngilizce çıkıyor.
+  `CultureFormattingSourceTests` sağlayıcısız biçimi düşürür. Global kültür
+  bilinçli olarak ayarlanmadı: Türkçe I/İ karşılaştırmalarını bozar.
+- **Store'a yeni metot** eklenirse `ProfileScopedCoinFlowStore` iletimini de
+  ekle (`ProfileTests` her iletimi ölçer). Singleton servislere durum koyma;
+  profil değişince servisler yeniden kurulmaz.
+- **XAML:** bir elemana `BindingContext="{Binding X}"` verirsen aynı elemanın
+  `IsVisible` gibi diğer bağlamaları da X'e bakar. Görünürlüğü dıştaki bir
+  `ContentView`'a koy (`CommitmentsPage.xaml`'daki ortak form örneği).
+- **Renk:** Finansal Yapı formu `SoftSky` zeminde durur; `SecondaryButton` da
+  `SoftSky` olduğu için o zeminde görünmez olur.
+- **Kimlik ve idempotency:** simülasyon/doğrudan giriş kayıtları `ScenarioId`'den
+  deterministik kimlik alır. Uygulanmış bir koşulun türünü değiştirme;
+  `FindAppliedSimulation` onu tanımaz ve ikinci kez kaydeder.
+- **Fixture'ın sıfırladığı risk test edilmez:** kanonik seed'de faiz sıfırdı ve
+  gidişat hatası testlere düşmedi. Riski taşıyan senaryoyu bilerek kur. Yeni bir
+  testi bir kez bilerek bozup düştüğünü gör.
+- **Dönem içinde `RefreshCurrentFinancialStateAsync` çağırma:** checkpoint
+  işlemidir, açık planı bozar (I14).
+- Aşağıdaki sürüm bölümlerinde anılan `PLAN-*.md`, `DEVIR-FAZ3.md`,
+  `BULGU-KART-FAIZI.md`, `agents/*.md` ve `CLAUDE.md` **repoda yok** (hiç
+  commit'lenmemiş yerel dosyalardı). Gerekli bilgi bu dosyada ve
+  `ARCHITECTURE.md`'de.
+
+### Sıradaki olası işler
+
+Öncelik kullanıcının. Somut adayları "Açık işler" altında: Geçmiş ekranı (2),
+gecikmiş yükümlülüğün temsili (5, ürün kararı bekliyor), dönem sonunun kart
+borcunu göstermemesi (7), kredide "bu taksiti ödedim" (8), simülatörde ilk maaş
+öncesi gider uyarısı (9), kart başına faiz oranı (11). Akbank PDF içe aktarma
+(6) kullanıcı tarafından ertelendi.
+
+## Sürüm geçmişi
+
+İlk tur (06–07.09.2026): `v1.0.3` → `v1.5.0`, 29 commit, 11 sürüm. Altı düzeltme, üç özellik, bir
 hesap hatası, iki sadeleştirme. Hepsi gerçek kullanımdan çıktı; çoğunun ortak
 paydası **motor doğru hesaplıyordu ama ekran eksik ya da yanlış söylüyordu**.
 Dört istisna: v1.2.1'de motorun kendisi eksik hesaplıyordu; v1.3.0 ve v1.4.0'da
@@ -38,9 +174,18 @@ ekran doğruydu ama okunmuyordu; v1.5.0 ise eksik olan bir şeyi ekledi.
 | **v1.6.0** | **Üç zaman diliminin izolasyonu** — dönem içi gözlem dönem planını ve geçmiş logunu bozuyordu |
 | **v1.6.1** | **Gidişat faizi saymıyordu** — plana tam uygun gidene faiz kadar kâr gösteriyordu |
 | **v1.7.0** | **Gidişat parametre parametre** — açık faizi gözlemden yeniden hesaplanıyor; kart faizi hesaptan çıktı |
+| **v1.8.0** | **Yaşam gideri bir havuz** — günlere bölmek plana uyana hayalet sapma üretiyordu |
+| **v1.9.0** | **Doğru kredi durumu** — checkpoint taksitin tamamını anaparadan düşüyordu; faiz taksitten türetiliyor |
+| **v1.10.0** | **Krediye erken kapama ve ara ödeme** simülatörde; erken ödeme kredinin üstüne oynatılan bir olay |
+| **v1.11.0** | **Kredi kapatma önerisi** — 12 Dönem'de "şu gün kapatabilirsin" |
+| v1.11.1 | Kapatma tutarı formu tarihi yanlış okunuyordu · kültürsüz biçimler · flaky test |
+| **v1.12.0** | **Profiller** — her profil ayrı veritabanı |
+| **v1.13.0** | **Gece otomatik yedek** ve yeniden kurulumda geri yükleme |
+| **v1.14.0** | **Yedekten ekle** — profil varken yedekteki profili kopya olarak ekleme |
+| **v1.15.0** | **Plan türleri gruplandı, Finansal Yapı'dan doğrudan giriş** — simüle edilen her tür aynı sonuçla doğrudan girilebiliyor |
 
-Grafik çalışmasının tamamı (Faz 1–4) ve alınan tasarım kararları:
-**`DEVIR-FAZ3.md`** — dört faz da bitti, belge artık geriye dönük referans.
+Grafik çalışması (Faz 1–4, v1.1.0–v1.2.0) v1.3.0'da geri alındı; ayrıntı
+aşağıdaki sürüm bölümlerinde. Anılan `DEVIR-FAZ3.md` repoda yok.
 
 ### v1.2.0 ne getirdi
 
@@ -789,7 +934,7 @@ Bu projede sekizinci kez yalnız ekranda görülen kusur.
 
 2. **Geçmiş ekranı düzgün kullanılamıyor.** Kullanıcının notu. İzolasyon
    tamamlandığına göre 2 numaranın evi netleşti; ekranın kendisi ayrı bir tur.
-   `PLAN-IZOLASYON.md` "Ayrı tur" bölümüne bak.
+   (Anılan `PLAN-IZOLASYON.md` repoda yok; bağlam v1.6.0 bölümünde.)
 
 3. **Kart harcaması gözlemi (ölçülmedi).** Dönem içi kart hareketleri
    `CreditCard.Charges`'a yazılıyor; bu bir **planlama** değişikliği ve I14
@@ -838,19 +983,17 @@ Bu projede sekizinci kez yalnız ekranda görülen kusur.
    bırakıyor ve 12 ay sonu bazla birebir aynı çıkıyor — koşul eklenmiş gibi
    görünüyor ama hiçbir şey değişmiyor.
 
-10. **Doküman kayması.** `README.md` ve `docs/ARCHITECTURE.md` eski:
-   "Veri ve migration" girişi şema v9 yazıyor (kod v15; v14 ve v15 notları
-   eklendi; katman tablosu v1.12.0'da v15'e düzeltildi, "Profiller" bölümü
-   eklendi), README 135 test yazıyor (gerçek 406).
-   Kart faizi, ekranlar, mevcut tutar, kart sayfası ve geçici planlar
-   bölümleri güncellendi; kalan sapma bu iki sayı.
+10. ~~**Doküman kayması.**~~ ✅ 14.09.2026: README ve ARCHITECTURE şema
+   sürümünü v15 olarak yazıyor, README'deki bağlantılar `docs/` altına göre
+   düzeltildi. README'de test sayısı artık geçmiyor. Kalan bilinen sapma: sürüm
+   bölümlerinde anılan yerel planlama belgeleri repoda yok (Devir → Tuzaklar).
 
 11. **Faiz oranıyla oynayamıyorsun.** Kart ve KMH için tek bir varsayılan `%5`
    var (Ayarlar'dan ikisi ayrı ayrı girilebiliyor ama kart başına değil).
    Gerçek oranlar farklı — Garanti kart %3,25, KMH %4,25 — ve model bu
    karşılaştırmayı gösteremediği için "kartı KMH'dan kapatmak ucuz mu"
-   sorusu yanıtlanamıyor. `BULGU-KART-FAIZI.md` sonundaki not bu boşluğu
-   tarif ediyor.
+   sorusu yanıtlanamıyor. (Boşluğu tarif eden `BULGU-KART-FAIZI.md` repoda yok;
+   bağlam v1.2.1 bölümünde.)
 
 12. **Gerçek veritabanında kredi anaparaları bozuk olabilir (🔴 kullanıcı eylemi).**
    v1.9.0 öncesi her kapatılan checkpoint anaparadan taksitin tamamını düştü.
@@ -858,16 +1001,28 @@ Bu projede sekizinci kez yalnız ekranda görülen kusur.
    çıkarsa Finansal Yapı → Düzenle → **bankanın bugünkü erken kapama tutarı**.
    Kullanıcı Burgan için bunu 13.09.2026'da yaptı; Garanti için henüz bilinmiyor.
 
-13. **Artık worktree'ler.** `.claude/worktrees/kind-tharp-5d47f1` ve
-   `nervous-elbakyan-48fcd9` birleştirildi (v1.11.1) ama silinmedi;
-   `kind-tharp`'ta commit'lenmemiş kopya duruyor. Kullanıcı onayıyla
-   `git worktree remove` ve dal silme.
+13. **Artık dallar.** Worktree'ler kalktı (14.09.2026'da `git worktree list`
+   yalnız `main`). Yerel dallar `claude/kind-tharp-5d47f1`,
+   `claude/nervous-elbakyan-48fcd9` ve `feat/card-payment-preference-history`
+   (uzakta da var) duruyor; üçünün de `main`'de olmayan commit'i yok.
+   Kullanıcı onayıyla silinebilir.
 
 14. **Öneri motorunun bilinen sadeleştirmeleri.** Ufuk sonrası KMH faizi
    sayılmaz; pozitif bakiyeye mevduat getirisi verilmez (kapatmak mı, mevduatta
    tutmak mı sorusu cevaplanmaz); değişken faizli kredinin gelecek faizi
    bugünkü sabit varsayılır; ara ödemede ödenen tutar plandakinden farklı
    girilse de olay plandaki tutarla işlenir.
+
+15. **v1.15.0'dan kalan küçükler.**
+   - Yayındaki `v1.15.0` sürüm notu v1.14.0'ın metni. Doğrusu `release.yml`'de;
+     `gh release edit` kullanıcı onayı bekliyor.
+   - Ortak formdan girilen kayıtta eski formdaki "Not" alanı yok; açıklama plan
+     adı.
+   - Finansal Yapı formunda "Vazgeç" (`SecondaryButton`) `SoftSky` zeminde
+     zayıf görünüyor; v1.15.0 öncesinden beri.
+   - Eski "Tek seferlik ödeme" (`FutureOneTimePayment`) ile uygulanmış
+     kayıtlar Finansal Yapı'da "Düzenli Ödemeler" altında "Planlı ödeme"
+     rozetiyle duruyor. Yeni kayıt bu türde oluşmuyor; eskileri taşınmadı.
 
 ## Bilinen sadeleştirmeler (bug değil, kasıtlı)
 
@@ -961,6 +1116,8 @@ gün girilir.
 
 ## Rol promptları
 
-`agents/MENTOR.md` · `agents/DEV.md` · `agents/BA.md`
-(BA.md'deki "kod esastır" kuralı hatalı — kod/doküman çelişkisinde dört yollu
-triyaj yapılmalı: kod bug'ı / doküman eski / kural değişti / karar eksik)
+Eski oturumlarda `agents/MENTOR.md`, `agents/DEV.md`, `agents/BA.md` rol promptları
+kullanıldı; bu dosyalar repoda yok. Onlardan korunmaya değer tek kural: kod ile
+doküman çelişince "kod esastır" deme, dört yollu triyaj yap — kod bug'ı /
+doküman eski / kural değişti / karar eksik. Güncel çalışma biçimi Devir
+bölümünde.
