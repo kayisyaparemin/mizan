@@ -40,6 +40,20 @@ public partial class SettingsPage : ContentPage
         await _viewModel.ClearDevelopmentDataAsync();
     }
 
+    private async void OnRequestBackupAccessClicked(
+        object? sender,
+        EventArgs eventArgs)
+    {
+        await _viewModel.RequestBackupAccessAsync();
+    }
+
+    private async void OnBackUpNowClicked(
+        object? sender,
+        EventArgs eventArgs)
+    {
+        await _viewModel.BackUpNowAsync();
+    }
+
     private async void OnLoadCanonicalSeedClicked(
         object? sender,
         EventArgs eventArgs)

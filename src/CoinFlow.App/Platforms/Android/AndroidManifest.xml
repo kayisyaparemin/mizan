@@ -4,5 +4,14 @@
       android:allowBackup="false"
       android:icon="@mipmap/appicon"
       android:roundIcon="@mipmap/appicon_round"
+      android:requestLegacyExternalStorage="true"
       android:supportsRtl="true" />
+  <!-- Gece yedeği görevi telefon yeniden başlayınca da kurulu kalsın. -->
+  <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+  <!-- Yedekler depolamanın en üstündeki Mizan klasörüne yazılır; uygulama
+       kaldırılınca silinmesin diye uygulamanın kendi klasöründe değil.
+       Android 11+: "Tüm dosyalara erişim". Android 10 ve altı: klasik izin. -->
+  <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
+  <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29" />
+  <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="29" />
 </manifest>

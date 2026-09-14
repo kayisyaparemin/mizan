@@ -1,5 +1,7 @@
-﻿using Android.App;
+using Android.App;
 using Android.Runtime;
+using Android.Util;
+using CoinFlow.App.Backup;
 
 namespace CoinFlow.App;
 
@@ -12,4 +14,18 @@ public class MainApplication : MauiApplication
     }
 
     protected override MauiApp CreateMauiApp() => MauiProgram.CreateMauiApp();
+
+    public override void OnCreate()
+    {
+        base.OnCreate();
+        try
+        {
+            NightlyBackupJob.EnsureScheduled(this);
+        }
+        catch (Exception exception)
+        {
+            // Yedek görevi kurulamadı diye uygulama açılmaz olmamalı.
+            Log.Warn("Mizan", $"Gece yedeği kurulamadı: {exception}");
+        }
+    }
 }

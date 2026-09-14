@@ -49,7 +49,33 @@
                 </BindableLayout.ItemTemplate>
             </VerticalStackLayout>
 
+            <!-- Yeni kurulum: hiç profil yok. -->
+            <Border IsVisible="{Binding IsFirstRun}"
+                    BackgroundColor="{StaticResource SoftSky}"
+                    StrokeThickness="0">
+                <VerticalStackLayout Spacing="10">
+                    <Label Text="Mizan'a hoş geldin" Style="{StaticResource SectionTitle}" />
+                    <Label Style="{StaticResource AlertBody}">
+                        <Label.FormattedText>
+                            <FormattedString>
+                                <Span Text="Daha önce Mizan kullandıysan yedeğinden kaldığın yerden devam edebilirsin. Yedekler " />
+                                <Span Text="{Binding BackupLocation}" FontFamily="OpenSansSemibold" />
+                                <Span Text=" klasöründe durur." />
+                            </FormattedString>
+                        </Label.FormattedText>
+                    </Label>
+                    <Button Text="Yedekten Geri Yükle"
+                            IsEnabled="{Binding CanInteract}"
+                            Clicked="OnRestoreClicked" />
+                    <Button Text="Temiz Başla"
+                            Style="{StaticResource SecondaryButton}"
+                            IsEnabled="{Binding CanInteract}"
+                            Clicked="OnCreateClicked" />
+                </VerticalStackLayout>
+            </Border>
+
             <Button Text="Yeni Profil"
+                    IsVisible="{Binding HasProfiles}"
                     IsEnabled="{Binding CanInteract}"
                     Clicked="OnCreateClicked" />
             <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" />

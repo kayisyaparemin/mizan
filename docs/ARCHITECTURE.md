@@ -204,3 +204,21 @@ AppDataDirectory/
 - **`ProfileService`** kuralları taşır: ad boş olamaz, en fazla 30 karakter, Türkçe büyük/küçük harfe duyarsız benzersiz; son kalan ve açık olan profil silinemez. Her açılışta yeni bir `SessionId` üretir ("bu oturumda bir kez sor" kararları buna bağlıdır).
 - **`ProfileNavigator`** (App) kök sayfayı değiştirir. Uygulama her soğuk açılışta `ProfileSelectionPage` ile başlar; profil açılınca `AppShell` **her seferinde yeniden** kurulur (transient), böylece önceki profilin sayfa ve view model durumu taşınmaz. "Profil Değiştir" önce ekranı seçim sayfasına alır, sonra bağlantıyı kapatır. Arka plandan dönüşte kök sayfa değişmediği için profil yeniden sorulmaz.
 - **Profil öncesi sürümden geçiş.** Kökte `coinflow.db3` varsa ilk profil listelemesinde `Profilim` profiline taşınır (dosya kopyalanmaz, yerinden alınır; varsa SQLite yan dosyaları önce). Taşıma meta yazımından önce yapılır; ikisi arasında kesilirse klasör kurtarma kuralıyla yine listelenir.
+
+## Yedekleme
+
+Uygulama kaldırılınca Android uygulamanın kendi klasörünü (bütün profil veritabanları dahil) siler. Yedek bu yüzden uygulamanın dışında, depolamanın en üstündeki **`Mizan`** klasöründe durur (geliştirme sürümü: `Mizan Dev`, aynı telefonda iki sürüm birbirinin yedeğinin üzerine yazmasın diye).
+
+```text
+/storage/emulated/0/Mizan/
+  Mizan-yedek-2026-09-14.zip
+    mizan-backup.json          ← biçim, tarih, şema, profil listesi
+    profiles/{id:N}/coinflow.db3
+```
+
+- **`ProfileBackupArchive`** (Infrastructure) bütün profilleri tek zip'e yazar. Veritabanı dosyası kopyalanmaz: açık profil o anda yazıyor olabilir, `VACUUM INTO` tek okuma işleminde tutarlı bir anlık görüntü üretir. Geri yükleme yalnız hiç profil yokken çalışır; zip, manifest, her veritabanının `quick_check`'i ve şema sürümü (uygulamanınkinden yeni olamaz) doğrulanır, profiller önce geçici klasöre açılır ve ancak hepsi geçerse yerine taşınır.
+- **Parmak izi içerikten hesaplanır**, dosya zamanından değil: store her açılışta ayar satırını aynı değerlerle yeniden yazıyor. Son açılış tarihi parmak izine girmez.
+- **`BackupService`** (Application): gün başına bir dosya (aynı gün üzerine yazılır), değişiklik yoksa gece yeni dosya yazılmaz (son yedek klasörden silinmişse yazılır), en yeni 7 yedek kalır, Mizan'ın adlandırmadığı dosyalara dokunulmaz. Yedek önce önbellekte oluşturulur, klasöre geçici adla kopyalanıp yerine taşınır.
+- **`FolderBackupStorage`** düz dosya işlemi; izin kısmı **`AndroidStorageAccess`**: Android 11+ "Tüm dosyalara erişim" (`MANAGE_EXTERNAL_STORAGE`, sistem ayarındaki anahtar), 10 ve altı `WRITE_EXTERNAL_STORAGE` + `requestLegacyExternalStorage`. İzin sayesinde yeniden kurulan uygulama da klasördeki eski yedekleri listeleyebilir.
+- **`NightlyBackupJob`** — JobScheduler, ek kütüphane yok. Tek seferlik görev 23:30'dan önce başlamaz, en geç 3 saat içinde çalışır, bitince ertesi gece için yeniden kurulur; `persisted` olduğu için telefon yeniden başlayınca da durur. Uygulama açılışında (`MainApplication.OnCreate`) kurulu değilse kurulur. Java adı sabittir (`com.coinflow.mobile.NightlyBackupJob`); kalıcı görev sınıf adıyla saklanır.
+- **Akış.** Profil seçim ekranı izin yoksa kurulum başına bir kez izin ister (sayfa pencereye bağlandıktan sonra; ilk sayfada erken gösterilen uyarı Android'de düşüyor). Hiç profil yokken "Yedekten Geri Yükle / Temiz Başla"; geri yükleme klasördeki yedekleri tarihleriyle listeler, "Başka bir dosya seç…" sistem seçicisini `Mizan` klasöründe açar (`ActivityResults` + `EXTRA_INITIAL_URI`). Ayarlar'da son yedek, "Şimdi Yedekle" ve izin yoksa "İzin Ver".

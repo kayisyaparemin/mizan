@@ -45,8 +45,13 @@ public sealed class FileSystemProfileRepository : IProfileRepository
 
     public bool HasLegacyDatabase => File.Exists(LegacyDatabasePath);
 
+    public string RootDirectory => _rootDirectory;
+
     public string GetDatabasePath(Guid profileId) =>
         Path.Combine(ProfileDirectory(profileId), DatabaseFileName);
+
+    public string GetProfileDirectory(Guid profileId) =>
+        ProfileDirectory(profileId);
 
     public async Task<IReadOnlyList<UserProfile>> GetProfilesAsync(
         CancellationToken cancellationToken = default)

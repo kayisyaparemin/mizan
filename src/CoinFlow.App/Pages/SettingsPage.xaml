@@ -86,6 +86,30 @@
                 </Border>
 
                 <Border>
+                    <VerticalStackLayout Spacing="8">
+                        <Label Text="Yedekleme" Style="{StaticResource SectionTitle}" />
+                        <Label Text="{Binding LastBackupText}" FontFamily="OpenSansSemibold" />
+                        <Label Text="{Binding BackupDescription}" Style="{StaticResource MutedText}" />
+                        <Border IsVisible="{Binding NeedsBackupAccess}"
+                                BackgroundColor="{StaticResource WarningSurface}"
+                                StrokeThickness="0"
+                                Padding="12">
+                            <VerticalStackLayout Spacing="8">
+                                <Label Text="Yedek klasörüne erişim izni yok; gece yedeği alınamıyor."
+                                       TextColor="{StaticResource WarningText}" />
+                                <Button Text="İzin Ver"
+                                        IsEnabled="{Binding CanInteract}"
+                                        Clicked="OnRequestBackupAccessClicked" />
+                            </VerticalStackLayout>
+                        </Border>
+                        <Button Text="Şimdi Yedekle"
+                                IsVisible="{Binding HasBackupAccess}"
+                                IsEnabled="{Binding CanInteract}"
+                                Clicked="OnBackUpNowClicked" />
+                    </VerticalStackLayout>
+                </Border>
+
+                <Border>
                     <VerticalStackLayout Spacing="6">
                         <Label Text="Hakkında" Style="{StaticResource SectionTitle}" />
                         <Label Text="Mizan" FontFamily="OpenSansSemibold" FontSize="20" />

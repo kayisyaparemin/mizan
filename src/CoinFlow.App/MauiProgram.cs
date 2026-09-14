@@ -1,3 +1,4 @@
+using CoinFlow.App.Backup;
 using CoinFlow.App.Pages;
 using CoinFlow.App.Services;
 using CoinFlow.App.ViewModels;
@@ -49,6 +50,21 @@ public static class MauiProgram
             services => services.GetRequiredService<ProfileScopedCoinFlowStore>());
         builder.Services.AddSingleton<ProfileService>();
         builder.Services.AddSingleton<ProfileNavigator>();
+        // Yedek: bütün profiller tek dosyada, uygulamanın dışında — depolamanın
+        // en üstündeki Mizan klasöründe. Uygulama kaldırılınca silinmez.
+        builder.Services.AddSingleton<IProfileBackupArchive>(
+            services => new ProfileBackupArchive(
+                profileRepository,
+                services.GetRequiredService<IClock>()));
+        builder.Services.AddSingleton<IBackupStorage>(
+            new FolderBackupStorage(
+                AndroidStorageAccess.FolderPath,
+                $"Dahili depolama › {AndroidStorageAccess.FolderName}",
+                new AndroidStorageAccess()));
+        builder.Services.AddSingleton(new BackupOptions(
+            Path.Combine(FileSystem.CacheDirectory, "backup")));
+        builder.Services.AddSingleton<BackupService>();
+        builder.Services.AddSingleton<IBackupFilePicker, AndroidBackupFilePicker>();
         builder.Services.AddSingleton<SalaryPeriodCalculator>();
         builder.Services.AddSingleton<PaymentAssignmentStrategyResolver>();
         builder.Services.AddSingleton<CreditCardPaymentPreferenceResolver>();

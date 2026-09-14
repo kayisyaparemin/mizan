@@ -1,5 +1,7 @@
 ﻿using Android.App;
+using Android.Content;
 using Android.Content.PM;
+using CoinFlow.App.Backup;
 using Android.OS;
 using AndroidX.Core.View;
 
@@ -23,5 +25,11 @@ public class MainActivity : MauiAppCompatActivity
         var controller = WindowCompat.GetInsetsController(Window, Window.DecorView);
         controller.AppearanceLightStatusBars = true;
         controller.AppearanceLightNavigationBars = true;
+    }
+
+    protected override void OnActivityResult(int requestCode, Result resultCode, Intent? data)
+    {
+        base.OnActivityResult(requestCode, resultCode, data);
+        ActivityResults.OnActivityResult(requestCode, resultCode, data);
     }
 }

@@ -13,7 +13,7 @@ public sealed class SqliteCoinFlowStore : ICoinFlowStore, IAsyncDisposable
     // v12: kaydedilmiş simülasyon taslakları.
     // v13: açık dönemin gözlem defteri (I14/I15). Her ikisi de yalnız yeni
     // tablo ekler; mevcut tabloların hiçbirine dokunmaz, veri taşınmaz.
-    private const int CurrentSchemaVersion = 15;
+    public const int CurrentSchemaVersion = 15;
     private const int CurrentCardStatementModelVersion = 7;
     private const decimal DefaultPlanningInterestRate = 0.05m;
     private static readonly Guid LegacyInitialAssignmentStrategyId =

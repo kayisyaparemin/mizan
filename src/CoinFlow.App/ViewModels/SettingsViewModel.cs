@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CoinFlow.App.Models;
 using CoinFlow.App.Services;
+using CoinFlow.Application.Models;
 using CoinFlow.Application.Services;
 using CoinFlow.Domain.Models;
 
@@ -10,6 +11,7 @@ namespace CoinFlow.App.ViewModels;
 
 public partial class SettingsViewModel(
     CoinFlowService service,
+    BackupService backup,
     IUserFeedbackService feedback) : ViewModelBase
 {
     // Mevcut tutar ve çapa artık Ana Sayfa'dan güncelleniyor; burada yalnız
@@ -46,6 +48,24 @@ public partial class SettingsViewModel(
     [ObservableProperty] private string previewText = string.Empty;
     [ObservableProperty] private bool hasPreview;
     [ObservableProperty] private bool isSettingsDirty;
+    [ObservableProperty] private string lastBackupText = string.Empty;
+    [ObservableProperty] private bool hasBackupAccess;
+
+    public string BackupDescription =>
+        $"Her gece bütün profiller {backup.LocationDescription} klasörüne yedeklenir; " +
+        "o gün hiçbir şey değişmediyse yeni dosya yazılmaz. Son 7 yedek saklanır. " +
+        "Uygulamayı kaldırıp yeniden kurarsan ilk açılışta yedekten geri yükleyebilirsin.";
+
+    public bool NeedsBackupAccess => !HasBackupAccess;
+
+    partial void OnHasBackupAccessChanged(bool value) =>
+        OnPropertyChanged(nameof(NeedsBackupAccess));
+
+    public async Task RequestBackupAccessAsync()
+    {
+        await backup.RequestAccessAsync();
+        await LoadBackupStateAsync();
+    }
 
     public bool IsDevelopment => BuildInfo.IsDevelopment;
     public string BuildChannel => BuildInfo.Channel;
@@ -69,8 +89,55 @@ public partial class SettingsViewModel(
     partial void OnIsSettingsDirtyChanged(bool value) =>
         SaveCommand.NotifyCanExecuteChanged();
 
+    public async Task BackUpNowAsync()
+    {
+        if (IsBusy)
+        {
+            return;
+        }
+
+        try
+        {
+            IsBusy = true;
+            var result = await backup.BackUpNowAsync();
+            await LoadBackupStateAsync();
+            if (result.Outcome == BackupOutcome.Created)
+            {
+                await feedback.ShowSuccessAsync(
+                    $"Bütün profiller {backup.LocationDescription} klasörüne yedeklendi: {result.State!.FileName}",
+                    title: "Yedeklendi");
+            }
+            else if (result.Outcome == BackupOutcome.NoAccess)
+            {
+                await feedback.ShowErrorAsync(
+                    "Yedek klasörüne erişim izni yok. \"İzin Ver\" ile açabilirsin.",
+                    title: "Yedeklenemedi");
+            }
+        }
+        catch (Exception exception)
+        {
+            await feedback.ShowErrorAsync(
+                UserFacingMessages.FromException(exception),
+                title: "Yedeklenemedi");
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    private async Task LoadBackupStateAsync()
+    {
+        HasBackupAccess = backup.HasAccess;
+        var state = await backup.GetLastBackupAsync();
+        LastBackupText = state is null
+            ? "Henüz yedek alınmadı."
+            : $"Son yedek: {state.BackedUpAt.ToLocalTime().ToString("d MMMM yyyy HH:mm", TurkishCulture)} · {state.FileName}";
+    }
+
     public async Task LoadAsync()
     {
+        await LoadBackupStateAsync();
         var plan = await service.GetFinancialPlanAsync();
         var settings = plan.Settings;
         var overview = await service.GetPaymentAssignmentStrategyOverviewAsync();

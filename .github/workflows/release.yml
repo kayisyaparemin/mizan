@@ -201,29 +201,32 @@ jobs:
           cat > release-notes.md <<NOTES
           # Mizan $version
 
-          Yeni özellik: **profiller**.
+          Yeni özellik: **otomatik yedek** ve yeniden kurulumda **geri yükleme**.
 
-          ### Uygulama açılırken profil soruyor
+          ### Her gece yedek
 
-          Mizan artık her açılışta **Profil Seç** ekranıyla başlıyor. Her
-          profilin verisi tamamen ayrı: yeni bir profil açtığında uygulama
-          yeni yüklenmiş gibi ilk kurulumla başlar, diğer profillerin hiçbir
-          kaydını görmez ve değiştirmez.
+          Mizan her gece 23:30 civarında bütün profillerini telefonun dahili
+          depolamasındaki **Mizan** klasörüne yedekler. O gün hiçbir şey
+          değişmediyse yeni dosya yazılmaz; son 7 yedek saklanır. Klasör
+          uygulamanın dışında olduğu için uygulamayı kaldırsan da yedeklerin
+          durur.
 
-          - **Yeni Profil** ile ad verip oluştur; profil hemen açılır.
-          - Profil kartındaki **Düzenle** ile adını değiştir ya da sil.
-            Silme kalıcıdır ve o profilin bütün verisini götürür; son kalan
-            profil silinemez.
-          - Uygulamanın içindeyken yan menüde aktif profilin adı ve
-            **Profil Değiştir** var.
-          - Başka bir uygulamaya geçip döndüğünde profil yeniden sorulmaz;
-            kaldığın yerden devam edersin.
+          - Güncellemeden sonraki ilk açılışta bir kez **"Tüm dosyalara
+            erişim"** izni istenir. Açılan ekrandaki anahtarı aç, geri dön.
+            Vazgeçersen sonra **Ayarlar → Yedekleme → İzin Ver**.
+          - **Ayarlar → Yedekleme**'de son yedeğin tarihi ve **Şimdi
+            Yedekle** var. İlk yedeği o geceyi beklemeden hemen alabilirsin.
 
-          ### Mevcut verin kaybolmaz
+          ### Yeniden kurunca: yedekten dön ya da temiz başla
 
-          Güncellemeden sonraki ilk açılışta bugüne kadarki bütün verin
-          **Profilim** adlı profile taşınır. Hiçbir şeyi yeniden girmen
-          gerekmez; istersen profilin adını değiştirebilirsin.
+          Hiç profil yokken açılış ekranı iki seçenek sunar:
+
+          - **Yedekten Geri Yükle** — Mizan klasöründeki yedekler tarihleriyle
+            listelenir, seçtiğin yedekteki bütün profiller geri gelir. Yedek
+            dosyan başka bir yerdeyse **Başka bir dosya seç…** ile seçebilirsin.
+            Mizan yedeği olmayan ya da bozuk bir dosya reddedilir, hiçbir şey
+            değişmez.
+          - **Temiz Başla** — yeni profil, ilk kurulum.
           NOTES
 
       - name: Upload signed APK artifact
