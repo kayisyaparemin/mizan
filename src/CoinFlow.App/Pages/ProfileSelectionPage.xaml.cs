@@ -84,7 +84,8 @@ public partial class ProfileSelectionPage : ContentPage
             "Profilin adı ne olsun? Yeni profil boş başlar; ilk kurulumla devam edersin.",
             "Oluştur",
             "Vazgeç",
-            maxLength: _viewModel.MaxNameLength);
+            "Örn. Ev bütçesi",
+            _viewModel.MaxNameLength);
         if (name is not null)
         {
             await _viewModel.CreateAndOpenAsync(name);
@@ -250,9 +251,10 @@ public partial class ProfileSelectionPage : ContentPage
             "Profilin yeni adı:",
             "Kaydet",
             "Vazgeç",
+            // Alan mevcut adla doldurulmaz; boş kaydetmek adı değiştirmez.
             profile.Name,
             _viewModel.MaxNameLength);
-        if (name is not null)
+        if (!string.IsNullOrWhiteSpace(name))
         {
             await _viewModel.RenameAsync(profile, name);
         }

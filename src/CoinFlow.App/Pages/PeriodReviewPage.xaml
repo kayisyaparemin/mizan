@@ -88,7 +88,7 @@
                                     </Grid>
                                     <Picker ItemsSource="{Binding StatusOptions}" SelectedItem="{Binding SelectedStatus}" />
                                     <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
-                                        <Entry Text="{Binding ActualAmount}" Placeholder="Gerçek tutar" Keyboard="Numeric" />
+                                        <Entry Text="{Binding ActualAmount}" Placeholder="{Binding AmountPlaceholder}" Keyboard="Numeric" />
                                         <DatePicker Grid.Column="1" Date="{Binding ActualDate}" Format="dd.MM.yyyy" />
                                     </Grid>
                                     <Entry Text="{Binding Note}" Placeholder="Not (opsiyonel)" />
@@ -102,7 +102,7 @@
                     <VerticalStackLayout Spacing="9">
                         <Label Text="Yaşam Giderleri" Style="{StaticResource SectionTitle}" />
                         <Label Text="Bu dönemde günlük yaşam için toplam ne kadar harcadın? Tek sayı yeterli." Style="{StaticResource MutedText}" />
-                        <Entry Text="{Binding ActualLivingSpend}" Placeholder="Toplam yaşam gideri" Keyboard="Numeric" />
+                        <Entry Text="{Binding ActualLivingSpend}" Placeholder="{Binding LivingPlaceholder}" Keyboard="Numeric" />
                         <Grid ColumnDefinitions="*,Auto"><Label Text="İsteğe bağlı ayrıntı" VerticalOptions="Center" /><Switch Grid.Column="1" IsToggled="{Binding ShowLivingBreakdown}" /></Grid>
                         <VerticalStackLayout IsVisible="{Binding ShowLivingBreakdown}" Spacing="6">
                             <Entry Text="{Binding GroceryAmount}" Placeholder="Market" Keyboard="Numeric" />
@@ -112,15 +112,15 @@
                             <Entry Text="{Binding OtherLivingAmount}" Placeholder="Diğer" Keyboard="Numeric" />
                         </VerticalStackLayout>
                         <Label Text="Dönemde ödenen diğer faiz (varsa)" Style="{StaticResource FieldLabel}" />
-                        <Entry Text="{Binding ActualInterest}" Keyboard="Numeric" />
+                        <Entry Text="{Binding ActualInterest}" Placeholder="{Binding InterestPlaceholder}" Keyboard="Numeric" />
                     </VerticalStackLayout>
                 </Border>
 
                 <Border BackgroundColor="{StaticResource SoftPeach}" StrokeThickness="0">
                     <VerticalStackLayout Spacing="8">
                         <Label Text="Plan Dışı Büyük Ödeme" Style="{StaticResource SectionTitle}" />
-                        <Entry Text="{Binding NewPaymentName}" Placeholder="Ad" />
-                        <Entry Text="{Binding NewPaymentCategory}" Placeholder="Kategori" />
+                        <Entry Text="{Binding NewPaymentName}" Placeholder="Ne için ödedin? Örn. Araba tamiri" />
+                        <Entry Text="{Binding NewPaymentCategory}" Placeholder="Kategori (boşsa Diğer)" />
                         <Grid ColumnDefinitions="*,*" ColumnSpacing="8"><Entry Text="{Binding NewPaymentAmount}" Placeholder="Tutar" Keyboard="Numeric" /><DatePicker Grid.Column="1" Date="{Binding NewPaymentDate}" Format="dd.MM.yyyy" /></Grid>
                         <Button Text="+ Ödeme Ekle" Command="{Binding AddUnplannedPaymentCommand}" Style="{StaticResource SecondaryButton}" />
                     </VerticalStackLayout>
@@ -128,8 +128,8 @@
                 <Border BackgroundColor="{StaticResource SoftPink}" StrokeThickness="0">
                     <VerticalStackLayout Spacing="8">
                         <Label Text="Plan Dışı Gelir" Style="{StaticResource SectionTitle}" />
-                        <Entry Text="{Binding NewIncomeName}" Placeholder="Bonus, iade, ek gelir..." />
-                        <Entry Text="{Binding NewIncomeCategory}" Placeholder="Kategori" />
+                        <Entry Text="{Binding NewIncomeName}" Placeholder="Örn. Prim, iade, satış" />
+                        <Entry Text="{Binding NewIncomeCategory}" Placeholder="Kategori (boşsa Ek gelir)" />
                         <Grid ColumnDefinitions="*,*" ColumnSpacing="8"><Entry Text="{Binding NewIncomeAmount}" Placeholder="Tutar" Keyboard="Numeric" /><DatePicker Grid.Column="1" Date="{Binding NewIncomeDate}" Format="dd.MM.yyyy" /></Grid>
                         <Button Text="+ Gelir Ekle" Command="{Binding AddUnplannedIncomeCommand}" Style="{StaticResource SecondaryButton}" />
                     </VerticalStackLayout>
@@ -155,7 +155,7 @@
                         <Label Text="Gelecek hesaplamaları bu tutardan devam eder." Style="{StaticResource MutedText}" />
                         <Label Text="Hesaplanan öneri" Style="{StaticResource FieldLabel}" />
                         <Label Text="{Binding SuggestedStartingSavings}" FontFamily="OpenSansSemibold" FontSize="20" />
-                        <Entry Text="{Binding CurrentStartingSavings}" Placeholder="Yeni planlama başlangıç durumu" Keyboard="Numeric" controls:SignedNumericEntry.AllowNegative="True" />
+                        <Entry Text="{Binding CurrentStartingSavings}" Placeholder="Boş bırakırsan hesaplanan öneri" Keyboard="Numeric" controls:SignedNumericEntry.AllowNegative="True" />
                         <Button Text="Güncelle" Command="{Binding RecalculateSuggestedCommand}" Style="{StaticResource SecondaryButton}" />
                         <Label Text="Gerçek durum farklıysa tutarı düzeltebilirsin; fark dönem düzeltmesi olarak saklanır." Style="{StaticResource MutedText}" />
                     </VerticalStackLayout>

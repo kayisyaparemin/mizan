@@ -27,7 +27,7 @@
                     <Label Text="Yalnız henüz başlamamış dönemler seçilebilir. Önceki kararlar değiştirilmez."
                            Style="{StaticResource MutedText}" />
                     <Label Text="Not" Style="{StaticResource FieldLabel}" />
-                    <Entry Text="{Binding StrategyNote}" />
+                    <Entry Text="{Binding StrategyNote}" Placeholder="Not (isteğe bağlı)" />
                     <Button Text="Geçişi Önizle"
                             Command="{Binding PreviewStrategyCommand}" />
                 </VerticalStackLayout>

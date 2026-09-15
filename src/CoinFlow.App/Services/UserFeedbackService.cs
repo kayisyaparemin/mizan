@@ -27,7 +27,7 @@ public sealed class UserFeedbackService : IUserFeedbackService
         string message,
         string accept,
         string cancel,
-        string initialValue = "",
+        string placeholder = "",
         int maxLength = -1) =>
         CurrentPage().DisplayPromptAsync(
             title,
@@ -35,7 +35,7 @@ public sealed class UserFeedbackService : IUserFeedbackService
             accept,
             cancel,
             maxLength: maxLength,
-            initialValue: initialValue);
+            placeholder: placeholder);
 
     public async Task<string?> ChooseAsync(
         string title,

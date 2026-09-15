@@ -108,6 +108,7 @@ public partial class CommitmentsViewModel(
     [ObservableProperty] private bool hasActiveForm;
     [ObservableProperty] private string formTitle = "Yeni kayıt";
     [ObservableProperty] private string formLead = string.Empty;
+    [ObservableProperty] private string namePlaceholder = "Kayıt adı";
     [ObservableProperty] private string structureSummary = "—";
 
     [ObservableProperty] private string name = string.Empty;
@@ -115,9 +116,9 @@ public partial class CommitmentsViewModel(
     [ObservableProperty] private string amount = string.Empty;
     [ObservableProperty] private DateTime effectiveDate = DateTime.Today;
 
-    [ObservableProperty] private string paymentDay = "10";
+    [ObservableProperty] private string paymentDay = string.Empty;
     [ObservableProperty] private DateTime nextPaymentDate = DateTime.Today.AddMonths(1);
-    [ObservableProperty] private string installmentCount = "12";
+    [ObservableProperty] private string installmentCount = string.Empty;
     [ObservableProperty] private string remainingDebt = string.Empty;
     [ObservableProperty] private string earlyClosureAmount = string.Empty;
     [ObservableProperty]
@@ -158,9 +159,9 @@ public partial class CommitmentsViewModel(
     [RelayCommand]
     private void ToggleAdvancedCardOptions() =>
         ShowAdvancedCardOptions = !ShowAdvancedCardOptions;
-    [ObservableProperty] private string closingDay = "25";
-    [ObservableProperty] private string dueDay = "5";
-    [ObservableProperty] private string minimumRate = "40";
+    [ObservableProperty] private string closingDay = string.Empty;
+    [ObservableProperty] private string dueDay = string.Empty;
+    [ObservableProperty] private string minimumRate = string.Empty;
     [ObservableProperty] private DateTime cardChargeDate = DateTime.Today.AddMonths(1);
     [ObservableProperty] private string cardChargeAmount = string.Empty;
     [ObservableProperty] private SelectionOption<CreditCardPaymentStrategy>? selectedPaymentStrategy;
@@ -370,8 +371,18 @@ public partial class CommitmentsViewModel(
             "temporary" => "Tutarı ya da tarihi aydan aya değişen ödemeler; her ödemeyi tarihiyle ekle.",
             _ => string.Empty
         };
+        NamePlaceholder = NamePlaceholderFor(recordType);
         SaveButtonText = "Kaydet";
     }
+
+    private static string NamePlaceholderFor(string recordType) => recordType switch
+    {
+        "salary" => "Örn. Maaş, kira geliri",
+        "loan" => "Örn. İhtiyaç kredisi, taşıt kredisi",
+        "card" => "Kartın adı",
+        "temporary" => "Örn. Okul taksidi, vergi borcu",
+        _ => "Kayıt adı"
+    };
 
     /// <summary>
     /// Simülatördeki formu açar. Kaydet, simülasyonu uygulamakla aynı yoldan
@@ -600,6 +611,7 @@ public partial class CommitmentsViewModel(
         SelectedRecordType = RecordTypes.Single(x => x.Value == "card");
         HasActiveForm = true;
         FormTitle = "Kart Bilgilerini Düzenle";
+        NamePlaceholder = NamePlaceholderFor("card");
         FormLead = "Sık kararlar kart kontrol ekranında; burada kartın temel bilgileri var.";
         IsEditingCard = true;
         SaveButtonText = "Değişiklikleri Kaydet";
@@ -907,6 +919,7 @@ public partial class CommitmentsViewModel(
         SelectedRecordType = RecordTypes.Single(x => x.Value == "loan");
         HasActiveForm = true;
         FormTitle = "Krediyi Düzenle";
+        NamePlaceholder = NamePlaceholderFor("loan");
         FormLead = "Kalan anaparayı ya da bankadan aldığın kapatma tutarını " +
                    "güncel tut; erken kapama hesabı bunlardan yapılır.";
         SaveButtonText = "Değişiklikleri Kaydet";
@@ -1026,10 +1039,10 @@ public partial class CommitmentsViewModel(
             Bank = Bank.Trim(),
             Limit = RequirePositive(ParseMoney(CardLimit, "Kart limiti"), "Kart limiti"),
             CarriedBalance = actualStatement is null
-                ? Math.Max(0m, ParseMoney(CarriedBalance, "Devreden bakiye"))
+                ? Math.Max(0m, ParseOptionalMoney(CarriedBalance) ?? 0m)
                 : 0m,
             UnbilledSpending = actualStatement is null
-                ? Math.Max(0m, ParseMoney(UnbilledSpending, "Ekstreleşmemiş harcama"))
+                ? Math.Max(0m, ParseOptionalMoney(UnbilledSpending) ?? 0m)
                 : 0m,
             BalanceAsOfDate = actualStatement?.StatementDate ??
                 (_editingCardBalanceDate ??
@@ -1149,11 +1162,25 @@ public partial class CommitmentsViewModel(
 
     private void ResetForm()
     {
+        // Önceki kaydın değerleri yeni forma taşınmaz; boş alan placeholder
+        // gösterir.
         Name = string.Empty;
         Bank = string.Empty;
         Amount = string.Empty;
+        PaymentDay = string.Empty;
+        InstallmentCount = string.Empty;
         RemainingDebt = string.Empty;
         EarlyClosureAmount = string.Empty;
+        PlanPaymentAmount = string.Empty;
+        CardLimit = string.Empty;
+        CarriedBalance = string.Empty;
+        UnbilledSpending = string.Empty;
+        ClosingDay = string.Empty;
+        DueDay = string.Empty;
+        MinimumRate = string.Empty;
+        FixedPaymentAmount = string.Empty;
+        ProjectionFallbackFixedAmount = string.Empty;
+        CardChargeAmount = string.Empty;
         EarlyClosureNote = string.Empty;
         _editingQuote = null;
         SelectedLoanKind = LoanKinds[0];
@@ -1236,15 +1263,6 @@ public partial class CommitmentsViewModel(
             string.IsNullOrWhiteSpace(Bank))
         {
             Bank = result.DetectedBank;
-        }
-
-        if (string.IsNullOrWhiteSpace(Name))
-        {
-            Name = result.DetectedBank.Contains(
-                "Bonus",
-                StringComparison.OrdinalIgnoreCase)
-                ? "Bonus"
-                : "Axess";
         }
 
         CardStatementDate = (result.StatementDate ??

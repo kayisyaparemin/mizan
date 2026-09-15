@@ -272,12 +272,14 @@ public partial class DashboardViewModel(
         HasObservation = progress.HasObservation;
         if (progress.Observation is { } observation)
         {
-            LastObservationText =
-                $"Son gözlem: {observation.ObservedOn.ToString("dd MMMM yyyy", TurkishCulture)}";
+            // Alan son gözlemle doldurulmaz; tutar bu satırda görünür, yeni
+            // gözlem boş alana yazılır.
+            LastObservationText = observation.ObservedBalance is { } observed
+                ? $"Son gözlem: {observation.ObservedOn.ToString("dd MMMM yyyy", TurkishCulture)} · {Money(observed, 2)}"
+                : $"Son gözlem: {observation.ObservedOn.ToString("dd MMMM yyyy", TurkishCulture)}";
             ObservationDateText =
                 $"{observation.ObservedOn.ToString("dd MMMM", TurkishCulture)} gözlemi";
-            CurrentBalanceInput = observation.ObservedBalance
-                ?.ToString("0.##", TurkishCulture) ?? string.Empty;
+            CurrentBalanceInput = string.Empty;
         }
         else
         {

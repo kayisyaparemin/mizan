@@ -24,7 +24,7 @@ public interface IUserFeedbackService
         string message,
         string accept,
         string cancel,
-        string initialValue = "",
+        string placeholder = "",
         int maxLength = -1);
 
     /// <summary>Seçenek listesi gösterir; seçilen metni ya da <c>null</c> döner.</summary>

@@ -46,7 +46,7 @@
                 <Border IsVisible="{Binding IsPeriodStep}">
                     <VerticalStackLayout Spacing="10">
                         <Label Text="Dönem günü" Style="{StaticResource FieldLabel}" />
-                        <Entry Text="{Binding PeriodDay}" Keyboard="Numeric" />
+                        <Entry Text="{Binding PeriodDay}" Placeholder="Gelirin yattığı gün, 1–31" Keyboard="Numeric" />
                         <Label Text="Gelirin hangi dönemi karşılar?"
                                Style="{StaticResource FieldLabel}" />
                         <Picker ItemsSource="{Binding AssignmentModes}"
@@ -57,9 +57,9 @@
                 <Border IsVisible="{Binding IsIncomeStep}">
                     <VerticalStackLayout Spacing="10">
                         <Label Text="Gelir adı" Style="{StaticResource FieldLabel}" />
-                        <Entry Text="{Binding IncomeName}" Placeholder="Maaş" />
+                        <Entry Text="{Binding IncomeName}" Placeholder="Örn. Maaş, kira geliri" />
                         <Label Text="Aylık net tutar" Style="{StaticResource FieldLabel}" />
-                        <Entry Text="{Binding IncomeAmount}" Keyboard="Numeric" />
+                        <Entry Text="{Binding IncomeAmount}" Placeholder="Örn. 45.000" Keyboard="Numeric" />
                         <Label Text="Geçerlilik tarihi" Style="{StaticResource FieldLabel}" />
                         <DatePicker Date="{Binding IncomeEffectiveDate}" />
                         <Button Text="Gelir Ekle"
@@ -101,11 +101,11 @@
                 <Border IsVisible="{Binding IsCardStep}">
                     <VerticalStackLayout Spacing="10">
                         <Label Text="Kart adı" Style="{StaticResource FieldLabel}" />
-                        <Entry Text="{Binding CardName}" Placeholder="Axess" />
+                        <Entry Text="{Binding CardName}" Placeholder="Kartın adı" />
                         <Label Text="Banka" Style="{StaticResource FieldLabel}" />
-                        <Entry Text="{Binding CardBank}" />
+                        <Entry Text="{Binding CardBank}" Placeholder="Kartın bankası" />
                         <Label Text="Limit" Style="{StaticResource FieldLabel}" />
-                        <Entry Text="{Binding CardLimit}" Keyboard="Numeric" />
+                        <Entry Text="{Binding CardLimit}" Placeholder="Örn. 50.000" Keyboard="Numeric" />
                         <Label Text="Kesilmiş bir ekstren var mı?"
                                Style="{StaticResource FieldLabel}" />
                         <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
@@ -142,9 +142,9 @@
                                    IsVisible="{Binding HasCardStatementImportWarnings}"
                                    TextColor="{StaticResource Error}" />
                             <Label Text="Ekstre tutarı" Style="{StaticResource FieldLabel}" />
-                            <Entry Text="{Binding CardStatementAmount}" Keyboard="Numeric" />
+                            <Entry Text="{Binding CardStatementAmount}" Placeholder="Ekstredeki toplam borç" Keyboard="Numeric" />
                             <Label Text="Asgari ödeme" Style="{StaticResource FieldLabel}" />
-                            <Entry Text="{Binding CardStatementMinimum}" Keyboard="Numeric" />
+                            <Entry Text="{Binding CardStatementMinimum}" Placeholder="Ekstredeki asgari tutar" Keyboard="Numeric" />
                             <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
                                 <VerticalStackLayout Spacing="6">
                                     <Label Text="Kesim tarihi" Style="{StaticResource FieldLabel}" />
@@ -181,11 +181,11 @@
                               IsVisible="{Binding IsLegacyCardSetup}">
                             <VerticalStackLayout Spacing="6">
                                 <Label Text="Devreden bakiye" Style="{StaticResource FieldLabel}" />
-                                <Entry Text="{Binding CardCarriedBalance}" Keyboard="Numeric" />
+                                <Entry Text="{Binding CardCarriedBalance}" Placeholder="Yoksa boş bırak" Keyboard="Numeric" />
                             </VerticalStackLayout>
                             <VerticalStackLayout Grid.Column="1" Spacing="6">
                                 <Label Text="Ekstreleşmemiş" Style="{StaticResource FieldLabel}" />
-                                <Entry Text="{Binding CardUnbilledSpending}" Keyboard="Numeric" />
+                                <Entry Text="{Binding CardUnbilledSpending}" Placeholder="Yoksa boş bırak" Keyboard="Numeric" />
                             </VerticalStackLayout>
                         </Grid>
                         <VerticalStackLayout IsVisible="{Binding IsLegacyCardSetup}"
@@ -196,15 +196,15 @@
                         <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8">
                             <VerticalStackLayout Spacing="6">
                                 <Label Text="Kesim günü" Style="{StaticResource FieldLabel}" />
-                                <Entry Text="{Binding CardClosingDay}" Keyboard="Numeric" />
+                                <Entry Text="{Binding CardClosingDay}" Placeholder="1–31" Keyboard="Numeric" />
                             </VerticalStackLayout>
                             <VerticalStackLayout Grid.Column="1" Spacing="6">
                                 <Label Text="Son ödeme" Style="{StaticResource FieldLabel}" />
-                                <Entry Text="{Binding CardDueDay}" Keyboard="Numeric" />
+                                <Entry Text="{Binding CardDueDay}" Placeholder="1–31" Keyboard="Numeric" />
                             </VerticalStackLayout>
                             <VerticalStackLayout Grid.Column="2" Spacing="6">
                                 <Label Text="Asgari %" Style="{StaticResource FieldLabel}" />
-                                <Entry Text="{Binding CardMinimumRate}" Keyboard="Numeric" />
+                                <Entry Text="{Binding CardMinimumRate}" Placeholder="Örn. 40" Keyboard="Numeric" />
                             </VerticalStackLayout>
                         </Grid>
                         <!-- §14: bu iki alan varsayılan davranış kuralıdır.
@@ -265,25 +265,25 @@
                 <Border IsVisible="{Binding IsLoanStep}">
                     <VerticalStackLayout Spacing="10">
                         <Label Text="Kredi adı" Style="{StaticResource FieldLabel}" />
-                        <Entry Text="{Binding LoanName}" />
+                        <Entry Text="{Binding LoanName}" Placeholder="Örn. İhtiyaç kredisi" />
                         <Label Text="Banka" Style="{StaticResource FieldLabel}" />
-                        <Entry Text="{Binding LoanBank}" />
+                        <Entry Text="{Binding LoanBank}" Placeholder="Kredinin bankası" />
                         <Label Text="Aylık ödeme" Style="{StaticResource FieldLabel}" />
-                        <Entry Text="{Binding LoanMonthlyPayment}" Keyboard="Numeric" />
+                        <Entry Text="{Binding LoanMonthlyPayment}" Placeholder="Aylık taksit, örn. 7.500" Keyboard="Numeric" />
                         <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
                             <VerticalStackLayout Spacing="6">
                                 <Label Text="Ödeme günü" Style="{StaticResource FieldLabel}" />
-                                <Entry Text="{Binding LoanPaymentDay}" Keyboard="Numeric" />
+                                <Entry Text="{Binding LoanPaymentDay}" Placeholder="1–31" Keyboard="Numeric" />
                             </VerticalStackLayout>
                             <VerticalStackLayout Grid.Column="1" Spacing="6">
                                 <Label Text="Kalan taksit" Style="{StaticResource FieldLabel}" />
-                                <Entry Text="{Binding LoanInstallmentCount}" Keyboard="Numeric" />
+                                <Entry Text="{Binding LoanInstallmentCount}" Placeholder="Örn. 24" Keyboard="Numeric" />
                             </VerticalStackLayout>
                         </Grid>
                         <Label Text="Sonraki ödeme tarihi" Style="{StaticResource FieldLabel}" />
                         <DatePicker Date="{Binding LoanNextPaymentDate}" />
                         <Label Text="Kalan anapara" Style="{StaticResource FieldLabel}" />
-                        <Entry Text="{Binding LoanRemainingDebt}" Keyboard="Numeric" />
+                        <Entry Text="{Binding LoanRemainingDebt}" Placeholder="Bilmiyorsan boş bırak" Keyboard="Numeric" />
                         <Button Text="Kredi Ekle"
                                 Command="{Binding AddLoanCommand}" />
                         <VerticalStackLayout BindableLayout.ItemsSource="{Binding DraftLoans}"
@@ -326,15 +326,16 @@
                         <Picker ItemsSource="{Binding PaymentTypes}"
                                 SelectedItem="{Binding SelectedPaymentType}" />
                         <Label Text="Ödeme adı" Style="{StaticResource FieldLabel}" />
-                        <Entry Text="{Binding PaymentName}" />
+                        <Entry Text="{Binding PaymentName}" Placeholder="Örn. Okul taksidi, vergi borcu" />
                         <Label Text="Tutar" Style="{StaticResource FieldLabel}" />
-                        <Entry Text="{Binding PaymentAmount}" Keyboard="Numeric" />
+                        <Entry Text="{Binding PaymentAmount}" Placeholder="Örn. 5.000" Keyboard="Numeric" />
                         <Label Text="Tarih" Style="{StaticResource FieldLabel}" />
                         <DatePicker Date="{Binding PaymentDate}" />
                         <VerticalStackLayout Spacing="6"
                                              IsVisible="{Binding IsPaymentPlanType}">
                             <Label Text="Ödeme adedi" Style="{StaticResource FieldLabel}" />
                             <Entry Text="{Binding PaymentCount}"
+                                   Placeholder="Örn. 12"
                                    Keyboard="Numeric" />
                         </VerticalStackLayout>
                         <Button Text="Ödeme Ekle"
@@ -377,6 +378,7 @@
                     <VerticalStackLayout Spacing="10">
                         <Label Text="Aylık yaşam gideri" Style="{StaticResource FieldLabel}" />
                         <Entry Text="{Binding MonthlyLivingBudget}"
+                               Placeholder="Market, yakıt gibi aylık toplam, örn. 20.000"
                                Keyboard="Numeric" />
                     </VerticalStackLayout>
                 </Border>
@@ -385,6 +387,7 @@
                     <VerticalStackLayout Spacing="10">
                         <Label Text="Mevcut Tutar" Style="{StaticResource FieldLabel}" />
                         <Entry Text="{Binding CurrentAmount}"
+                               Placeholder="Bugün hesabındaki toplam para"
                                Keyboard="Numeric"
                                controls:SignedNumericEntry.AllowNegative="True" />
                         <Label Text="Negatif değer girebilirsin (örn. -1.500)."

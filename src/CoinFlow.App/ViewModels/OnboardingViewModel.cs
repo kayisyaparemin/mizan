@@ -119,10 +119,10 @@ public partial class OnboardingViewModel : ViewModelBase
     [ObservableProperty] private bool canGoBack;
     [ObservableProperty] private bool canGoNext;
 
-    [ObservableProperty] private string periodDay = "10";
+    [ObservableProperty] private string periodDay = string.Empty;
     [ObservableProperty] private SelectionOption<PaymentAssignmentMode>? selectedAssignmentMode;
 
-    [ObservableProperty] private string incomeName = "Maaş";
+    [ObservableProperty] private string incomeName = string.Empty;
     [ObservableProperty] private string incomeAmount = string.Empty;
     [ObservableProperty] private DateTime incomeEffectiveDate;
 
@@ -131,8 +131,8 @@ public partial class OnboardingViewModel : ViewModelBase
     [ObservableProperty] private string cardLimit = string.Empty;
     [ObservableProperty] private bool cardHasActualStatement;
     [ObservableProperty] private bool isLegacyCardSetup = true;
-    [ObservableProperty] private string cardCarriedBalance = "0";
-    [ObservableProperty] private string cardUnbilledSpending = "0";
+    [ObservableProperty] private string cardCarriedBalance = string.Empty;
+    [ObservableProperty] private string cardUnbilledSpending = string.Empty;
     [ObservableProperty] private DateTime cardBalanceDate;
     [ObservableProperty] private string cardStatementAmount = string.Empty;
     [ObservableProperty] private string cardStatementMinimum = string.Empty;
@@ -155,28 +155,28 @@ public partial class OnboardingViewModel : ViewModelBase
     private string? _cardStatementFingerprint;
     private CreditCardStatementSource _cardStatementSource =
         CreditCardStatementSource.Manual;
-    [ObservableProperty] private string cardClosingDay = "25";
-    [ObservableProperty] private string cardDueDay = "5";
-    [ObservableProperty] private string cardMinimumRate = "40";
+    [ObservableProperty] private string cardClosingDay = string.Empty;
+    [ObservableProperty] private string cardDueDay = string.Empty;
+    [ObservableProperty] private string cardMinimumRate = string.Empty;
     [ObservableProperty] private SelectionOption<CreditCardPaymentStrategy>? selectedCardPaymentStrategy;
     [ObservableProperty] private SelectionOption<ProjectionFallbackStrategy>? selectedCardFallbackStrategy;
 
     [ObservableProperty] private string loanName = string.Empty;
     [ObservableProperty] private string loanBank = string.Empty;
     [ObservableProperty] private string loanMonthlyPayment = string.Empty;
-    [ObservableProperty] private string loanPaymentDay = "10";
+    [ObservableProperty] private string loanPaymentDay = string.Empty;
     [ObservableProperty] private DateTime loanNextPaymentDate;
-    [ObservableProperty] private string loanInstallmentCount = "12";
+    [ObservableProperty] private string loanInstallmentCount = string.Empty;
     [ObservableProperty] private string loanRemainingDebt = string.Empty;
 
     [ObservableProperty] private string paymentName = string.Empty;
     [ObservableProperty] private string paymentAmount = string.Empty;
     [ObservableProperty] private DateTime paymentDate;
-    [ObservableProperty] private string paymentCount = "12";
+    [ObservableProperty] private string paymentCount = string.Empty;
     [ObservableProperty] private SelectionOption<string>? selectedPaymentType;
     [ObservableProperty] private bool isPaymentPlanType;
-    [ObservableProperty] private string monthlyLivingBudget = "0";
-    [ObservableProperty] private string currentAmount = "0";
+    [ObservableProperty] private string monthlyLivingBudget = string.Empty;
+    [ObservableProperty] private string currentAmount = string.Empty;
     [ObservableProperty] private bool hasDraftIncomes;
     [ObservableProperty] private bool hasDraftCards;
     [ObservableProperty] private bool hasDraftLoans;
@@ -187,7 +187,7 @@ public partial class OnboardingViewModel : ViewModelBase
     [ObservableProperty] private string reviewPaymentText = "Yaklaşan ödeme eklenmedi";
     [ObservableProperty] private string reviewLivingText = "0 TL";
     [ObservableProperty] private string reviewCurrentAmountText = "0 TL";
-    [ObservableProperty] private string reviewPeriodText = "Dönem günü 10";
+    [ObservableProperty] private string reviewPeriodText = "Dönem günü seçilmedi";
 
     partial void OnStepIndexChanged(int value)
     {
@@ -204,14 +204,6 @@ public partial class OnboardingViewModel : ViewModelBase
     partial void OnSelectedPaymentTypeChanged(SelectionOption<string>? value)
     {
         IsPaymentPlanType = value?.Value is "recurring" or "temporary";
-        if (value?.Value == "temporary" && PaymentCount == "12")
-        {
-            PaymentCount = "3";
-        }
-        else if (value?.Value == "recurring" && PaymentCount == "3")
-        {
-            PaymentCount = "12";
-        }
     }
 
     partial void OnCardHasActualStatementChanged(bool value) =>
@@ -286,7 +278,7 @@ public partial class OnboardingViewModel : ViewModelBase
                     ? "Gelir"
                     : IncomeName.Trim()
             });
-            IncomeName = "Maaş";
+            IncomeName = string.Empty;
             IncomeAmount = string.Empty;
             RefreshDraftLines();
             SetStatus(string.Empty);
@@ -432,8 +424,11 @@ public partial class OnboardingViewModel : ViewModelBase
             CardName = string.Empty;
             CardBank = string.Empty;
             CardLimit = string.Empty;
-            CardCarriedBalance = "0";
-            CardUnbilledSpending = "0";
+            CardCarriedBalance = string.Empty;
+            CardUnbilledSpending = string.Empty;
+            CardClosingDay = string.Empty;
+            CardDueDay = string.Empty;
+            CardMinimumRate = string.Empty;
             CardHasActualStatement = false;
             CardStatementAmount = string.Empty;
             CardStatementMinimum = string.Empty;
@@ -482,6 +477,8 @@ public partial class OnboardingViewModel : ViewModelBase
             LoanBank = string.Empty;
             LoanMonthlyPayment = string.Empty;
             LoanRemainingDebt = string.Empty;
+            LoanPaymentDay = string.Empty;
+            LoanInstallmentCount = string.Empty;
             RefreshDraftLines();
             SetStatus(string.Empty);
         }
@@ -628,9 +625,9 @@ public partial class OnboardingViewModel : ViewModelBase
                 MonthlyLivingBudget = ParseNonNegativeMoney(
                     MonthlyLivingBudget,
                     "Yaşam gideri"),
-                ProjectionStartingSavings = ParseMoney(
-                    CurrentAmount,
-                    "Mevcut tutar"),
+                ProjectionStartingSavings = string.IsNullOrWhiteSpace(CurrentAmount)
+                    ? 0m
+                    : ParseMoney(CurrentAmount, "Mevcut tutar"),
                 ProjectionAnchorDate = _draftAnchorDate
             },
             Salaries = _salaries.ToArray(),
@@ -674,9 +671,9 @@ public partial class OnboardingViewModel : ViewModelBase
         _cards.Clear();
         _paymentPlans.Clear();
         _payments.Clear();
-        PeriodDay = "10";
-        MonthlyLivingBudget = "0";
-        CurrentAmount = "0";
+        PeriodDay = string.Empty;
+        MonthlyLivingBudget = string.Empty;
+        CurrentAmount = string.Empty;
         SelectedAssignmentMode = AssignmentModes[0];
         SelectedPaymentType = PaymentTypes[0];
         CardHasActualStatement = false;
@@ -828,7 +825,9 @@ public partial class OnboardingViewModel : ViewModelBase
             : "Yaklaşan ödeme eklenmedi";
         ReviewLivingText = TryMoneyText(MonthlyLivingBudget);
         ReviewCurrentAmountText = TryMoneyTextSigned(CurrentAmount);
-        ReviewPeriodText = $"Dönem günü {PeriodDay}";
+        ReviewPeriodText = string.IsNullOrWhiteSpace(PeriodDay)
+            ? "Dönem günü seçilmedi"
+            : $"Dönem günü {PeriodDay}";
     }
 
     private CreditCardStatement BuildCurrentStatement(Guid cardId)
@@ -901,15 +900,6 @@ public partial class OnboardingViewModel : ViewModelBase
             string.IsNullOrWhiteSpace(CardBank))
         {
             CardBank = result.DetectedBank;
-        }
-
-        if (string.IsNullOrWhiteSpace(CardName))
-        {
-            CardName = result.DetectedBank.Contains(
-                "Bonus",
-                StringComparison.OrdinalIgnoreCase)
-                ? "Bonus"
-                : "Axess";
         }
 
         CardStatementDate = (result.StatementDate ?? _clock.Today)
@@ -1048,7 +1038,9 @@ public partial class OnboardingViewModel : ViewModelBase
     {
         try
         {
-            return Money(ParseMoney(value, "Tutar"));
+            return Money(string.IsNullOrWhiteSpace(value)
+                ? 0m
+                : ParseMoney(value, "Tutar"));
         }
         catch
         {

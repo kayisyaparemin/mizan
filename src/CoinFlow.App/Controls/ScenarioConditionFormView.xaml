@@ -78,7 +78,7 @@
 
         <Label Text="{Binding ScenarioDescription}" Style="{StaticResource MutedText}" />
         <Label Text="Plan adı" Style="{StaticResource FieldLabel}" />
-        <Entry Text="{Binding Name}" Placeholder="Örn. Beyaz eşya" />
+        <Entry Text="{Binding Name}" Placeholder="{Binding NamePlaceholder}" />
         <VerticalStackLayout IsVisible="{Binding IsLoanPrepayment}" Spacing="7">
             <Label Text="Kredi" Style="{StaticResource FieldLabel}" />
             <Picker ItemsSource="{Binding Loans}"
@@ -91,7 +91,7 @@
         <VerticalStackLayout IsVisible="{Binding IsRegularScenario}" Spacing="7">
             <VerticalStackLayout IsVisible="{Binding NeedsAmount}" Spacing="7">
                 <Label Text="{Binding AmountLabel}" Style="{StaticResource FieldLabel}" />
-                <Entry Text="{Binding Amount}" Keyboard="Numeric" />
+                <Entry Text="{Binding Amount}" Placeholder="Örn. 25.000" Keyboard="Numeric" />
             </VerticalStackLayout>
             <Label Text="{Binding StartDateLabel}" Style="{StaticResource FieldLabel}" />
             <DatePicker Date="{Binding StartDate}" />
@@ -122,7 +122,7 @@
 
         <VerticalStackLayout IsVisible="{Binding NeedsPaymentCount}" Spacing="7">
             <Label Text="{Binding PaymentCountLabel}" Style="{StaticResource FieldLabel}" />
-            <Entry Text="{Binding PaymentCount}" Keyboard="Numeric" />
+            <Entry Text="{Binding PaymentCount}" Placeholder="{Binding PaymentCountPlaceholder}" Keyboard="Numeric" />
         </VerticalStackLayout>
 
         <VerticalStackLayout IsVisible="{Binding NeedsFirstPayment}" Spacing="7">
@@ -132,7 +132,7 @@
 
         <VerticalStackLayout IsVisible="{Binding IsFinancing}" Spacing="7">
             <Label Text="Toplam geri ödeme" Style="{StaticResource FieldLabel}" />
-            <Entry Text="{Binding TotalRepaymentAmount}" Keyboard="Numeric" />
+            <Entry Text="{Binding TotalRepaymentAmount}" Placeholder="Faiz dahil toplam, örn. 30.000" Keyboard="Numeric" />
         </VerticalStackLayout>
     </VerticalStackLayout>
 </ContentView>

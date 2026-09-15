@@ -102,9 +102,9 @@
                            TextColor="{StaticResource Error}" />
 
                     <Label Text="Ekstre tutarı" Style="{StaticResource FieldLabel}" />
-                    <Entry Text="{Binding StatementDraftAmount}" Keyboard="Numeric" />
+                    <Entry Text="{Binding StatementDraftAmount}" Placeholder="Ekstredeki toplam borç" Keyboard="Numeric" />
                     <Label Text="Asgari ödeme" Style="{StaticResource FieldLabel}" />
-                    <Entry Text="{Binding StatementDraftMinimum}" Keyboard="Numeric" />
+                    <Entry Text="{Binding StatementDraftMinimum}" Placeholder="Ekstredeki asgari tutar" Keyboard="Numeric" />
                     <!-- Grid hücrelerine dogrudan yerlesim: iç içe VerticalStackLayout'lar
                          MAUI Android'de arrange sonsuz döngüsünü (ANR) tetikleyebiliyordu. -->
                     <Grid ColumnDefinitions="*,*"
@@ -235,7 +235,7 @@
                                Style="{StaticResource FieldLabel}" />
                         <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
                             <Entry Text="{Binding CurrentStatementCustomAmount}"
-                                   Placeholder="Örn. 25.000,00"
+                                   Placeholder="Ödeyeceğin tutar, örn. 5.000"
                                    Keyboard="Numeric" />
                             <Button Grid.Column="1"
                                     Text="Kaydet"
@@ -370,7 +370,7 @@
                     <VerticalStackLayout Spacing="10">
                         <Label Text="Açıklama" Style="{StaticResource FieldLabel}" />
                         <Entry Text="{Binding ChargeDescription}"
-                               Placeholder="Gelecek taksit" />
+                               Placeholder="Açıklama (boşsa Gelecek taksit)" />
                         <Grid ColumnDefinitions="*,*,Auto" ColumnSpacing="6">
                             <DatePicker Date="{Binding ChargeDate}" />
                             <Entry Grid.Column="1"

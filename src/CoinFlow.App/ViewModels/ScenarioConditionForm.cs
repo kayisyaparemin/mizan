@@ -34,15 +34,8 @@ public sealed partial class ScenarioConditionForm : ViewModelBase
             }
         }
 
-        if (directEntryOnly)
-        {
-            // Finansal Yapı'da örnek değerler kayıt olarak kaydedilebilirdi.
-            Name = string.Empty;
-            Amount = string.Empty;
-            PaymentCount = "1";
-            TotalRepaymentAmount = string.Empty;
-        }
-
+        // Alanlar örnek değerle dolu gelmez; örnekler placeholder'dadır.
+        // Dolu örnek değer fark edilmeden kayıt olarak kaydedilebiliyordu.
         SelectOption(SimulationScenarioCatalog.CashPayment);
     }
 
@@ -85,16 +78,24 @@ public sealed partial class ScenarioConditionForm : ViewModelBase
 
     [ObservableProperty] private ScenarioOption selectedOption =
         SimulationScenarioCatalog.CashPayment;
-    [ObservableProperty] private string name = "Beyaz eşya";
-    [ObservableProperty] private string amount = "120000";
+    [ObservableProperty] private string name = string.Empty;
+    [ObservableProperty] private string amount = string.Empty;
     [ObservableProperty] private SelectionOption<Guid>? selectedCreditCard;
     [ObservableProperty] private DateTime startDate = DateTime.Today;
-    [ObservableProperty] private string paymentCount = "9";
+    [ObservableProperty] private string paymentCount = string.Empty;
     [ObservableProperty] private DateTime firstPaymentDate = DateTime.Today.AddMonths(1);
-    [ObservableProperty] private string totalRepaymentAmount = "145000";
+    [ObservableProperty] private string totalRepaymentAmount = string.Empty;
     [ObservableProperty] private bool isCard;
     [ObservableProperty] private bool needsPaymentCount;
     [ObservableProperty] private string paymentCountLabel = "Ödeme / taksit sayısı";
+    [ObservableProperty] private string paymentCountPlaceholder = "Örn. 12";
+    /// <summary>
+    /// Ad boş bırakılırsa kullanılacak ad. Yalnız krediye erken ödemede var:
+    /// ad seçilen krediden türer. Diğer türlerde adı kullanıcı yazar.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(NamePlaceholder))]
+    private string nameSuggestion = string.Empty;
     [ObservableProperty] private bool needsFirstPayment;
     [ObservableProperty] private bool isFinancing;
     [ObservableProperty] private bool isStrategyChange;
@@ -118,6 +119,10 @@ public sealed partial class ScenarioConditionForm : ViewModelBase
     /// "tarihi taksit gününe taşı" gibi yeni koşul kolaylıkları buna bakar.
     /// </summary>
     public SimulationScenarioType? EditingType { get; private set; }
+
+    public string NamePlaceholder => NameSuggestion.Length > 0
+        ? NameSuggestion
+        : "Örn. Beyaz eşya, tatil, okul taksidi";
 
     public void SetLookups(FinancialPlan plan)
     {
@@ -238,6 +243,7 @@ public sealed partial class ScenarioConditionForm : ViewModelBase
     {
         if (IsLoanPrepayment)
         {
+            RefreshNameSuggestion();
             MoveStartDateToNextInstallment();
         }
     }
@@ -267,6 +273,9 @@ public sealed partial class ScenarioConditionForm : ViewModelBase
         PaymentCountLabel = isCardSpending
             ? "Taksit sayısı (1 = tek çekim)"
             : "Ödeme / taksit sayısı";
+        PaymentCountPlaceholder = isCardSpending
+            ? "Boş bırakırsan tek çekim"
+            : "Örn. 12";
         NeedsFirstPayment = option.Key == SimulationScenarioCatalog.Financing.Key ||
                             option.Key == SimulationScenarioCatalog.CashDebt.Key ||
                             option.Key == SimulationScenarioCatalog.RecurringPayment.Key;
@@ -303,11 +312,7 @@ public sealed partial class ScenarioConditionForm : ViewModelBase
                 : "Başlangıç / işlem tarihi";
         IsRegularScenario = !IsStrategyChange;
         ScenarioDescription = option.Description;
-
-        if (optionChanged && isCardSpending && string.IsNullOrWhiteSpace(PaymentCount))
-        {
-            PaymentCount = "1";
-        }
+        RefreshNameSuggestion();
 
         if (optionChanged && IsLoanPrepayment)
         {
@@ -315,10 +320,18 @@ public sealed partial class ScenarioConditionForm : ViewModelBase
         }
     }
 
+    private void RefreshNameSuggestion() =>
+        NameSuggestion = IsLoanPrepayment && SelectedLoan is { } loan
+            ? IsPartialPrepayment
+                ? $"{loan.Label} ara ödeme"
+                : $"{loan.Label} erken kapama"
+            : string.Empty;
+
     /// <summary>
     /// Erken ödemenin en ucuz günü taksit günüdür: işleyen faiz sıfırdır.
-    /// Tarihi bugünden sonraki ilk taksit gününe taşır ve plan adını
-    /// krediden türetir; düzenlenen koşulda kullanıcının seçimine dokunmaz.
+    /// Tarihi bugünden sonraki ilk taksit gününe taşır; düzenlenen koşulda
+    /// kullanıcının seçimine dokunmaz. Ad alanı doldurulmaz, krediden türeyen
+    /// ad placeholder'da görünür ve ad boş bırakılırsa kullanılır.
     /// </summary>
     private void MoveStartDateToNextInstallment()
     {
@@ -329,9 +342,6 @@ public sealed partial class ScenarioConditionForm : ViewModelBase
             return;
         }
 
-        Name = IsPartialPrepayment
-            ? $"{option.Label} ara ödeme"
-            : $"{option.Label} erken kapama";
         var from = DateOnly.FromDateTime(DateTime.Today);
         var next = Enumerable.Range(0, loan.RemainingInstallmentCount)
             .Select(index => CalendarRules.AddMonthsKeepingDay(
@@ -347,11 +357,13 @@ public sealed partial class ScenarioConditionForm : ViewModelBase
 
     public SimulationRequest BuildRequest(Guid scenarioId)
     {
-        var count = NeedsPaymentCount
-            ? int.TryParse(PaymentCount, out var parsed)
+        var isCardSpending = SelectedOption.Key == SimulationScenarioCatalog.CardSpending.Key;
+        var count = !NeedsPaymentCount ||
+                    (isCardSpending && string.IsNullOrWhiteSpace(PaymentCount))
+            ? 1
+            : int.TryParse(PaymentCount, out var parsed)
                 ? parsed
-                : throw new InvalidOperationException("Ödeme sayısı geçerli olmalıdır.")
-            : 1;
+                : throw new InvalidOperationException("Ödeme sayısı geçerli olmalıdır.");
         var type = SimulationScenarioCatalog.Resolve(
             SelectedOption,
             count,
@@ -362,7 +374,7 @@ public sealed partial class ScenarioConditionForm : ViewModelBase
             : null;
         return new SimulationRequest(
             type,
-            Name,
+            string.IsNullOrWhiteSpace(Name) ? NameSuggestion : Name.Trim(),
             NeedsAmount
                 ? ParseMoney(Amount, AmountLabel)
                 : 0m,
@@ -450,9 +462,9 @@ public sealed partial class ScenarioConditionForm : ViewModelBase
         // atamaları adı ve tarihi krediden yeniden türetirdi.
         EditingType = null;
         SelectOption(SimulationScenarioCatalog.CashPayment);
-        Name = _directEntryOnly ? string.Empty : "Yeni koşul";
+        Name = string.Empty;
         Amount = string.Empty;
-        PaymentCount = "1";
+        PaymentCount = string.Empty;
         StartDate = DateTime.Today;
         FirstPaymentDate = DateTime.Today.AddMonths(1);
         TotalRepaymentAmount = string.Empty;

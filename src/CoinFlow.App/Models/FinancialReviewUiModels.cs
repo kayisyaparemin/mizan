@@ -34,6 +34,10 @@ public partial class ActualPaymentInputItem : ObservableObject
     [ObservableProperty] private string actualAmount = string.Empty;
     [ObservableProperty] private DateTime actualDate = DateTime.Today;
     [ObservableProperty] private string note = string.Empty;
+
+    public string AmountPlaceholder => PlannedAmountValue is null
+        ? "Ödediğin tutar"
+        : "Boş bırakırsan planlanan tutar";
 }
 
 public sealed record ActualFlowInputItem(
