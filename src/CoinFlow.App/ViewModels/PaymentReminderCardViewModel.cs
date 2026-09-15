@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using CommunityToolkit.Mvvm.Messaging;
 using CoinFlow.App.Services;
 using CoinFlow.Application.Models;
 using CoinFlow.Application.Services;
@@ -90,15 +91,49 @@ public sealed partial class PaymentReminderCardViewModel(
     [ObservableProperty] private bool hasSnoozed;
     [ObservableProperty] private bool hasPaid;
     [ObservableProperty] private bool showPermissionWarning;
+    [ObservableProperty] private bool canSendSample;
+    [ObservableProperty] private string infoText = string.Empty;
+    [ObservableProperty] private bool hasInfo;
 
     private PaymentReminderMode _mode;
+    private bool _listensToNotificationAnswers;
+
+    /// <summary>
+    /// Bildirim düğmeleriyle gelen cevapları deftere işler. Ana Sayfa kalan
+    /// ödemelerini hesaplamadan önce çağırır.
+    /// </summary>
+    public async Task ApplyPendingAnswersAsync()
+    {
+        try
+        {
+            await coordinator.ApplyPendingAnswersAsync();
+        }
+        catch (Exception exception)
+        {
+            SetStatus(UserFacingMessages.FromException(
+                exception,
+                "Bildirimden gelen cevap kaydedilemedi."));
+        }
+    }
 
     public async Task LoadAsync()
     {
+        if (!_listensToNotificationAnswers)
+        {
+            // Uygulama açıkken bildirimde düğmeye basılırsa ekran hemen
+            // güncellenir. Zayıf referans: kapanan dönem detayı sızmaz.
+            _listensToNotificationAnswers = true;
+            WeakReferenceMessenger.Default.Register<PaymentReminderCardViewModel, PaymentReminderAnsweredMessage>(
+                this,
+                static (card, _) => MainThread.BeginInvokeOnMainThread(card.OnNotificationAnswered));
+        }
+
         try
         {
             Present(await coordinator.RefreshAsync());
             SetStatus(string.Empty);
+            // "Deneme bildirimi gönderildi" bir sonraki yenilemede eskir.
+            SetInfo(string.Empty);
         }
         catch (Exception exception)
         {
@@ -227,9 +262,62 @@ public sealed partial class PaymentReminderCardViewModel(
         }
     }
 
+    /// <summary>
+    /// "Deneme bildirimi gönder": sıradaki ödeme gününün bildirimi hemen düşer,
+    /// düğmeleri denenebilir. Ödeme gününü beklemeden akışı görmek için.
+    /// </summary>
+    [RelayCommand]
+    private async Task SendSampleAsync()
+    {
+        if (IsBusy)
+        {
+            return;
+        }
+
+        try
+        {
+            IsBusy = true;
+            SetInfo(string.Empty);
+            if (!scheduler.AreNotificationsAllowed &&
+                !await scheduler.RequestPermissionAsync())
+            {
+                ShowPermissionWarning = true;
+                return;
+            }
+
+            var sample = await coordinator.SendSampleAsync();
+            SetInfo(sample is null
+                ? "Hatırlatılacak ödeme yok; deneme bildirimi gönderilmedi."
+                : "Deneme bildirimi gönderildi; bildirim çubuğuna bak. \"Ödedim\" gerçekten ödendi işaretler, Ödediklerin listesinden geri alabilirsin.");
+            SetStatus(string.Empty);
+        }
+        catch (Exception exception)
+        {
+            SetStatus(UserFacingMessages.FromException(
+                exception,
+                "Deneme bildirimi gönderilemedi."));
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
     [RelayCommand]
     private void OpenNotificationSettings() =>
         scheduler.OpenNotificationSettings();
+
+    private async void OnNotificationAnswered()
+    {
+        await LoadAsync();
+        AnswersChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void SetInfo(string message)
+    {
+        InfoText = message;
+        HasInfo = message.Length > 0;
+    }
 
     private void Present(PaymentReminderBoard board)
     {
@@ -275,6 +363,7 @@ public sealed partial class PaymentReminderCardViewModel(
         }
 
         HasUpcoming = Upcoming.Count > 0;
+        CanSendSample = board.Mode != PaymentReminderMode.Off && board.Sample is not null;
         HasSnoozed = Snoozed.Count > 0;
         HasPaid = Paid.Count > 0;
         ShowPermissionWarning = _mode != PaymentReminderMode.Off &&

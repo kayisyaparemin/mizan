@@ -117,6 +117,21 @@
                 </BindableLayout.ItemTemplate>
             </VerticalStackLayout>
 
+            <!-- Ödeme gününü beklemeden bildirimi ve düğmelerini denemek için. -->
+            <Button Text="Deneme bildirimi gönder"
+                    IsVisible="{Binding CanSendSample}"
+                    Command="{Binding SendSampleCommand}"
+                    HorizontalOptions="Start"
+                    Padding="16,8"
+                    MinimumHeightRequest="40"
+                    CornerRadius="20"
+                    FontSize="13"
+                    BackgroundColor="{StaticResource ProjectionSurface}"
+                    TextColor="{StaticResource ProjectionText}" />
+            <Label Text="{Binding InfoText}"
+                   IsVisible="{Binding HasInfo}"
+                   Style="{StaticResource MutedText}" />
+
             <Label Text="{Binding StatusMessage}"
                    IsVisible="{Binding HasStatus}"
                    TextColor="{StaticResource Error}" />

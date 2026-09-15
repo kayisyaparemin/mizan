@@ -230,6 +230,9 @@ public partial class DashboardViewModel(
             var review = await service.GetPeriodReviewAvailabilityAsync();
             HasPendingReview = review.IsDue;
 
+            // Uygulama kapalıyken bildirimde "Ödedim" / "Ertele" denmiş olabilir;
+            // kalan ödemeler hesaplanmadan önce deftere işlenir.
+            await Reminders.ApplyPendingAnswersAsync();
             var progress = await service.GetPeriodProgressAsync();
             if (progress is null)
             {

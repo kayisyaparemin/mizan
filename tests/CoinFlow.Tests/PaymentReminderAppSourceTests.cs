@@ -99,7 +99,7 @@ public sealed class PaymentReminderAppSourceTests
         Assert.Contains("\"Tebrikler! 🎉\"", card);
         Assert.Contains("PaymentReminderAnswerKind.Paid", card);
         // Saydam: #AARRGGBB, alfa FF değil.
-        Assert.Matches("<Color x:Key=\"SnoozedSurface\">#[0-9A-E][0-9A-F]E0", colors);
+        Assert.Matches("<Color x:Key=\"SnoozedSurface\">#[0-9A-E][0-9A-F]E[0-9A-F]", colors);
         Assert.Matches("<Color x:Key=\"PaidSurface\">#[0-9A-E][0-9A-F]40A6", colors);
     }
 
@@ -133,6 +133,47 @@ public sealed class PaymentReminderAppSourceTests
         Assert.Contains("progress.IsSnoozed(line.Id)", dashboard);
         Assert.Contains("GetPaymentReminderResponsesAsync()", wizard);
         Assert.Contains("\"Hatırlatıcıda ertelendi\"", wizard);
+    }
+
+    [Fact]
+    public void Notification_HasPaidAndSnoozeButtons_ThatQueueTheAnswerWithoutOpeningTheDatabase()
+    {
+        var source = Read("Platforms", "Android", "PaymentReminders.cs");
+
+        Assert.Contains("Name = \"com.coinflow.mobile.PaymentReminderActionReceiver\"", source);
+        Assert.Contains("\"Ödedim\"", source);
+        Assert.Contains("\"Hepsini ödedim\"", source);
+        Assert.Contains("\"Ertele\"", source);
+        Assert.Contains("builder.AddAction(", source);
+        // Cevap kuyruğa yazılır, bildirim kapanır, açık ekranlara haber verilir.
+        Assert.Contains("AndroidPaymentReminderScheduler.Answer(", source);
+        Assert.Contains("payment-reminder-answers.txt", source);
+        Assert.Contains("NotificationManagerCompat.From(context).Cancel(", source);
+        Assert.Contains("WeakReferenceMessenger.Default.Send(new PaymentReminderAnsweredMessage())", source);
+        Assert.Contains("PaymentReminderPlanner.SnoozeUntil(now)", source);
+        Assert.DoesNotContain("CoinFlowService", source);
+        Assert.DoesNotContain("SqliteCoinFlowStore", source);
+        // v1.16.0'ın beş sütunlu alarm dosyası yükseltmeden sonra da okunur.
+        Assert.Contains("parts.Length is not (5 or 6)", source);
+    }
+
+    [Fact]
+    public void QueuedAnswers_AreAppliedBeforeHomeCalculates_AndOnlyRemovedAfterRecording()
+    {
+        var dashboard = Read("ViewModels", "DashboardViewModel.cs");
+        var coordinator = Read("Services", "PaymentReminderServices.cs");
+        var card = Read("ViewModels", "PaymentReminderCardViewModel.cs");
+        var view = Read("Controls", "PaymentReminderCardView.xaml");
+
+        Assert.True(
+            dashboard.IndexOf("await Reminders.ApplyPendingAnswersAsync();", StringComparison.Ordinal) is > 0 and var apply &&
+            apply < dashboard.IndexOf("await service.GetPeriodProgressAsync();", StringComparison.Ordinal));
+        var record = coordinator.IndexOf("await service.RecordPaymentReminderAnswerAsync(answer);", StringComparison.Ordinal);
+        Assert.True(record > 0 && record < coordinator.IndexOf("scheduler.RemoveAnswers(profile.Id, answers.Count);", StringComparison.Ordinal));
+        Assert.Contains("scheduler.RemoveAnswers(profileId, int.MaxValue);", coordinator);
+        Assert.Contains("WeakReferenceMessenger.Default.Register<PaymentReminderCardViewModel, PaymentReminderAnsweredMessage>", card);
+        Assert.Contains("Text=\"Deneme bildirimi gönder\"", view);
+        Assert.Contains("SendSampleCommand", view);
     }
 
     [Fact]

@@ -33,7 +33,7 @@
     <!-- Hatırlatıcı cevapları (#AARRGGBB): ertelenen saydam kırmızı, ödenen
          saydam yeşil. Saydam oldukları için hem lavanta kartta hem sayfa
          zemininde okunur. -->
-    <Color x:Key="SnoozedSurface">#40E0474F</Color>
+    <Color x:Key="SnoozedSurface">#66E8322F</Color>
     <Color x:Key="PaidSurface">#4540A66A</Color>
 
     <Color x:Key="Canvas">#FFFACF</Color>
