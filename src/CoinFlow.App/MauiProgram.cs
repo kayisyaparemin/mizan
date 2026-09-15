@@ -1,4 +1,5 @@
 using CoinFlow.App.Backup;
+using CoinFlow.App.Reminders;
 using CoinFlow.App.Pages;
 using CoinFlow.App.Services;
 using CoinFlow.App.ViewModels;
@@ -65,6 +66,10 @@ public static class MauiProgram
             Path.Combine(FileSystem.CacheDirectory, "backup")));
         builder.Services.AddSingleton<BackupService>();
         builder.Services.AddSingleton<IBackupFilePicker, AndroidBackupFilePicker>();
+        // Ödeme günü hatırlatıcısı: alarm + bildirim. Kurulan bildirimler telefon
+        // yeniden başlayınca dosyadan geri kurulur.
+        builder.Services.AddSingleton<IPaymentReminderScheduler, AndroidPaymentReminderScheduler>();
+        builder.Services.AddSingleton<PaymentReminderCoordinator>();
         builder.Services.AddSingleton<SalaryPeriodCalculator>();
         builder.Services.AddSingleton<PaymentAssignmentStrategyResolver>();
         builder.Services.AddSingleton<CreditCardPaymentPreferenceResolver>();
@@ -117,6 +122,7 @@ public static class MauiProgram
 
         builder.Services.AddTransient<ProfileSelectionViewModel>();
         builder.Services.AddTransient<ProfileSelectionPage>();
+        builder.Services.AddTransient<PaymentReminderCardViewModel>();
         builder.Services.AddTransient<DashboardViewModel>();
         builder.Services.AddTransient<OnboardingViewModel>();
         builder.Services.AddTransient<CommitmentsViewModel>();

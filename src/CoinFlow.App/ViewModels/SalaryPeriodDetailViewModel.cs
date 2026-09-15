@@ -9,7 +9,8 @@ namespace CoinFlow.App.ViewModels;
 
 public partial class SalaryPeriodDetailViewModel(
     SalaryPeriodDetailPresenter presenter,
-    CoinFlowService service) :
+    CoinFlowService service,
+    PaymentReminderCardViewModel reminders) :
     ViewModelBase,
     IQueryAttributable
 {
@@ -17,6 +18,10 @@ public partial class SalaryPeriodDetailViewModel(
 
     [ObservableProperty] private SalaryPeriodDetailData? detail;
     [ObservableProperty] private bool hasDetail;
+    [ObservableProperty] private bool showReminders;
+
+    /// <summary>Ana Sayfa'daki hatırlatıcı kartının aynısı.</summary>
+    public PaymentReminderCardViewModel Reminders { get; } = reminders;
     public bool IsDevelopment => BuildInfo.IsDevelopment;
 
     private DateOnly _periodStart;
@@ -40,6 +45,11 @@ public partial class SalaryPeriodDetailViewModel(
                 request.IsSimulationScenario);
             HasDetail = true;
             SetStatus(string.Empty);
+            ShowReminders = request.IsCurrentPeriod;
+            if (ShowReminders)
+            {
+                _ = Reminders.LoadAsync();
+            }
         }
         catch (Exception exception)
         {

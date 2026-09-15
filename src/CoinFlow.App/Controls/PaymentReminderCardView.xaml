@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- Ödeme günü hatırlatıcısı. BindingContext bir PaymentReminderCardViewModel;
+     Ana Sayfa ve "Bu dönem nasıl oluşuyor" ekranı aynı kartı kullanır.
+     Davranış çipleri plan türü seçicisiyle aynı görünümde. -->
+<ContentView xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="CoinFlow.App.Controls.PaymentReminderCardView"
+             x:Name="Root">
+    <Border BackgroundColor="{StaticResource SoftLavender}">
+        <VerticalStackLayout Spacing="9">
+            <Label Text="HATIRLATICI" Style="{StaticResource Eyebrow}" />
+            <Label Text="Ödeme günü hatırlatıcısı" Style="{StaticResource SectionTitle}" />
+            <Label Text="Kredi, kart ve planlı ödemelerinin vadesi geldiğinde telefonuna bildirim gönderelim."
+                   Style="{StaticResource MutedText}" />
+
+            <FlexLayout BindableLayout.ItemsSource="{Binding Modes}"
+                        Wrap="Wrap"
+                        Direction="Row">
+                <BindableLayout.ItemTemplate>
+                    <DataTemplate>
+                        <Button Text="{Binding Label}"
+                                Command="{Binding Source={x:Reference Root}, Path=BindingContext.SelectModeCommand}"
+                                CommandParameter="{Binding .}"
+                                Margin="0,0,6,6"
+                                Padding="16,6"
+                                MinimumHeightRequest="40"
+                                CornerRadius="20"
+                                FontSize="13"
+                                BackgroundColor="{StaticResource ProjectionSurface}"
+                                TextColor="{StaticResource ProjectionText}">
+                            <Button.Triggers>
+                                <DataTrigger TargetType="Button"
+                                             Binding="{Binding IsSelected}"
+                                             Value="True">
+                                    <Setter Property="BackgroundColor" Value="{StaticResource ProjectionText}" />
+                                    <Setter Property="TextColor" Value="{StaticResource Canvas}" />
+                                </DataTrigger>
+                            </Button.Triggers>
+                        </Button>
+                    </DataTemplate>
+                </BindableLayout.ItemTemplate>
+            </FlexLayout>
+
+            <Label Text="{Binding ModeDescription}" FontFamily="OpenSansSemibold" />
+
+            <Border IsVisible="{Binding ShowPermissionWarning}"
+                    Padding="12,10"
+                    BackgroundColor="{StaticResource WarningSurface}">
+                <VerticalStackLayout Spacing="6">
+                    <Label Text="Bildirim izni kapalı; hatırlatmalar telefonda görünmez."
+                           TextColor="{StaticResource WarningText}" />
+                    <Button Text="Bildirimleri Aç"
+                            Command="{Binding OpenNotificationSettingsCommand}"
+                            BackgroundColor="{StaticResource Canvas}"
+                            TextColor="{StaticResource Ink}" />
+                </VerticalStackLayout>
+            </Border>
+
+            <Label Text="{Binding SummaryText}"
+                   IsVisible="{Binding HasSummary}"
+                   Style="{StaticResource MutedText}" />
+            <VerticalStackLayout BindableLayout.ItemsSource="{Binding Upcoming}"
+                                 IsVisible="{Binding HasUpcoming}"
+                                 Spacing="8">
+                <BindableLayout.ItemTemplate>
+                    <DataTemplate>
+                        <Border Padding="12,8"
+                                BackgroundColor="{StaticResource Canvas}"
+                                Stroke="{StaticResource Canvas}">
+                            <VerticalStackLayout Spacing="2">
+                                <Label Text="{Binding When}"
+                                       Style="{StaticResource Eyebrow}" />
+                                <Label Text="{Binding Title}"
+                                       FontFamily="OpenSansSemibold" />
+                                <Label Text="{Binding Message}"
+                                       Style="{StaticResource MutedText}" />
+                            </VerticalStackLayout>
+                        </Border>
+                    </DataTemplate>
+                </BindableLayout.ItemTemplate>
+            </VerticalStackLayout>
+
+            <Label Text="{Binding StatusMessage}"
+                   IsVisible="{Binding HasStatus}"
+                   TextColor="{StaticResource Error}" />
+        </VerticalStackLayout>
+    </Border>
+</ContentView>

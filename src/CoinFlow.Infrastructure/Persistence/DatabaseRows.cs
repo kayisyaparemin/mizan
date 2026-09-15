@@ -176,6 +176,8 @@ internal sealed class SettingsRow
     public int PaymentAssignmentMode { get; set; }
     public int SchemaVersion { get; set; }
     public int DevelopmentSeedVersion { get; set; }
+    // Şema v16: ödeme günü hatırlatıcısı. Eski satırlarda 0 = kapalı.
+    public int PaymentReminderMode { get; set; }
 
     // Legacy columns remain mapped so upgrades can write existing NOT NULL tables.
     [Column("GamificationEnabled")]

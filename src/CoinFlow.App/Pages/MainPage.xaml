@@ -363,6 +363,9 @@
                     </VerticalStackLayout>
                 </Border>
 
+                <!-- Kalan ödemelerin hemen altında: ödeme günü geldiğinde bildirim. -->
+                <controls:PaymentReminderCardView BindingContext="{Binding Reminders}" />
+
                 <Button Text="Bu dönemi kapat →"
                         IsVisible="{Binding IsPeriodClosable}"
                         Command="{Binding OpenPeriodReviewCommand}" />

@@ -186,4 +186,6 @@ public sealed record SalaryPeriodDetailData(
 public sealed record SalaryPeriodDetailRequest(
     SalaryPeriodProjection Scenario,
     SalaryPeriodProjection? Baseline = null,
-    bool IsSimulationScenario = false);
+    bool IsSimulationScenario = false,
+    // Ana Sayfa'dan açılan mevcut dönem: ödeme hatırlatıcısı burada da kurulur.
+    bool IsCurrentPeriod = false);

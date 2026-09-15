@@ -6,8 +6,11 @@
       android:roundIcon="@mipmap/appicon_round"
       android:requestLegacyExternalStorage="true"
       android:supportsRtl="true" />
-  <!-- Gece yedeği görevi telefon yeniden başlayınca da kurulu kalsın. -->
+  <!-- Gece yedeği görevi ve ödeme hatırlatıcıları telefon yeniden başlayınca
+       da kurulu kalsın. -->
   <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+  <!-- Ödeme günü hatırlatıcısı. Android 13+ bu izni kullanıcıya sorar. -->
+  <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
   <!-- Yedekler depolamanın en üstündeki Mizan klasörüne yazılır; uygulama
        kaldırılınca silinmesin diye uygulamanın kendi klasöründe değil.
        Android 11+: "Tüm dosyalara erişim". Android 10 ve altı: klasik izin. -->

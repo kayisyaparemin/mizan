@@ -1291,6 +1291,114 @@ public sealed class CoinFlowService(
         CancellationToken cancellationToken = default) =>
         periodProgressService.GetAsync(cancellationToken);
 
+    public Task<PaymentReminderMode> GetPaymentReminderModeAsync(
+        CancellationToken cancellationToken = default) =>
+        store.GetPaymentReminderModeAsync(cancellationToken);
+
+    public Task SavePaymentReminderModeAsync(
+        PaymentReminderMode mode,
+        CancellationToken cancellationToken = default) =>
+        store.SavePaymentReminderModeAsync(mode, cancellationToken);
+
+    /// <summary>
+    /// Açık profilin kurulacak ödeme bildirimleri. Hatırlatıcı kapalıysa boş.
+    /// </summary>
+    public async Task<IReadOnlyList<PaymentReminder>> GetPaymentRemindersAsync(
+        DateTime now,
+        CancellationToken cancellationToken = default)
+    {
+        var mode = await store.GetPaymentReminderModeAsync(cancellationToken);
+        return mode == PaymentReminderMode.Off
+            ? []
+            : PaymentReminderPlanner.Plan(
+                mode,
+                await GetUpcomingPaymentDuesAsync(now, cancellationToken),
+                now);
+    }
+
+    /// <summary>
+    /// Hatırlatma ufkundaki ödemeler. Açık dönemde kaynak Ana Sayfa'nın
+    /// donmuş planıdır; ödendi işaretlenen satır hatırlatılmaz, bugün vadesi
+    /// gelen satır hatırlatılır. Dönem sonrasındaki ödemeler projeksiyondan
+    /// gelir: dönem kapatılmadan da ödeme günü hatırlatılmalı.
+    /// </summary>
+    public async Task<IReadOnlyList<PaymentDue>> GetUpcomingPaymentDuesAsync(
+        DateTime now,
+        CancellationToken cancellationToken = default)
+    {
+        var today = DateOnly.FromDateTime(now);
+        var last = today.AddDays(PaymentReminderPlanner.HorizonDays);
+        var history = await store.GetFinancialHistoryAsync(cancellationToken);
+        var openPlan = PeriodProgressService.ResolveOpenPlan(history);
+        if (openPlan is null)
+        {
+            return [];
+        }
+
+        var revision = history.Revisions
+            .Where(x => x.PeriodPlanSnapshotId == openPlan.Id)
+            .OrderBy(x => x.CreatedAtUtc)
+            .ThenBy(x => x.RevisionNumber)
+            .LastOrDefault();
+        var observation = await store.GetPeriodObservationAsync(
+            openPlan.Id,
+            cancellationToken);
+        var settled = observation?.Payments
+            .Where(x => x.Status != ActualPaymentStatus.Unpaid)
+            .Select(x => x.PeriodPlanPaymentLineId)
+            .ToHashSet() ?? [];
+        var dues = (revision?.PaymentLines ?? openPlan.PaymentLines)
+            .Where(x => !settled.Contains(x.Id) &&
+                        x.PlannedDate >= today &&
+                        x.PlannedDate <= last)
+            .Select(x => new PaymentDue(
+                DueKey(x.SourceEntityId, x.Name, x.PlannedDate),
+                x.Name,
+                x.PlannedDate,
+                x.PlannedAmount))
+            .ToList();
+
+        if (last > openPlan.PeriodEnd)
+        {
+            var periods = await GetFuturePeriodsAsync(
+                periodCount: 3,
+                cancellationToken: cancellationToken);
+            dues.AddRange(periods
+                .SelectMany(x => x.MandatoryItems)
+                .Where(x => x.DueDate > openPlan.PeriodEnd &&
+                            x.DueDate >= today &&
+                            x.DueDate <= last)
+                .Select(x => new PaymentDue(
+                    DueKey(x.PaymentId, x.Name, x.DueDate),
+                    x.Name,
+                    x.DueDate,
+                    x.Amount)));
+            var plan = await GetFinancialPlanAsync(cancellationToken);
+            dues.AddRange(plan.PlannedLargeExpenses
+                .Where(x => x.Status == PlannedExpenseStatus.Planned &&
+                            x.ExactDate > openPlan.PeriodEnd &&
+                            x.ExactDate >= today &&
+                            x.ExactDate <= last)
+                .Select(x => new PaymentDue(
+                    DueKey(x.Id, x.Name, x.ExactDate),
+                    x.Name,
+                    x.ExactDate,
+                    x.Amount)));
+        }
+
+        return dues
+            .GroupBy(x => x.Key)
+            .Select(x => x.First())
+            .OrderBy(x => x.DueDate)
+            .ThenBy(x => x.Name, StringComparer.Ordinal)
+            .ToArray();
+    }
+
+    private static string DueKey(Guid sourceId, string name, DateOnly date) =>
+        sourceId == Guid.Empty
+            ? $"{name}-{date:yyyyMMdd}"
+            : $"{sourceId:N}-{date:yyyyMMdd}";
+
     /// <summary>
     /// "Bugün şu kadar param var." Dönem içi gözlem — snapshot zincirine
     /// dokunmaz (I14), donmuş planı ve review checkpoint'ini değiştirmez.

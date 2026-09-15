@@ -1,7 +1,6 @@
 using CoinFlow.App.Models;
 using CoinFlow.App.Services;
 using CoinFlow.App.ViewModels;
-using CoinFlow.Application.Models;
 
 namespace CoinFlow.App.Pages;
 

@@ -11,7 +11,8 @@ public sealed class ProfileSelectionViewModel(
     ProfileService profiles,
     ProfileNavigator navigator,
     BackupService backup,
-    IBackupFilePicker filePicker) : ViewModelBase
+    IBackupFilePicker filePicker,
+    PaymentReminderCoordinator reminders) : ViewModelBase
 {
     private const long MaxBackupBytes = 1024L * 1024 * 1024;
     private const string AccessPromptShownKey = "backup.access-prompt-shown";
@@ -75,6 +76,8 @@ public sealed class ProfileSelectionViewModel(
         RunAsync(async () =>
         {
             await profiles.DeleteAsync(profile.Id);
+            // Silinen profilin ödeme bildirimleri çalmaya devam etmesin.
+            reminders.Forget(profile.Id);
             await ReloadAsync();
         });
 

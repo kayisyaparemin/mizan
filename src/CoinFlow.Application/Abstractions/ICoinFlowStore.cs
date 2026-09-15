@@ -16,6 +16,13 @@ public interface ICoinFlowStore
         UserSettings settings,
         CancellationToken cancellationToken = default);
 
+    /// <summary>Ödeme günü hatırlatıcısı; profil başına, finans ayarlarından ayrı.</summary>
+    Task<PaymentReminderMode> GetPaymentReminderModeAsync(
+        CancellationToken cancellationToken = default);
+    Task SavePaymentReminderModeAsync(
+        PaymentReminderMode mode,
+        CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<PaymentAssignmentStrategy>>
         GetPaymentAssignmentStrategiesAsync(
             CancellationToken cancellationToken = default);

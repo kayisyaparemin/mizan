@@ -13,8 +13,12 @@ namespace CoinFlow.App.ViewModels;
 
 public partial class DashboardViewModel(
     CoinFlowService service,
-    IServiceProvider services) : ViewModelBase
+    IServiceProvider services,
+    PaymentReminderCardViewModel reminders) : ViewModelBase
 {
+    /// <summary>Ödeme günü hatırlatıcısı; bu dönemin kalan ödemelerinin altında.</summary>
+    public PaymentReminderCardViewModel Reminders { get; } = reminders;
+
     /// <summary>
     /// Açık dönemin donmuş planında kalan ödemeler. Gelecek projeksiyonundan
     /// değil, dönemin kendi planından gelir (I16).
@@ -153,7 +157,9 @@ public partial class DashboardViewModel(
                 new ShellNavigationQueryParameters
                 {
                     [SalaryPeriodDetailViewModel.DetailQueryKey] =
-                        new SalaryPeriodDetailRequest(_currentPeriod)
+                        new SalaryPeriodDetailRequest(
+                            _currentPeriod,
+                            IsCurrentPeriod: true)
                 });
 
     private static decimal ParseMoney(string value)
@@ -241,6 +247,9 @@ public partial class DashboardViewModel(
                 ? string.Empty
                 : BuildDetails(_currentPeriod);
             BuildAlerts(dashboard, review.IsDue);
+            // Ödemeler değişmiş olabilir: telefondaki bildirimler her açılışta
+            // güncel planla eşitlenir. Hata kartta söylenir, ekranı bozmaz.
+            await Reminders.LoadAsync();
         }
         catch (Exception exception)
         {

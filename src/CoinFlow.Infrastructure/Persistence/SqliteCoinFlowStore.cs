@@ -13,7 +13,7 @@ public sealed class SqliteCoinFlowStore : ICoinFlowStore, IAsyncDisposable
     // v12: kaydedilmiş simülasyon taslakları.
     // v13: açık dönemin gözlem defteri (I14/I15). Her ikisi de yalnız yeni
     // tablo ekler; mevcut tabloların hiçbirine dokunmaz, veri taşınmaz.
-    public const int CurrentSchemaVersion = 15;
+    public const int CurrentSchemaVersion = 16;
     private const int CurrentCardStatementModelVersion = 7;
     private const decimal DefaultPlanningInterestRate = 0.05m;
     private static readonly Guid LegacyInitialAssignmentStrategyId =
@@ -188,6 +188,7 @@ public sealed class SqliteCoinFlowStore : ICoinFlowStore, IAsyncDisposable
             settings.PaymentAssignmentMode =
                 (int)PaymentAssignmentMode.UpcomingPeriod;
             settings.DevelopmentSeedVersion = 0;
+            settings.PaymentReminderMode = (int)PaymentReminderMode.Off;
             settings.SchemaVersion = CurrentSchemaVersion;
             connection.Update(settings);
         });
@@ -261,6 +262,28 @@ public sealed class SqliteCoinFlowStore : ICoinFlowStore, IAsyncDisposable
             ? null
             : FormatDate(settings.ProjectionAnchorDate);
         await _database.UpdateAsync(row);
+    }
+
+    public async Task<PaymentReminderMode> GetPaymentReminderModeAsync(
+        CancellationToken cancellationToken = default)
+    {
+        await InitializeAsync(cancellationToken);
+        var row = await _database.Table<SettingsRow>().FirstAsync();
+        return Enum.IsDefined(typeof(PaymentReminderMode), row.PaymentReminderMode)
+            ? (PaymentReminderMode)row.PaymentReminderMode
+            : PaymentReminderMode.Off;
+    }
+
+    public async Task SavePaymentReminderModeAsync(
+        PaymentReminderMode mode,
+        CancellationToken cancellationToken = default)
+    {
+        await InitializeAsync(cancellationToken);
+        // Yalnız bu sütun yazılır: finans ayarlarını taşıyan satırın geri
+        // kalanına dokunulmaz.
+        await _database.ExecuteAsync(
+            "UPDATE settings SET PaymentReminderMode = ?",
+            (int)mode);
     }
 
     public async Task<IReadOnlyList<PaymentAssignmentStrategy>>
