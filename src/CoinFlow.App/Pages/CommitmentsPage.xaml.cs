@@ -7,10 +7,6 @@ namespace CoinFlow.App.Pages;
 
 public partial class CommitmentsPage : ContentPage, IQueryAttributable
 {
-    private const string SpendingChoice = "Harcama";
-    private const string DebtChoice = "Borç / Kredi";
-    private const string OneTimeIncomeChoice = "Tek Seferlik Gelir";
-
     private readonly CommitmentsViewModel _viewModel;
     private bool _isShowingInitialStrategySetup;
     private string? _requestedSection;
@@ -54,19 +50,11 @@ public partial class CommitmentsPage : ContentPage, IQueryAttributable
     {
         base.OnAppearing();
         await _viewModel.LoadAsync();
-        if (string.Equals(
-                _requestedSection,
-                "payment",
-                StringComparison.OrdinalIgnoreCase))
+        if (!string.IsNullOrWhiteSpace(_requestedSection))
         {
-            _viewModel.SelectPaymentSection();
-        }
-        else if (string.Equals(
-                     _requestedSection,
-                     "income",
-                     StringComparison.OrdinalIgnoreCase))
-        {
-            _viewModel.SelectIncomeSection();
+            // Simülatörden uygulanan planla gelindi: kayıt listede, açık
+            // form kapanır.
+            _viewModel.CloseForm();
         }
 
         if (_requestedCardId is Guid cardId)
@@ -104,49 +92,10 @@ public partial class CommitmentsPage : ContentPage, IQueryAttributable
 
     private async void OnAddClicked(object? sender, EventArgs eventArgs)
     {
-        // İlk üçü simülatörün formunu açar: simüle edilebilen her harcama,
-        // borç ve gelir burada da girilebilir. Kart harcaması, tek seferlik ve
-        // düzenli ödeme "Harcama" altında.
-        var choice = await DisplayActionSheet(
-            "Ne eklemek istiyorsun?",
-            "Vazgeç",
-            null,
-            SpendingChoice,
-            DebtChoice,
-            OneTimeIncomeChoice,
-            "Maaş / Gelir Değişikliği",
-            "Bankadaki Kredimi Ekle",
-            "Kredi Kartı",
-            "Tarihleri Farklı Ödeme Planı");
-        switch (choice)
-        {
-            case SpendingChoice:
-                _viewModel.StartScenarioEntry(ScenarioGroup.Spending);
-                break;
-            case DebtChoice:
-                _viewModel.StartScenarioEntry(ScenarioGroup.Debt);
-                break;
-            case OneTimeIncomeChoice:
-                _viewModel.StartScenarioEntry(ScenarioGroup.Income);
-                break;
-            case "Maaş / Gelir Değişikliği":
-                _viewModel.StartAdd("salary");
-                break;
-            case "Kredi Kartı":
-                _viewModel.StartAdd("card");
-                break;
-            case "Bankadaki Kredimi Ekle":
-                _viewModel.StartAdd("loan");
-                break;
-            case "Tarihleri Farklı Ödeme Planı":
-                _viewModel.StartAdd("temporary");
-                break;
-        }
-
-        if (!string.IsNullOrWhiteSpace(choice) && choice != "Vazgeç")
-        {
-            await PageScroll.ScrollToAsync(0, 0, true);
-        }
+        // Eskiden yedi seçenekli bir menüydü. Artık simülatördeki gibi grup
+        // çipleri ve açıklamalı kartlar formun üstünde duruyor.
+        _viewModel.StartEntry();
+        await PageScroll.ScrollToAsync(0, 0, true);
     }
 
     private void OnRemovePlanPaymentClicked(

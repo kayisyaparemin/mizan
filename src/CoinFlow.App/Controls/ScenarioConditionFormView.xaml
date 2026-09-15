@@ -3,77 +3,16 @@
      ScenarioConditionForm'dur; ekleme/kaydetme butonu barındıran sayfada durur. -->
 <ContentView xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:controls="clr-namespace:CoinFlow.App.Controls"
              x:Class="CoinFlow.App.Controls.ScenarioConditionFormView"
              x:Name="Root">
     <VerticalStackLayout Spacing="9">
         <!-- 13 türlük tek Picker yerine: önce grup, sonra en fazla üç
-             açıklamalı tür kartı. -->
-        <Label Text="Plan türü" Style="{StaticResource FieldLabel}" />
-        <FlexLayout BindableLayout.ItemsSource="{Binding Groups}"
-                    Wrap="Wrap"
-                    Direction="Row">
-            <BindableLayout.ItemTemplate>
-                <DataTemplate>
-                    <Button Text="{Binding Label}"
-                            Command="{Binding Source={x:Reference Root}, Path=BindingContext.SelectGroupCommand}"
-                            CommandParameter="{Binding .}"
-                            Margin="0,0,5,6"
-                            Padding="10,6"
-                            MinimumHeightRequest="40"
-                            CornerRadius="20"
-                            FontSize="13"
-                            BackgroundColor="{StaticResource ProjectionSurface}"
-                            TextColor="{StaticResource ProjectionText}">
-                        <Button.Triggers>
-                            <DataTrigger TargetType="Button"
-                                         Binding="{Binding IsSelected}"
-                                         Value="True">
-                                <Setter Property="BackgroundColor" Value="{StaticResource ProjectionText}" />
-                                <Setter Property="TextColor" Value="{StaticResource Canvas}" />
-                            </DataTrigger>
-                        </Button.Triggers>
-                    </Button>
-                </DataTemplate>
-            </BindableLayout.ItemTemplate>
-        </FlexLayout>
-
-        <VerticalStackLayout BindableLayout.ItemsSource="{Binding VisibleOptions}"
-                             Spacing="6">
-            <BindableLayout.ItemTemplate>
-                <DataTemplate>
-                    <Border Padding="12,10"
-                            BackgroundColor="{StaticResource ProjectionSurface}"
-                            Stroke="{StaticResource ProjectionSurface}">
-                        <Border.Triggers>
-                            <DataTrigger TargetType="Border"
-                                         Binding="{Binding IsSelected}"
-                                         Value="True">
-                                <!-- Form hem krem (Simülatör) hem mavi (Finansal Yapı)
-                                     zeminde duruyor; lavanta ikisinden de ayrışıyor. -->
-                                <Setter Property="BackgroundColor" Value="{StaticResource SoftLavender}" />
-                                <Setter Property="Stroke" Value="{StaticResource ProjectionText}" />
-                            </DataTrigger>
-                        </Border.Triggers>
-                        <Border.GestureRecognizers>
-                            <TapGestureRecognizer
-                                Command="{Binding Source={x:Reference Root}, Path=BindingContext.SelectOptionCommand}"
-                                CommandParameter="{Binding .}" />
-                        </Border.GestureRecognizers>
-                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
-                            <Label Text="{Binding Marker}"
-                                   FontSize="18"
-                                   VerticalOptions="Center"
-                                   TextColor="{StaticResource ProjectionText}" />
-                            <VerticalStackLayout Grid.Column="1" Spacing="2">
-                                <Label Text="{Binding Title}"
-                                       FontFamily="OpenSansSemibold" />
-                                <Label Text="{Binding Summary}"
-                                       Style="{StaticResource MutedText}" />
-                            </VerticalStackLayout>
-                        </Grid>
-                    </Border>
-                </DataTemplate>
-            </BindableLayout.ItemTemplate>
+             açıklamalı tür kartı. Finansal Yapı türü kendi seçicisinde
+             seçer; orada bu bölüm gizlidir. -->
+        <VerticalStackLayout IsVisible="{Binding ShowsTypePicker}" Spacing="9">
+            <Label Text="Plan türü" Style="{StaticResource FieldLabel}" />
+            <controls:EntryTypePickerView />
         </VerticalStackLayout>
 
         <Label Text="{Binding ScenarioDescription}" Style="{StaticResource MutedText}" />

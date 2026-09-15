@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- Tür seçimi: önce grup çipi, sonra seçili grubun en fazla üç açıklamalı
+     kartı. Simülatörün koşul formu ile Finansal Yapı'nın ekleme alanı aynı
+     görünümü kullanır. BindingContext Groups, VisibleOptions,
+     SelectGroupCommand ve SelectOptionCommand sunar. -->
+<ContentView xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="CoinFlow.App.Controls.EntryTypePickerView"
+             x:Name="Root">
+    <VerticalStackLayout Spacing="9">
+        <FlexLayout BindableLayout.ItemsSource="{Binding Groups}"
+                    Wrap="Wrap"
+                    Direction="Row">
+            <BindableLayout.ItemTemplate>
+                <DataTemplate>
+                    <Button Text="{Binding Label}"
+                            Command="{Binding Source={x:Reference Root}, Path=BindingContext.SelectGroupCommand}"
+                            CommandParameter="{Binding .}"
+                            Margin="0,0,5,6"
+                            Padding="10,6"
+                            MinimumHeightRequest="40"
+                            CornerRadius="20"
+                            FontSize="13"
+                            BackgroundColor="{StaticResource ProjectionSurface}"
+                            TextColor="{StaticResource ProjectionText}">
+                        <Button.Triggers>
+                            <DataTrigger TargetType="Button"
+                                         Binding="{Binding IsSelected}"
+                                         Value="True">
+                                <Setter Property="BackgroundColor" Value="{StaticResource ProjectionText}" />
+                                <Setter Property="TextColor" Value="{StaticResource Canvas}" />
+                            </DataTrigger>
+                        </Button.Triggers>
+                    </Button>
+                </DataTemplate>
+            </BindableLayout.ItemTemplate>
+        </FlexLayout>
+
+        <VerticalStackLayout BindableLayout.ItemsSource="{Binding VisibleOptions}"
+                             Spacing="6">
+            <BindableLayout.ItemTemplate>
+                <DataTemplate>
+                    <Border Padding="12,10"
+                            BackgroundColor="{StaticResource ProjectionSurface}"
+                            Stroke="{StaticResource ProjectionSurface}">
+                        <Border.Triggers>
+                            <DataTrigger TargetType="Border"
+                                         Binding="{Binding IsSelected}"
+                                         Value="True">
+                                <!-- Seçim hem krem (Simülatör) hem mavi (Finansal Yapı)
+                                     zeminde duruyor; lavanta ikisinden de ayrışıyor. -->
+                                <Setter Property="BackgroundColor" Value="{StaticResource SoftLavender}" />
+                                <Setter Property="Stroke" Value="{StaticResource ProjectionText}" />
+                            </DataTrigger>
+                        </Border.Triggers>
+                        <Border.GestureRecognizers>
+                            <TapGestureRecognizer
+                                Command="{Binding Source={x:Reference Root}, Path=BindingContext.SelectOptionCommand}"
+                                CommandParameter="{Binding .}" />
+                        </Border.GestureRecognizers>
+                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
+                            <Label Text="{Binding Marker}"
+                                   FontSize="18"
+                                   VerticalOptions="Center"
+                                   TextColor="{StaticResource ProjectionText}" />
+                            <VerticalStackLayout Grid.Column="1" Spacing="2">
+                                <Label Text="{Binding Title}"
+                                       FontFamily="OpenSansSemibold" />
+                                <Label Text="{Binding Summary}"
+                                       Style="{StaticResource MutedText}" />
+                            </VerticalStackLayout>
+                        </Grid>
+                    </Border>
+                </DataTemplate>
+            </BindableLayout.ItemTemplate>
+        </VerticalStackLayout>
+    </VerticalStackLayout>
+</ContentView>

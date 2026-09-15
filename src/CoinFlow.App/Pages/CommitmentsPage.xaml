@@ -24,11 +24,20 @@
                     BackgroundColor="{StaticResource SoftSky}">
                 <VerticalStackLayout Spacing="10">
                     <Label Text="{Binding FormTitle}" Style="{StaticResource SectionTitle}" />
+
+                    <!-- Simülatördeki plan türü seçimiyle aynı tasarım: grup çipi ve
+                         açıklamalı kartlar. Düzenlemede gizlidir. BindingContext alt
+                         elemanda; görünürlük sayfanın kendi bağlamından okunur. -->
+                    <ContentView IsVisible="{Binding ShowEntryPicker}">
+                        <VerticalStackLayout Spacing="9">
+                            <Label Text="Ne eklemek istiyorsun?" Style="{StaticResource FieldLabel}" />
+                            <controls:EntryTypePickerView BindingContext="{Binding EntryPicker}" />
+                        </VerticalStackLayout>
+                    </ContentView>
                     <Label Text="{Binding FormLead}" Style="{StaticResource MutedText}" />
 
                     <!-- Simülatörün koşul formu: harcama, borç ve tek seferlik gelir
-                         buradan doğrudan kaydedilir. BindingContext alt elemanda;
-                         görünürlük sayfanın kendi bağlamından okunur. -->
+                         buradan doğrudan kaydedilir. -->
                     <ContentView IsVisible="{Binding IsScenarioEntry}">
                         <controls:ScenarioConditionFormView BindingContext="{Binding EntryForm}" />
                     </ContentView>
@@ -270,9 +279,11 @@
                     <Button Text="{Binding SaveButtonText}"
                             Command="{Binding SaveCommand}"
                             IsEnabled="{Binding CanInteract}" />
+                    <!-- SecondaryButton da SoftSky; bu zeminde görünmüyordu. -->
                     <Button Text="Vazgeç"
                             Command="{Binding CancelEditingCardCommand}"
-                            Style="{StaticResource SecondaryButton}" />
+                            Style="{StaticResource SecondaryButton}"
+                            BackgroundColor="{StaticResource Canvas}" />
                     <Label Text="{Binding StatusMessage}" IsVisible="{Binding HasStatus}" TextColor="{StaticResource Error}" />
                 </VerticalStackLayout>
             </Border>

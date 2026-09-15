@@ -19,7 +19,6 @@ public partial class CommitmentsViewModel(
 {
     public event Action<InitialPaymentStrategySetup>?
         InitialStrategySetupRequested;
-    public ObservableCollection<SelectionOption<string>> RecordTypes { get; } = [];
 
     /// <summary>
     /// Simülatörle aynı koşul formu. Simüle edilebilen bir harcama, borç ya da
@@ -93,8 +92,12 @@ public partial class CommitmentsViewModel(
     private DateOnly? _cardExactNextDueDate;
     private CancellationTokenSource? _statementImportCancellation;
 
-    [ObservableProperty] private bool isIncomeSection = true;
-    [ObservableProperty] private SelectionOption<string>? selectedRecordType;
+    private string? _recordType;
+    private RecordEntryPicker? _entryPicker;
+
+    /// <summary>"+ Ekle" alanının kayıt türü seçicisi.</summary>
+    public RecordEntryPicker EntryPicker => _entryPicker ??= CreateEntryPicker();
+    [ObservableProperty] private bool showEntryPicker;
     [ObservableProperty] private bool isSalary;
     [ObservableProperty] private bool isLoan;
     [ObservableProperty] private bool isPlan;
@@ -304,7 +307,6 @@ public partial class CommitmentsViewModel(
         }
 
         RefreshGroupedItems();
-        RefreshRecordTypes();
         EntryForm.SetLookups(plan);
         SelectedPaymentStrategy ??= PaymentStrategies[0];
         SelectedProjectionFallbackStrategy ??=
@@ -333,47 +335,69 @@ public partial class CommitmentsViewModel(
         }
     }
 
-    public void SelectIncomeSection()
-    {
-        IsIncomeSection = true;
-        CancelEditingCard();
-        RefreshRecordTypes();
-    }
+    /// <summary>Başka bir ekrandan yönlendirilince açık form kapanır.</summary>
+    public void CloseForm() => CancelEditingCard();
 
-    public void SelectPaymentSection()
-    {
-        IsIncomeSection = false;
-        CancelEditingCard();
-        RefreshRecordTypes();
-    }
-
-    public void StartAdd(string recordType)
+    /// <summary>
+    /// "+ Ekle": simülatördeki plan türü seçimiyle aynı tasarımda kayıt türü
+    /// seçicisini açar. Ortak formdan girilen türler simülasyonu uygulamakla
+    /// aynı yoldan yazılır; gelir, kart, banka kredisi ve değişken ödeme planı
+    /// kendi formlarında kalır.
+    /// </summary>
+    public void StartEntry(RecordEntryOption? option = null)
     {
         ResetForm();
-        IsIncomeSection = recordType == "salary";
-        RefreshRecordTypes();
-        SelectedRecordType = RecordTypes.SingleOrDefault(x =>
-            x.Value == recordType) ?? RecordTypes.FirstOrDefault();
+        EntryForm.Reset();
+        _pendingEntryId = Guid.NewGuid();
         HasActiveForm = true;
-        FormTitle = recordType switch
-        {
-            "salary" => "Gelir Ekle",
-            "loan" => "Kredi Ekle",
-            "card" => "Kredi Kartı Ekle",
-            "temporary" => "Ödeme Planı Ekle",
-            _ => "Yeni Kayıt"
-        };
-        FormLead = recordType switch
-        {
-            "salary" => "Düzenli gelir veya gelir değişikliği.",
-            "loan" => "Bankada zaten devam eden kredinin taksitleri.",
-            "card" => "Kart limiti, borç ve ödeme tercihleri.",
-            "temporary" => "Tutarı ya da tarihi aydan aya değişen ödemeler; her ödemeyi tarihiyle ekle.",
-            _ => string.Empty
-        };
-        NamePlaceholder = NamePlaceholderFor(recordType);
+        ShowEntryPicker = true;
+        FormTitle = "Yeni Kayıt";
         SaveButtonText = "Kaydet";
+        EntryPicker.Select(option ?? FinancialRecordEntryCatalog.Default);
     }
+
+    private RecordEntryPicker CreateEntryPicker()
+    {
+        var picker = new RecordEntryPicker();
+        picker.OptionSelected += ApplyEntryOption;
+        return picker;
+    }
+
+    /// <summary>
+    /// Seçilen türün formunu gösterir. Tür değiştirilince yazılmış alanlar
+    /// silinmez; kaydedilen yalnız görünen formdur.
+    /// </summary>
+    private void ApplyEntryOption(RecordEntryOption option)
+    {
+        // Ortak form türün açıklamasını kendisi gösterir.
+        FormLead = option.Scenario is null
+            ? option.Description
+            : "Kaydettiğinde doğrudan finans planına eklenir; önce denemek istersen Simülatör'ü kullan.";
+        if (option.Scenario is { } scenario)
+        {
+            EntryForm.SelectOption(scenario);
+            _recordType = null;
+            IsScenarioEntry = true;
+        }
+        else
+        {
+            _recordType = RecordTypeFor(option.Form);
+            NamePlaceholder = NamePlaceholderFor(_recordType);
+            IsScenarioEntry = false;
+        }
+
+        RefreshRecordFormFlags();
+        SetStatus(string.Empty);
+    }
+
+    private static string RecordTypeFor(RecordEntryForm form) => form switch
+    {
+        RecordEntryForm.Salary => "salary",
+        RecordEntryForm.Loan => "loan",
+        RecordEntryForm.CreditCard => "card",
+        RecordEntryForm.PaymentPlan => "temporary",
+        _ => throw new ArgumentOutOfRangeException(nameof(form))
+    };
 
     private static string NamePlaceholderFor(string recordType) => recordType switch
     {
@@ -384,45 +408,15 @@ public partial class CommitmentsViewModel(
         _ => "Kayıt adı"
     };
 
-    /// <summary>
-    /// Simülatördeki formu açar. Kaydet, simülasyonu uygulamakla aynı yoldan
-    /// yazar; burada girilen kayıt simülasyonda görülen sonucu üretir.
-    /// </summary>
-    public void StartScenarioEntry(ScenarioGroup group)
-    {
-        ResetForm();
-        SelectedRecordType = null;
-        EntryForm.Reset();
-        EntryForm.SelectGroup(group);
-        _pendingEntryId = Guid.NewGuid();
-        IsScenarioEntry = true;
-        IsIncomeSection = group == ScenarioGroup.Income;
-        HasActiveForm = true;
-        FormTitle = group switch
-        {
-            ScenarioGroup.Spending => "Harcama Ekle",
-            ScenarioGroup.Debt => "Borç veya Kredi Ekle",
-            ScenarioGroup.Income => "Tek Seferlik Gelir Ekle",
-            _ => "Yeni Kayıt"
-        };
-        FormLead = "Simülatördeki formun aynısı. Kaydettiğinde doğrudan finans planına eklenir; önce denemek istersen Simülatör'ü kullan.";
-        SaveButtonText = "Kaydet";
-    }
-
-    partial void OnSelectedRecordTypeChanged(
-        SelectionOption<string>? value) =>
-        RefreshRecordFormFlags();
-
     partial void OnIsScenarioEntryChanged(bool value) =>
         RefreshRecordFormFlags();
 
     /// <summary>
-    /// Ortak form açıkken kayda özel alanlar görünmez; sayfa yeniden
-    /// yüklenince kayıt türü listesi varsayılana dönse bile.
+    /// Ortak form açıkken kayda özel alanlar görünmez.
     /// </summary>
     private void RefreshRecordFormFlags()
     {
-        var type = IsScenarioEntry ? null : SelectedRecordType?.Value;
+        var type = IsScenarioEntry ? null : _recordType;
         IsSalary = type == "salary";
         IsLoan = type == "loan";
         IsPlan = type == "temporary";
@@ -606,12 +600,8 @@ public partial class CommitmentsViewModel(
         _cardExactNextStatementDate =
             card.CurrentStatement?.NextStatementDate;
         _cardExactNextDueDate = card.CurrentStatement?.NextDueDate;
-        IsIncomeSection = false;
-        RefreshRecordTypes();
-        SelectedRecordType = RecordTypes.Single(x => x.Value == "card");
-        HasActiveForm = true;
+        OpenRecordFormForEdit("card");
         FormTitle = "Kart Bilgilerini Düzenle";
-        NamePlaceholder = NamePlaceholderFor("card");
         FormLead = "Sık kararlar kart kontrol ekranında; burada kartın temel bilgileri var.";
         IsEditingCard = true;
         SaveButtonText = "Değişiklikleri Kaydet";
@@ -820,7 +810,7 @@ public partial class CommitmentsViewModel(
 
     private Func<Task> BuildPersistOperation(out string successMessage)
     {
-        switch (SelectedRecordType?.Value)
+        switch (_recordType)
         {
             case "salary":
                 var salary = new SalaryScheduleEntry
@@ -864,6 +854,9 @@ public partial class CommitmentsViewModel(
         _cardExactNextDueDate = null;
         IsEditingCard = false;
         IsScenarioEntry = false;
+        _recordType = null;
+        RefreshRecordFormFlags();
+        ShowEntryPicker = false;
         HasActiveForm = false;
         SaveButtonText = "Kaydet";
         CardFutureCharges.Clear();
@@ -914,12 +907,8 @@ public partial class CommitmentsViewModel(
             .Single(x => x.Id == loanId);
         ResetForm();
         _editingLoanId = loan.Id;
-        IsIncomeSection = false;
-        RefreshRecordTypes();
-        SelectedRecordType = RecordTypes.Single(x => x.Value == "loan");
-        HasActiveForm = true;
+        OpenRecordFormForEdit("loan");
         FormTitle = "Krediyi Düzenle";
-        NamePlaceholder = NamePlaceholderFor("loan");
         FormLead = "Kalan anaparayı ya da bankadan aldığın kapatma tutarını " +
                    "güncel tut; erken kapama hesabı bunlardan yapılır.";
         SaveButtonText = "Değişiklikleri Kaydet";
@@ -1140,24 +1129,15 @@ public partial class CommitmentsViewModel(
         };
     }
 
-    private void RefreshRecordTypes()
+    /// <summary>Düzenleme: tür seçicisi olmadan kaydın kendi formunu açar.</summary>
+    private void OpenRecordFormForEdit(string recordType)
     {
-        var selected = SelectedRecordType?.Value;
-        RecordTypes.Clear();
-        if (IsIncomeSection)
-        {
-            RecordTypes.Add(new SelectionOption<string>("Gelir / Gelir değişikliği", "salary"));
-        }
-        else
-        {
-            RecordTypes.Add(new SelectionOption<string>("Kredi", "loan"));
-            RecordTypes.Add(new SelectionOption<string>("Kredi kartı", "card"));
-            RecordTypes.Add(new SelectionOption<string>("Ödeme planı", "temporary"));
-        }
-
-        SelectedRecordType =
-            RecordTypes.FirstOrDefault(x => x.Value == selected) ??
-            RecordTypes.FirstOrDefault();
+        _recordType = recordType;
+        IsScenarioEntry = false;
+        ShowEntryPicker = false;
+        RefreshRecordFormFlags();
+        NamePlaceholder = NamePlaceholderFor(recordType);
+        HasActiveForm = true;
     }
 
     private void ResetForm()

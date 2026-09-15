@@ -16,6 +16,12 @@ namespace CoinFlow.App.ViewModels;
 public sealed partial class ScenarioConditionForm : ViewModelBase
 {
     private readonly bool _directEntryOnly;
+
+    /// <summary>
+    /// Simülatörde tür seçimi formun içindedir. Finansal Yapı türü kendi
+    /// ekleme alanında seçer; orada formun seçicisi gizlenir.
+    /// </summary>
+    public bool ShowsTypePicker => !_directEntryOnly;
     private readonly Dictionary<Guid, Loan> _loans = [];
 
     /// <param name="directEntryOnly">
