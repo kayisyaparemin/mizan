@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- "Ödediklerin": hatırlatıcıdan "Ödedim" denen ödemeler. BindingContext bir
+     PaymentReminderCardViewModel; hatırlatıcı kartının listesiyle karışmasın
+     diye kartın dışında, ayrı bir blok. Saydam yeşil, kartın saydam kırmızı
+     ertelenenlerinin karşılığı. Dokununca işaret geri alınabilir. -->
+<ContentView xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="CoinFlow.App.Controls.PaymentReminderPaidView"
+             x:Name="Root">
+    <Border IsVisible="{Binding HasPaid}">
+        <VerticalStackLayout Spacing="9">
+            <Label Text="ÖDEDİKLERİN" Style="{StaticResource Eyebrow}" />
+            <Label Text="Bildirimden ya da hatırlatıcıdan ödedim dediklerin; kalan ödemelerinden düştüler."
+                   Style="{StaticResource MutedText}" />
+            <VerticalStackLayout BindableLayout.ItemsSource="{Binding Paid}"
+                                 Spacing="8">
+                <BindableLayout.ItemTemplate>
+                    <DataTemplate>
+                        <Border Padding="12,8"
+                                BackgroundColor="{StaticResource PaidSurface}"
+                                Stroke="{StaticResource PaidSurface}">
+                            <Border.GestureRecognizers>
+                                <TapGestureRecognizer Command="{Binding Source={x:Reference Root}, Path=BindingContext.UndoPaidCommand}"
+                                                      CommandParameter="{Binding .}" />
+                            </Border.GestureRecognizers>
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                                <VerticalStackLayout Spacing="2">
+                                    <Label Text="{Binding When}"
+                                           Style="{StaticResource Eyebrow}"
+                                           TextColor="{StaticResource PositiveText}" />
+                                    <Label Text="{Binding What}"
+                                           FontFamily="OpenSansSemibold" />
+                                    <Label Text="{Binding Detail}"
+                                           Style="{StaticResource MutedText}" />
+                                </VerticalStackLayout>
+                                <Label Grid.Column="1"
+                                       Text="{Binding Tag}"
+                                       FontFamily="OpenSansSemibold"
+                                       FontSize="13"
+                                       TextColor="{StaticResource PositiveText}"
+                                       VerticalOptions="Center" />
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </BindableLayout.ItemTemplate>
+            </VerticalStackLayout>
+        </VerticalStackLayout>
+    </Border>
+</ContentView>

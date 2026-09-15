@@ -133,8 +133,18 @@ public partial class PeriodReviewWizardViewModel(
             CurrentStartingSavings = string.Empty;
 
             Payments.Clear();
+            // Hatırlatıcıda ertelenip ödendiği söylenmeyen ödeme "Ödenmedi"
+            // açılır; kullanıcı ödediyse burada değiştirir.
+            var snoozedKeys = (await service.GetPaymentReminderResponsesAsync())
+                .Where(x => x.Kind == PaymentReminderAnswerKind.Snoozed)
+                .Select(x => x.DueKey)
+                .ToHashSet(StringComparer.Ordinal);
             foreach (var line in FinalPaymentLines(plan, _context.Revision))
             {
+                var snoozed = snoozedKeys.Contains(PaymentReminderPlanner.DueKey(
+                    line.SourceEntityId,
+                    line.Name,
+                    line.PlannedDate));
                 var item = new ActualPaymentInputItem
                 {
                     PlanLineId = line.Id,
@@ -142,10 +152,11 @@ public partial class PeriodReviewWizardViewModel(
                     PlannedDate = line.PlannedDate,
                     PlannedAmountValue = line.PlannedAmount,
                     ActualDate = line.PlannedDate.ToDateTime(
-                        TimeOnly.MinValue)
+                        TimeOnly.MinValue),
+                    Note = snoozed ? "Hatırlatıcıda ertelendi" : string.Empty
                 };
                 item.SelectedStatus = item.StatusOptions.First(x =>
-                    x.Value == (line.PlannedAmount is null
+                    x.Value == (line.PlannedAmount is null || snoozed
                         ? ActualPaymentStatus.Unpaid
                         : ActualPaymentStatus.Paid));
                 Payments.Add(item);

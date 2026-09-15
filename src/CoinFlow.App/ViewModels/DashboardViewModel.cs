@@ -92,6 +92,8 @@ public partial class DashboardViewModel(
     /// <summary>Dönem detayına açılabilmek için tutulan mevcut dönem.</summary>
     private SalaryPeriodProjection? _currentPeriod;
 
+    private bool _listensToReminderAnswers;
+
     /// <summary>
     /// §11 — yalnız gerçekten anlamlı olan uyarılar, önceliğe göre.
     /// </summary>
@@ -200,6 +202,14 @@ public partial class DashboardViewModel(
         if (IsBusy)
         {
             return;
+        }
+
+        if (!_listensToReminderAnswers)
+        {
+            // Hatırlatıcıda "Ödedim" / geri al: kalan ödemeler ve dönem sonu
+            // değişir. Kart bu view model'le aynı ömürde; sızıntı yok.
+            _listensToReminderAnswers = true;
+            Reminders.AnswersChanged += async (_, _) => await LoadAsync();
         }
 
         try
@@ -359,6 +369,14 @@ public partial class DashboardViewModel(
                 detail = string.IsNullOrWhiteSpace(detail)
                     ? "Vadesi geçti"
                     : $"{detail} • Vadesi geçti";
+            }
+
+            // Hatırlatıcıda ertelenen ödeme vadesi geçse de burada kalır.
+            if (progress.IsSnoozed(line.Id))
+            {
+                detail = string.IsNullOrWhiteSpace(detail)
+                    ? "Ertelendi"
+                    : $"{detail} • Ertelendi";
             }
 
             RemainingLines.Add(new RemainingPaymentLine(

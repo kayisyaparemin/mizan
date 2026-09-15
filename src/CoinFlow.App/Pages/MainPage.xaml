@@ -363,6 +363,10 @@
                     </VerticalStackLayout>
                 </Border>
 
+                <!-- Hatırlatıcıdan "Ödedim" denenler: KALAN'dan düşenler, saydam yeşil.
+                     Hatırlatıcı kartının listesinden ayrı durur. -->
+                <controls:PaymentReminderPaidView BindingContext="{Binding Reminders}" />
+
                 <!-- Kalan ödemelerin hemen altında: ödeme günü geldiğinde bildirim. -->
                 <controls:PaymentReminderCardView BindingContext="{Binding Reminders}" />
 

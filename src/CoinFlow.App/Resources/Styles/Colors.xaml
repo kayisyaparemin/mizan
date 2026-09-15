@@ -30,6 +30,11 @@
     <Color x:Key="ProjectionText">#4D567E</Color>
     <Color x:Key="WarningSurface">#F6E8C9</Color>
     <Color x:Key="WarningText">#6F5727</Color>
+    <!-- Hatırlatıcı cevapları (#AARRGGBB): ertelenen saydam kırmızı, ödenen
+         saydam yeşil. Saydam oldukları için hem lavanta kartta hem sayfa
+         zemininde okunur. -->
+    <Color x:Key="SnoozedSurface">#40E0474F</Color>
+    <Color x:Key="PaidSurface">#4540A66A</Color>
 
     <Color x:Key="Canvas">#FFFACF</Color>
     <Color x:Key="Surface">#FFE4BF</Color>

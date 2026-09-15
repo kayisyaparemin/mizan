@@ -458,6 +458,11 @@
                     <controls:PaymentReminderCardView BindingContext="{Binding Reminders}" />
                 </ContentView>
 
+                <!-- Bu dönemde hatırlatıcıdan "Ödedim" denenler; kartın listesinden ayrı. -->
+                <ContentView IsVisible="{Binding ShowReminders}">
+                    <controls:PaymentReminderPaidView BindingContext="{Binding Reminders}" />
+                </ContentView>
+
                 <VerticalStackLayout IsVisible="{Binding Detail.HasPayments}" Spacing="10">
                     <Label Text="Ödeme ayrıntıları" Style="{StaticResource SectionTitle}" />
                     <VerticalStackLayout BindableLayout.ItemsSource="{Binding Detail.PaymentRows}"

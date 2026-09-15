@@ -31,17 +31,43 @@ public sealed class PaymentReminderCoordinator(
     ProfileService profiles,
     IPaymentReminderScheduler scheduler)
 {
-    public async Task<IReadOnlyList<PaymentReminder>> RefreshAsync()
+    private static readonly PaymentReminderBoard Empty =
+        new(PaymentReminderMode.Off, [], [], [], [], null);
+
+    /// <summary>
+    /// Kartın verisini okur ve telefondaki bildirimleri onunla eşitler:
+    /// "Ödedim" denen ödemenin kalan bildirimleri kalkar, ertelenenin
+    /// yeniden hatırlatması kurulur.
+    /// </summary>
+    public async Task<PaymentReminderBoard> RefreshAsync()
     {
         if (profiles.ActiveProfile is not { } profile)
         {
-            return [];
+            return Empty;
         }
 
-        var reminders = await service.GetPaymentRemindersAsync(DateTime.Now);
-        scheduler.Replace(profile.Id, reminders);
-        return reminders;
+        var board = await service.GetPaymentReminderBoardAsync(DateTime.Now);
+        scheduler.Replace(profile.Id, board.Reminders);
+        return board;
     }
+
+    public Task SaveModeAsync(PaymentReminderMode mode) =>
+        service.SavePaymentReminderModeAsync(mode);
+
+    /// <summary>Karttan gelen cevap: ertelenen ödeme için "Evet, ödedim".</summary>
+    public Task AnswerAsync(
+        PaymentReminderAnswerKind kind,
+        IReadOnlyList<PaymentDue> payments) =>
+        service.RecordPaymentReminderAnswerAsync(new PaymentReminderAnswer(
+            kind,
+            DateTime.Now,
+            kind == PaymentReminderAnswerKind.Snoozed
+                ? PaymentReminderPlanner.SnoozeUntil(DateTime.Now)
+                : null,
+            payments));
+
+    public Task UndoAsync(string dueKey) =>
+        service.UndoPaymentReminderAnswerAsync(dueKey);
 
     /// <summary>Silinen profilin bildirimleri de silinir.</summary>
     public void Forget(Guid profileId) => scheduler.Replace(profileId, []);

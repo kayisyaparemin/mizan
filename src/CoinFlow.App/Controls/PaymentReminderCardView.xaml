@@ -56,6 +56,42 @@
                 </VerticalStackLayout>
             </Border>
 
+            <!-- ERTELENENLER — bildirimde "Ertele" denenler. Saydam kırmızı; dokununca
+                 "Bu ödeme yapıldı mı?" sorulur. Sıradaki ödemelerde ikinci kez görünmez. -->
+            <VerticalStackLayout BindableLayout.ItemsSource="{Binding Snoozed}"
+                                 IsVisible="{Binding HasSnoozed}"
+                                 Spacing="8">
+                <BindableLayout.ItemTemplate>
+                    <DataTemplate>
+                        <Border Padding="12,8"
+                                BackgroundColor="{StaticResource SnoozedSurface}"
+                                Stroke="{StaticResource SnoozedSurface}">
+                            <Border.GestureRecognizers>
+                                <TapGestureRecognizer Command="{Binding Source={x:Reference Root}, Path=BindingContext.ResolveSnoozedCommand}"
+                                                      CommandParameter="{Binding .}" />
+                            </Border.GestureRecognizers>
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                                <VerticalStackLayout Spacing="2">
+                                    <Label Text="{Binding When}"
+                                           Style="{StaticResource Eyebrow}"
+                                           TextColor="{StaticResource DeficitText}" />
+                                    <Label Text="{Binding What}"
+                                           FontFamily="OpenSansSemibold" />
+                                    <Label Text="{Binding Detail}"
+                                           Style="{StaticResource MutedText}" />
+                                </VerticalStackLayout>
+                                <Label Grid.Column="1"
+                                       Text="{Binding Tag}"
+                                       FontFamily="OpenSansSemibold"
+                                       FontSize="13"
+                                       TextColor="{StaticResource DeficitText}"
+                                       VerticalOptions="Center" />
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </BindableLayout.ItemTemplate>
+            </VerticalStackLayout>
+
             <Label Text="{Binding SummaryText}"
                    IsVisible="{Binding HasSummary}"
                    Style="{StaticResource MutedText}" />
