@@ -27,6 +27,12 @@ public sealed class FinancialInstrumentReconciliationService(
         var paymentPlans = data.PaymentPlans.ToDictionary(x => x.Id);
         var cards = data.CreditCards.ToDictionary(x => x.Id);
         var largeExpenses = data.PlannedLargeExpenses.ToDictionary(x => x.Id);
+        // Ödenmemiş yükümlülük yeni dönemin ilk gününe taşınır, checkpoint
+        // gününe değil: yeni dönemin donmuş planı (checkpoint, sonraki
+        // checkpoint] penceresini okur. Checkpoint gününe taşınan borç
+        // projeksiyonda görünüp Ana Sayfa planına hiç girmiyordu; geçici ödeme
+        // ve büyük gider bu yüzden hiçbir review'da kapatılamıyordu (I4).
+        var carryDate = newAnchor.AddDays(1);
         var unpaidLoanIds = new HashSet<Guid>();
         var prepayments = data.LoanPrepayments.ToDictionary(x => x.Id);
         var removedPrepaymentIds = new HashSet<Guid>();
@@ -94,7 +100,8 @@ public sealed class FinancialInstrumentReconciliationService(
                                         line.PlannedDate,
                                         1,
                                         loan.PaymentDay),
-                                    newAnchor),
+                                    newAnchor,
+                                    carryDate),
                                 RemainingInstallmentCount = remaining,
                                 RemainingDebt = RemainingPrincipalAfter(
                                     loan,
@@ -104,12 +111,12 @@ public sealed class FinancialInstrumentReconciliationService(
                             };
                             loans[loan.Id] = DropStaleClosureQuote(paidLoan);
                         }
-                        else if (loan.NextPaymentDate < newAnchor)
+                        else if (loan.NextPaymentDate <= newAnchor)
                         {
                             // Ödenmeyen yükümlülük gelecek plandan kaybolmaz.
                             loans[loan.Id] = DropStaleClosureQuote(loan with
                             {
-                                NextPaymentDate = newAnchor
+                                NextPaymentDate = carryDate
                             });
                         }
                         if (!paid)
@@ -135,8 +142,8 @@ public sealed class FinancialInstrumentReconciliationService(
                                     ? item
                                     : paid
                                         ? item with { IsPaid = true }
-                                        : item.DueDate < newAnchor
-                                            ? item with { DueDate = newAnchor }
+                                        : item.DueDate <= newAnchor
+                                            ? item with { DueDate = carryDate }
                                             : item).ToArray()
                         };
                         break;
@@ -166,8 +173,8 @@ public sealed class FinancialInstrumentReconciliationService(
                             {
                                 Status = PlannedExpenseStatus.Completed
                             }
-                            : expense.ExactDate < newAnchor
-                                ? expense with { ExactDate = newAnchor }
+                            : expense.ExactDate <= newAnchor
+                                ? expense with { ExactDate = carryDate }
                                 : expense;
                         break;
                     }
@@ -178,7 +185,7 @@ public sealed class FinancialInstrumentReconciliationService(
         {
             loans[loanId] = loans[loanId] with
             {
-                NextPaymentDate = newAnchor
+                NextPaymentDate = carryDate
             };
         }
 
@@ -187,15 +194,15 @@ public sealed class FinancialInstrumentReconciliationService(
             x => x.Value with
             {
                 Installments = x.Value.Installments.Select(item =>
-                    !item.IsPaid && item.DueDate < newAnchor
-                        ? item with { DueDate = newAnchor }
+                    !item.IsPaid && item.DueDate <= newAnchor
+                        ? item with { DueDate = carryDate }
                         : item).ToArray()
             });
         largeExpenses = largeExpenses.ToDictionary(
             x => x.Key,
             x => x.Value.Status == PlannedExpenseStatus.Planned &&
-                 x.Value.ExactDate < newAnchor
-                ? x.Value with { ExactDate = newAnchor }
+                 x.Value.ExactDate <= newAnchor
+                ? x.Value with { ExactDate = carryDate }
                 : x.Value);
 
         // Checkpoint'i geçmiş ama plan satırına hiç düşmemiş erken ödeme de
@@ -216,7 +223,8 @@ public sealed class FinancialInstrumentReconciliationService(
 
     private static DateOnly ResolveOutstandingDate(
         DateOnly date,
-        DateOnly newAnchor) => date < newAnchor ? newAnchor : date;
+        DateOnly newAnchor,
+        DateOnly carryDate) => date <= newAnchor ? carryDate : date;
 
     /// <summary>
     /// I17 — taksit ödenince kalan anaparadan yalnız anapara payı düşer.

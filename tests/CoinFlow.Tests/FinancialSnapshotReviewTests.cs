@@ -890,7 +890,15 @@ public sealed class FinancialSnapshotReviewTests
             Assert.Equal(before.RemainingInstallmentCount,
                 after.RemainingInstallmentCount);
             Assert.True(after.IsActive);
-            Assert.Equal(FirstReviewDate, after.NextPaymentDate);
+            // Yeni dönemin ilk günü: donmuş planın penceresi checkpoint'i
+            // dışarıda bırakır.
+            Assert.Equal(FirstReviewDate.AddDays(1), after.NextPaymentDate);
+            Assert.Contains(
+                (await store.GetFinancialHistoryAsync()).Plans
+                    .Single(x => x.PeriodStart == FirstReviewDate)
+                    .PaymentLines,
+                x => x.SourceEntityId == after.Id &&
+                     x.PlannedDate == FirstReviewDate.AddDays(1));
             Assert.Contains(
                 (await review.GetFuturePeriodsAsync(periodCount: 1))[0]
                 .MandatoryItems,
