@@ -128,7 +128,8 @@
                             <Button Grid.Column="1"
                                     Text="Hayır"
                                     Command="{Binding UseLegacyCardSetupCommand}"
-                                    Style="{StaticResource SecondaryButton}" />
+                                    Style="{StaticResource SecondaryButton}"
+                                    BackgroundColor="{StaticResource Canvas}" />
                         </Grid>
                         <VerticalStackLayout IsVisible="{Binding CardHasActualStatement}"
                                              Spacing="8">

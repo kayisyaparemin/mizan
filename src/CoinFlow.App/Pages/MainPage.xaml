@@ -110,7 +110,7 @@
                                Style="{StaticResource CardHeading}" />
                         <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
                             <Entry Text="{Binding CurrentBalanceInput}"
-                                   Placeholder="Bugün hesabındaki toplam para"
+                                   Placeholder="Bugünkü tutar"
                                    Keyboard="Numeric"
                                    controls:SignedNumericEntry.AllowNegative="True" />
                             <Button Grid.Column="1"
