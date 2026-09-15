@@ -1,4 +1,3 @@
-using CoinFlow.Application.Services;
 using CoinFlow.Infrastructure.Persistence;
 
 namespace CoinFlow.Tests;

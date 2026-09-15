@@ -3,12 +3,10 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CoinFlow.App.Models;
 using CoinFlow.App.Services;
-using CoinFlow.Application.Abstractions;
 using CoinFlow.Application.Models;
 using CoinFlow.Application.Services;
 using CoinFlow.Domain.Calculations;
 using CoinFlow.Domain.Models;
-using Microsoft.Maui.Devices;
 
 namespace CoinFlow.App.ViewModels;
 
@@ -55,14 +53,6 @@ public partial class CommitmentsViewModel(
         new("Sabit tutar üzerinden hesapla", ProjectionFallbackStrategy.FixedAmount)
     ];
 
-    public ObservableCollection<SelectionOption<CreditCardPaymentType>>
-        PaymentPlanTypes { get; } =
-    [
-        new("Asgari ödeme", CreditCardPaymentType.Minimum),
-        new("Ekstrenin tamamı", CreditCardPaymentType.FullStatement),
-        new("Özel tutar", CreditCardPaymentType.FixedAmount)
-    ];
-
     public ObservableCollection<SelectionOption<LoanKind>> LoanKinds { get; } =
     [
         new("Tüketici kredisi (ihtiyaç, taşıt)", LoanKind.Consumer),
@@ -78,7 +68,6 @@ public partial class CommitmentsViewModel(
         new("Başka tutar", CurrentStatementPaymentMode.Custom)
     ];
 
-    public ObservableCollection<FinancialRecordLine> Items { get; } = [];
     public ObservableCollection<FinancialRecordLine> IncomeItems { get; } = [];
     public ObservableCollection<FinancialRecordLine> CreditCardItems { get; } = [];
     public ObservableCollection<FinancialRecordLine> LoanItems { get; } = [];
@@ -86,7 +75,9 @@ public partial class CommitmentsViewModel(
     public ObservableCollection<FinancialRecordLine> OneTimePaymentItems { get; } = [];
     public ObservableCollection<DatedAmountLine> PlanInstallments { get; } = [];
     public ObservableCollection<DatedAmountLine> CardFutureCharges { get; } = [];
-    public ObservableCollection<CardPaymentPlanLine> CardPaymentPlans { get; } = [];
+    // Kart ödeme kararları Kart Kontrol ekranında verilir; kart bilgileri
+    // düzenlenirken olduğu gibi geri yazılır, yoksa kayıt onları silerdi.
+    private IReadOnlyList<CreditCardPaymentPlan> _editingCardPaymentPlans = [];
 
     private readonly List<FinancialRecordLine> _allItems = [];
     private readonly Dictionary<Guid, string> _cardChargeDescriptions = [];
@@ -103,7 +94,6 @@ public partial class CommitmentsViewModel(
     private CancellationTokenSource? _statementImportCancellation;
 
     [ObservableProperty] private bool isIncomeSection = true;
-    [ObservableProperty] private bool isPaymentSection;
     [ObservableProperty] private SelectionOption<string>? selectedRecordType;
     [ObservableProperty] private bool isSalary;
     [ObservableProperty] private bool isLoan;
@@ -115,23 +105,15 @@ public partial class CommitmentsViewModel(
 
     /// <summary>Kayda özel formlar (gelir, kredi, kart, ödeme planı).</summary>
     public bool IsRecordForm => !IsScenarioEntry;
-    [ObservableProperty] private bool hasNoSalary;
     [ObservableProperty] private bool hasActiveForm;
     [ObservableProperty] private string formTitle = "Yeni kayıt";
     [ObservableProperty] private string formLead = string.Empty;
     [ObservableProperty] private string structureSummary = "—";
-    [ObservableProperty] private bool hasIncomeItems;
-    [ObservableProperty] private bool hasCreditCardItems;
-    [ObservableProperty] private bool hasLoanItems;
-    [ObservableProperty] private bool hasRegularPaymentItems;
-    [ObservableProperty] private bool hasOneTimePaymentItems;
-    [ObservableProperty] private Guid? firstCardId;
 
     [ObservableProperty] private string name = string.Empty;
     [ObservableProperty] private string bank = string.Empty;
     [ObservableProperty] private string amount = string.Empty;
     [ObservableProperty] private DateTime effectiveDate = DateTime.Today;
-    [ObservableProperty] private string note = string.Empty;
 
     [ObservableProperty] private string paymentDay = "10";
     [ObservableProperty] private DateTime nextPaymentDate = DateTime.Today.AddMonths(1);
@@ -187,24 +169,18 @@ public partial class CommitmentsViewModel(
     [ObservableProperty] private SelectionOption<ProjectionFallbackStrategy>? selectedProjectionFallbackStrategy;
     [ObservableProperty] private string projectionFallbackFixedAmount = string.Empty;
     [ObservableProperty] private bool isFixedProjectionFallback;
-    [ObservableProperty] private DateTime cardPaymentPlanDate = DateTime.Today.AddMonths(1);
-    [ObservableProperty] private SelectionOption<CreditCardPaymentType>? selectedPaymentPlanType;
-    [ObservableProperty] private string cardPaymentPlanAmount = string.Empty;
-    [ObservableProperty] private bool isFixedPaymentPlan;
     [ObservableProperty] private bool isEditingCard;
     [ObservableProperty] private string saveButtonText = "Kaydet";
 
     public async Task LoadAsync()
     {
         var plan = await service.GetFinancialPlanAsync();
-        HasNoSalary = plan.Salaries.Count == 0;
         _allItems.Clear();
 
         foreach (var salary in plan.Salaries.OrderByDescending(x => x.EffectiveDate))
         {
             _allItems.Add(new FinancialRecordLine(
                 salary.Id,
-                ManagementSection.Income,
                 FinancialRecordKind.Salary,
                 salary.Description.Length == 0 ? "Gelir" : salary.Description,
                 $"Geçerli: {salary.EffectiveDate:dd.MM.yyyy}",
@@ -225,7 +201,6 @@ public partial class CommitmentsViewModel(
         {
             _allItems.Add(new FinancialRecordLine(
                 income.Id,
-                ManagementSection.Income,
                 FinancialRecordKind.OtherIncome,
                 income.Description.Length == 0 ? "Diğer gelir" : income.Description,
                 income.ExactDate.ToString("dd.MM.yyyy"),
@@ -238,7 +213,6 @@ public partial class CommitmentsViewModel(
             var loan = overview.Loan;
             _allItems.Add(new FinancialRecordLine(
                 loan.Id,
-                ManagementSection.Payment,
                 FinancialRecordKind.Loan,
                 $"{loan.Bank} {loan.Name}".Trim(),
                 $"Sonraki: {loan.NextPaymentDate:dd.MM.yyyy} • {loan.RemainingInstallmentCount} ödeme",
@@ -259,7 +233,6 @@ public partial class CommitmentsViewModel(
             };
             _allItems.Add(new FinancialRecordLine(
                 planned.Prepayment.Id,
-                ManagementSection.Payment,
                 FinancialRecordKind.LoanPrepayment,
                 $"{loanName} · {mode}",
                 $"Planlı: {planned.Prepayment.Date:dd.MM.yyyy}",
@@ -280,7 +253,6 @@ public partial class CommitmentsViewModel(
                 : $"{paymentPlan.Installments.Count(x => !x.IsPaid)} ödeme • tarihleri belli";
             _allItems.Add(new FinancialRecordLine(
                 paymentPlan.Id,
-                ManagementSection.Payment,
                 paymentPlan.Kind == PaymentPlanKind.Temporary
                     ? FinancialRecordKind.TemporaryPlan
                     : FinancialRecordKind.InstallmentPlan,
@@ -312,7 +284,6 @@ public partial class CommitmentsViewModel(
                 : $"Ödeme tercihi: {StrategyLabel(card.PaymentStrategy)} • Henüz karar vermediğim ekstrelerde: {FallbackLabel(card.ProjectionFallbackStrategy)}";
             _allItems.Add(new FinancialRecordLine(
                 card.Id,
-                ManagementSection.Payment,
                 FinancialRecordKind.CreditCard,
                 $"{card.Bank} {card.Name}".Trim(),
                 paymentText,
@@ -324,7 +295,6 @@ public partial class CommitmentsViewModel(
         {
             _allItems.Add(new FinancialRecordLine(
                 expense.Id,
-                ManagementSection.Payment,
                 FinancialRecordKind.LargeExpense,
                 expense.Name,
                 $"{expense.ExactDate:dd.MM.yyyy} • {expense.Note}",
@@ -334,12 +304,10 @@ public partial class CommitmentsViewModel(
 
         RefreshGroupedItems();
         RefreshRecordTypes();
-        RefreshVisibleItems();
         EntryForm.SetLookups(plan);
         SelectedPaymentStrategy ??= PaymentStrategies[0];
         SelectedProjectionFallbackStrategy ??=
             ProjectionFallbackStrategies[0];
-        SelectedPaymentPlanType ??= PaymentPlanTypes[0];
         SelectedCurrentStatementPaymentMode ??=
             CurrentStatementPaymentModes[0];
     }
@@ -364,35 +332,24 @@ public partial class CommitmentsViewModel(
         }
     }
 
-    [RelayCommand]
-    private void ShowIncome()
+    public void SelectIncomeSection()
     {
         IsIncomeSection = true;
-        IsPaymentSection = false;
         CancelEditingCard();
         RefreshRecordTypes();
-        RefreshVisibleItems();
     }
 
-    public void SelectIncomeSection() => ShowIncome();
-
-    [RelayCommand]
-    private void ShowPayments()
+    public void SelectPaymentSection()
     {
         IsIncomeSection = false;
-        IsPaymentSection = true;
         CancelEditingCard();
         RefreshRecordTypes();
-        RefreshVisibleItems();
     }
-
-    public void SelectPaymentSection() => ShowPayments();
 
     public void StartAdd(string recordType)
     {
         ResetForm();
         IsIncomeSection = recordType == "salary";
-        IsPaymentSection = !IsIncomeSection;
         RefreshRecordTypes();
         SelectedRecordType = RecordTypes.SingleOrDefault(x =>
             x.Value == recordType) ?? RecordTypes.FirstOrDefault();
@@ -429,7 +386,6 @@ public partial class CommitmentsViewModel(
         _pendingEntryId = Guid.NewGuid();
         IsScenarioEntry = true;
         IsIncomeSection = group == ScenarioGroup.Income;
-        IsPaymentSection = !IsIncomeSection;
         HasActiveForm = true;
         FormTitle = group switch
         {
@@ -471,11 +427,6 @@ public partial class CommitmentsViewModel(
         SelectionOption<ProjectionFallbackStrategy>? value) =>
         IsFixedProjectionFallback =
             value?.Value == ProjectionFallbackStrategy.FixedAmount;
-
-    partial void OnSelectedPaymentPlanTypeChanged(
-        SelectionOption<CreditCardPaymentType>? value) =>
-        IsFixedPaymentPlan =
-            value?.Value == CreditCardPaymentType.FixedAmount;
 
     partial void OnCardHasActualStatementChanged(bool value) =>
         IsLegacyCardSetup = !value;
@@ -528,9 +479,7 @@ public partial class CommitmentsViewModel(
                 id,
                 DateOnly.FromDateTime(CardChargeDate),
                 parsed,
-                string.IsNullOrWhiteSpace(Note)
-                ? "Gelecek taksit"
-                : Note.Trim()));
+                "Gelecek taksit"));
             _cardChargeDescriptions[id] = CardFutureCharges[^1].Description;
             CardChargeAmount = string.Empty;
             SetStatus(string.Empty);
@@ -623,39 +572,6 @@ public partial class CommitmentsViewModel(
     private void CancelStatementImport() =>
         _statementImportCancellation?.Cancel();
 
-    [RelayCommand]
-    private void AddCardPaymentPlan()
-    {
-        try
-        {
-            var type = SelectedPaymentPlanType?.Value
-                ?? throw new InvalidOperationException("Ödeme tercihi seçmelisin.");
-            var parsed = type == CreditCardPaymentType.FixedAmount
-                ? RequirePositive(
-                    ParseMoney(CardPaymentPlanAmount, "Özel ödeme tutarı"),
-                    "Özel ödeme tutarı")
-                : (decimal?)null;
-            var date = DateOnly.FromDateTime(CardPaymentPlanDate);
-            var existing = CardPaymentPlans.FirstOrDefault(x => x.DueDate == date);
-            if (existing is not null)
-            {
-                CardPaymentPlans.Remove(existing);
-            }
-
-            CardPaymentPlans.Add(new CardPaymentPlanLine(
-                existing?.Id ?? Guid.NewGuid(),
-                date,
-                type,
-                parsed));
-            CardPaymentPlanAmount = string.Empty;
-            SetStatus(string.Empty);
-        }
-        catch (Exception exception)
-        {
-            SetStatus(UserFacingMessages.FromException(exception));
-        }
-    }
-
     public void RemovePlanPayment(DatedAmountLine line) =>
         PlanInstallments.Remove(line);
 
@@ -664,9 +580,6 @@ public partial class CommitmentsViewModel(
         CardFutureCharges.Remove(line);
         _cardChargeDescriptions.Remove(line.Id);
     }
-
-    public void RemoveCardPaymentPlan(CardPaymentPlanLine line) =>
-        CardPaymentPlans.Remove(line);
 
     public async Task EditCardAsync(Guid cardId)
     {
@@ -683,7 +596,6 @@ public partial class CommitmentsViewModel(
             card.CurrentStatement?.NextStatementDate;
         _cardExactNextDueDate = card.CurrentStatement?.NextDueDate;
         IsIncomeSection = false;
-        IsPaymentSection = true;
         RefreshRecordTypes();
         SelectedRecordType = RecordTypes.Single(x => x.Value == "card");
         HasActiveForm = true;
@@ -753,15 +665,7 @@ public partial class CommitmentsViewModel(
             _cardChargeDescriptions[charge.Id] = charge.Description;
         }
 
-        CardPaymentPlans.Clear();
-        foreach (var payment in card.PaymentPlans)
-        {
-            CardPaymentPlans.Add(new CardPaymentPlanLine(
-                payment.Id,
-                payment.DueDate,
-                payment.PaymentType,
-                payment.Amount));
-        }
+        _editingCardPaymentPlans = card.PaymentPlans;
     }
 
     [RelayCommand]
@@ -951,7 +855,7 @@ public partial class CommitmentsViewModel(
         HasActiveForm = false;
         SaveButtonText = "Kaydet";
         CardFutureCharges.Clear();
-        CardPaymentPlans.Clear();
+        _editingCardPaymentPlans = [];
         _cardChargeDescriptions.Clear();
     }
 
@@ -999,7 +903,6 @@ public partial class CommitmentsViewModel(
         ResetForm();
         _editingLoanId = loan.Id;
         IsIncomeSection = false;
-        IsPaymentSection = true;
         RefreshRecordTypes();
         SelectedRecordType = RecordTypes.Single(x => x.Value == "loan");
         HasActiveForm = true;
@@ -1159,16 +1062,9 @@ public partial class CommitmentsViewModel(
                     Amount = x.Amount
                 })
                 .ToArray(),
-            PaymentPlans = CardPaymentPlans
+            PaymentPlans = _editingCardPaymentPlans
                 .OrderBy(x => x.DueDate)
-                .Select(x => new CreditCardPaymentPlan
-                {
-                    Id = x.Id,
-                    CreditCardId = cardId,
-                    DueDate = x.DueDate,
-                    PaymentType = x.PaymentType,
-                    Amount = x.Amount
-                })
+                .Select(x => x with { CreditCardId = cardId })
                 .ToArray()
         };
         return card;
@@ -1251,24 +1147,11 @@ public partial class CommitmentsViewModel(
             RecordTypes.FirstOrDefault();
     }
 
-    private void RefreshVisibleItems()
-    {
-        var section = IsIncomeSection
-            ? ManagementSection.Income
-            : ManagementSection.Payment;
-        Items.Clear();
-        foreach (var item in _allItems.Where(x => x.Section == section))
-        {
-            Items.Add(item);
-        }
-    }
-
     private void ResetForm()
     {
         Name = string.Empty;
         Bank = string.Empty;
         Amount = string.Empty;
-        Note = string.Empty;
         RemainingDebt = string.Empty;
         EarlyClosureAmount = string.Empty;
         EarlyClosureNote = string.Empty;
@@ -1276,7 +1159,7 @@ public partial class CommitmentsViewModel(
         SelectedLoanKind = LoanKinds[0];
         PlanInstallments.Clear();
         CardFutureCharges.Clear();
-        CardPaymentPlans.Clear();
+        _editingCardPaymentPlans = [];
         _cardChargeDescriptions.Clear();
         CardHasActualStatement = false;
         CardStatementAmount = string.Empty;
@@ -1330,18 +1213,12 @@ public partial class CommitmentsViewModel(
             }
         }
 
-        HasIncomeItems = IncomeItems.Count > 0;
-        HasCreditCardItems = CreditCardItems.Count > 0;
-        HasLoanItems = LoanItems.Count > 0;
-        HasRegularPaymentItems = RegularPaymentItems.Count > 0;
-        HasOneTimePaymentItems = OneTimePaymentItems.Count > 0;
         // §12 — her bölümün kendi boş durumu olsun.
-        HasNoIncomeItems = !HasIncomeItems;
-        HasNoCreditCardItems = !HasCreditCardItems;
-        HasNoLoanItems = !HasLoanItems;
-        HasNoRegularPaymentItems = !HasRegularPaymentItems;
-        HasNoOneTimePaymentItems = !HasOneTimePaymentItems;
-        FirstCardId = CreditCardItems.FirstOrDefault()?.Id;
+        HasNoIncomeItems = IncomeItems.Count == 0;
+        HasNoCreditCardItems = CreditCardItems.Count == 0;
+        HasNoLoanItems = LoanItems.Count == 0;
+        HasNoRegularPaymentItems = RegularPaymentItems.Count == 0;
+        HasNoOneTimePaymentItems = OneTimePaymentItems.Count == 0;
         StructureSummary =
             $"{IncomeItems.Count} gelir • {CreditCardItems.Count} kart • " +
             $"{LoanItems.Count(x => x.Kind == FinancialRecordKind.Loan)} kredi • {RegularPaymentItems.Count + OneTimePaymentItems.Count} ödeme";

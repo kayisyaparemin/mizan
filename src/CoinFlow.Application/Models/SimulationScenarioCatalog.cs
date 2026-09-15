@@ -167,9 +167,6 @@ public static class SimulationScenarioCatalog
         PaymentStrategy
     ];
 
-    public static string GroupLabel(ScenarioGroup group) =>
-        Groups.Single(x => x.Group == group).Label;
-
     public static IReadOnlyList<ScenarioOption> OptionsIn(
         ScenarioGroup group,
         bool directEntryOnly = false) =>

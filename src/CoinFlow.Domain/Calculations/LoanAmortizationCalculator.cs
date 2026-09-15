@@ -53,18 +53,12 @@ public sealed record LoanAmortization(
 
     public decimal RemainingInterest =>
         Math.Max(0m, RemainingInstallmentTotal - Principal);
-
-    public decimal AnnualCompoundRate =>
-        (decimal)(Math.Pow(1d + (double)MonthlyRate, 12d) - 1d);
 }
 
 public sealed record LoanAnalysis(
     Loan Loan,
     LoanAmortization? Amortization,
-    LoanAnalysisIssue Issue)
-{
-    public bool CanQuote => Amortization is not null;
-}
+    LoanAnalysisIssue Issue);
 
 /// <summary>
 /// Belirli bir günde krediyi kapatmanın bedeli. O güne kadar vadesi gelen

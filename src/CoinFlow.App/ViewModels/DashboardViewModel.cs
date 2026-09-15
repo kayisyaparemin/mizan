@@ -60,7 +60,6 @@ public partial class DashboardViewModel(
     [ObservableProperty] private string plannedEndingCompareText = "—";
     [ObservableProperty] private string projectedEndingText = "—";
     [ObservableProperty] private bool isProjectedEndingNegative;
-    [ObservableProperty] private string observedBalanceText = "—";
 
     // --- KALAN bloğu ---
     [ObservableProperty]
@@ -83,8 +82,6 @@ public partial class DashboardViewModel(
         "Başlamak için gelirini ekle.";
     [ObservableProperty] private string emptyStateAction = "Gelir Ekle";
     [ObservableProperty] private bool hasPendingReview;
-    [ObservableProperty] private string pendingReviewTitle = string.Empty;
-    [ObservableProperty] private string pendingReviewMessage = string.Empty;
     [ObservableProperty] private bool shouldShowOnboarding;
     [ObservableProperty] private bool showCalculationDetails;
 
@@ -216,12 +213,6 @@ public partial class DashboardViewModel(
 
             var review = await service.GetPeriodReviewAvailabilityAsync();
             HasPendingReview = review.IsDue;
-            PendingReviewTitle = review.IsDue
-                ? "Geçen dönemi güncelle"
-                : string.Empty;
-            PendingReviewMessage = review.IsDue
-                ? "Planınla gerçekte olanı karşılaştır ve yeni planını güncel durumundan başlat."
-                : string.Empty;
 
             var progress = await service.GetPeriodProgressAsync();
             if (progress is null)
@@ -297,9 +288,6 @@ public partial class DashboardViewModel(
 
         // Parametre parametre: her bölüm planlanan ile şu anki hâli yan yana
         // koyar. Tek bir "fark" rakamı hangi kalemin değiştiğini gizliyordu.
-        ObservedBalanceText = progress.ObservedBalance is { } balance
-            ? Money(balance)
-            : "—";
 
         // YAŞAM GİDERİ — havuz
         PlannedLivingText = Money(progress.PlannedLivingBudget);
@@ -527,21 +515,10 @@ public partial class DashboardViewModel(
                 .Concat(cardInterestLines));
     }
 
-    private static UpcomingPaymentLine ToLine(
-        ObligationItem payment,
-        string detail) => new(
-        payment.DueDate.ToString("dd MMM", TurkishCulture),
-        payment.Name,
-        Money(payment.Amount),
-        detail);
-
     private static string ModeText(
         CoinFlow.Domain.Models.PaymentAssignmentMode mode) =>
         mode == CoinFlow.Domain.Models.PaymentAssignmentMode.PreviousPeriod
             ? "Geçmiş dönemi kapatırım"
             : "Gelecek dönemi karşılarım";
-
-    private static string PeriodText(SalaryPeriod period) =>
-        $"{period.Start.ToString("dd MMM", TurkishCulture)} → {period.End.ToString("dd MMM yyyy", TurkishCulture)}";
 
 }

@@ -169,16 +169,6 @@ public partial class CommitmentsPage : ContentPage, IQueryAttributable
         }
     }
 
-    private void OnRemoveCardPaymentPlanClicked(
-        object? sender,
-        EventArgs eventArgs)
-    {
-        if (sender is Button { CommandParameter: CardPaymentPlanLine line })
-        {
-            _viewModel.RemoveCardPaymentPlan(line);
-        }
-    }
-
     private async void OnEditCardClicked(
         object? sender,
         EventArgs eventArgs)

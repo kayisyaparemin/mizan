@@ -70,7 +70,6 @@ public partial class PeriodReviewWizardViewModel(
     public bool IsReviewVisible => !IsSuccess;
     public bool HasPayments => Payments.Count > 0;
     public bool HasFlows => Flows.Count > 0;
-    public bool IsNotBusy => !IsBusy;
     public string PlanIndicator => CurrentStep == 1 ? "●  Plan" : "✓  Plan";
     public string ActualIndicator => CurrentStep < 2
         ? "○  Gerçek"

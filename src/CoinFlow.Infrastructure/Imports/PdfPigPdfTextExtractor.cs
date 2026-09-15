@@ -1,6 +1,5 @@
 using CoinFlow.Application.Abstractions;
 using UglyToad.PdfPig;
-using System.Text;
 
 namespace CoinFlow.Infrastructure.Imports;
 

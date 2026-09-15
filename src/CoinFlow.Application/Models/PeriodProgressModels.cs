@@ -47,7 +47,6 @@ public sealed record PeriodProgress(
     public bool HasObservation => Observation is not null;
     public bool HasRemainingLines => RemainingLines.Count > 0;
     public bool WasRevised => RevisionCount > 0;
-    public bool HasCards => Cards.Count > 0;
 
     /// <summary>
     /// KMH satırı yalnız gerçekten açık varsa gösterilir; sıfır yazmak için
@@ -91,6 +90,4 @@ public sealed record PeriodCardComparison(
     public decimal? Difference => Current is { } current
         ? current - Planned
         : null;
-
-    public bool HasCurrent => Current is not null;
 }

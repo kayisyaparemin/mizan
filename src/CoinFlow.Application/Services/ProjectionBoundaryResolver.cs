@@ -9,10 +9,7 @@ public sealed record ProjectionBoundary(
     DateOnly FirstUnrealizedSalaryDate,
     decimal StartingSavings,
     DateOnly? ClosedCheckpointDate,
-    Guid? SourcePeriodActualId)
-{
-    public bool IsActualFinalization => SourcePeriodActualId is not null;
-}
+    Guid? SourcePeriodActualId);
 
 public sealed class ProjectionBoundaryResolver(
     SalaryPeriodCalculator salaryPeriodCalculator)

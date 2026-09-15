@@ -72,8 +72,6 @@ public sealed record SalaryPeriodProjection(
         AvailableAfterMandatory - CarryOverDeficit;
     public decimal CurrentPeriodNetContribution =>
         EstimatedSavingsCapacity;
-    public decimal CurrentPeriodSavingsBeforeDeficitInterest =>
-        EstimatedSavingsCapacity;
     public decimal DeficitPrincipal =>
         EndingProjectedSavingsBeforeDeficitInterest < 0m
             ? Math.Abs(EndingProjectedSavingsBeforeDeficitInterest)

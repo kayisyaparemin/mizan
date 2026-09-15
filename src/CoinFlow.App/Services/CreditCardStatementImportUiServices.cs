@@ -1,7 +1,6 @@
 using System.Diagnostics;
 using CoinFlow.Application.Abstractions;
 using Microsoft.Extensions.Logging;
-using Microsoft.Maui.ApplicationModel;
 using Microsoft.Maui.Storage;
 
 namespace CoinFlow.App.Services;

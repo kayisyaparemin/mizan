@@ -15,7 +15,6 @@ public partial class FutureMonthsViewModel(
     public ObservableCollection<ProjectionLine> Periods { get; } = [];
     public ObservableCollection<LoanAdviceLine> LoanAdvice { get; } = [];
     [ObservableProperty] private bool hasLoanAdvice;
-    [ObservableProperty] private bool isLoadingLoanAdvice;
     private CancellationTokenSource? _loanAdviceCancellation;
     private bool _preserveOnNextAppearance;
 
@@ -70,7 +69,6 @@ public partial class FutureMonthsViewModel(
                     Money(row.AvailableAfterMandatory),
                     Money(-row.CarryOverDeficit),
                     row.HasCarryOverDeficit,
-                    Money(row.EstimatedSavingsCapacity),
                     Money(row.TotalInterestGenerated),
                     row.TotalInterestGenerated > 0m,
                     Money(row.EndingProjectedSavings),
@@ -207,7 +205,6 @@ public partial class FutureMonthsViewModel(
         _loanAdviceCancellation = cancellation;
         try
         {
-            IsLoadingLoanAdvice = true;
             var advice = await Task.Run(
                 () => service.GetLoanPayoffAdviceAsync(cancellation.Token),
                 cancellation.Token);
@@ -227,13 +224,6 @@ public partial class FutureMonthsViewModel(
             LoanAdvice.Clear();
             HasLoanAdvice = false;
             SetStatus(UserFacingMessages.FromException(exception));
-        }
-        finally
-        {
-            if (ReferenceEquals(_loanAdviceCancellation, cancellation))
-            {
-                IsLoadingLoanAdvice = false;
-            }
         }
     }
 

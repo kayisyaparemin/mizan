@@ -1,4 +1,3 @@
-using CoinFlow.Domain.Models;
 
 namespace CoinFlow.Domain.Calculations;
 

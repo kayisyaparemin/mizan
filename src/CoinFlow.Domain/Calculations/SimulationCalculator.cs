@@ -66,8 +66,6 @@ public sealed record SimulationImpactRow(
 {
     public decimal MandatoryOutflowDifference =>
         Scenario.MandatoryOutflow - Baseline.MandatoryOutflow;
-    public decimal AvailableDifference =>
-        Scenario.AvailableAfterMandatory - Baseline.AvailableAfterMandatory;
     public decimal SavingsCapacityDifference =>
         Scenario.EstimatedSavingsCapacity - Baseline.EstimatedSavingsCapacity;
     public decimal ProjectedSavingsDifference =>
@@ -111,8 +109,6 @@ public sealed record SimulationResult(
         Math.Max(0m, -AdditionalInterestCost);
 
     public IReadOnlyList<LoanPrepaymentImpact> LoanImpacts { get; init; } = [];
-
-    public decimal LoanInterestSaving => LoanImpacts.Sum(x => x.InterestSaving);
 }
 
 public sealed class SimulationCalculator(

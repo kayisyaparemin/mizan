@@ -111,7 +111,6 @@ public sealed record DetailComparisonRow(
     public bool IsFavorable => Difference != 0m &&
         (HigherIsBetter ? Difference > 0m : Difference < 0m);
     public bool IsUnfavorable => Difference != 0m && !IsFavorable;
-    public bool IsNeutral => Difference == 0m;
 
     private static string Money(decimal value) =>
         $"{value.ToString("N2", TurkishCulture)} TL";
@@ -171,7 +170,6 @@ public sealed record SalaryPeriodDetailData(
     public bool IsStandardProjection => !IsSimulationScenario;
     public bool HasIncomeCoverageMessage =>
         !string.IsNullOrWhiteSpace(IncomeCoverageMessage);
-    public bool HasNeedBreakdownRows => NeedBreakdownRows.Count > 0;
     public bool HasDeficit => Deficit is not null;
     public bool HasMandatoryRows => MandatoryRows.Count > 0;
     public bool HasInterestRows => InterestRows.Count > 0;

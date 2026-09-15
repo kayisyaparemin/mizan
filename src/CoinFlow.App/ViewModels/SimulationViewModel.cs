@@ -59,30 +59,7 @@ public partial class SimulationViewModel(
     [NotifyPropertyChangedFor(nameof(HasStaleResult))]
     [NotifyPropertyChangedFor(nameof(RunSimulationButtonText))]
     private bool isResultStale;
-    [ObservableProperty] private string baselineEnding = "—";
-    [ObservableProperty] private string scenarioEnding = "—";
-    [ObservableProperty] private string endingDifference = "—";
-    [ObservableProperty] private string tightestPeriod = "—";
-    [ObservableProperty] private string lowestAvailable = "—";
-    [ObservableProperty] private string lowestSavingsCapacity = "—";
-    [ObservableProperty] private string lowestProjectedSavings = "—";
-    [ObservableProperty] private string firstNegativePeriod = "Yok";
-    [ObservableProperty] private string maximumCarryOverDeficit = "—";
-    [ObservableProperty] private string recoveryPeriod = "—";
-    [ObservableProperty] private string totalScenarioCost = "—";
-    [ObservableProperty] private string monthlyBurden = string.Empty;
-    [ObservableProperty] private bool hasMonthlyBurden;
-    [ObservableProperty] private string financingCost = string.Empty;
-    [ObservableProperty] private bool hasFinancingCost;
-    [ObservableProperty] private string baselineInterest = "—";
-    [ObservableProperty] private string scenarioInterest = "—";
-    [ObservableProperty] private string interestDifference = "—";
-    [ObservableProperty] private string interestDifferenceTitle =
-        "Ek Faiz Yükü";
-    [ObservableProperty] private string friendlySummary = string.Empty;
     [ObservableProperty] private string assignmentModeText = string.Empty;
-    [ObservableProperty] private bool hasStrategyTransitionSummary;
-    [ObservableProperty] private string strategyTransitionSummary = string.Empty;
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanRunSimulation))]
     [NotifyPropertyChangedFor(nameof(HasNoDraftConditions))]
@@ -1093,49 +1070,8 @@ public partial class SimulationViewModel(
     private void Populate(SimulationResult result)
     {
         var projectionSummary = simulatorInsightService.Build(result.Scenario);
-        var baselineEnding = result.Baseline[^1].EndingProjectedSavings;
-        var scenarioEnding = result.Risk.EndingProjectedSavings;
-        BaselineEnding = Money(baselineEnding);
-        ScenarioEnding = Money(scenarioEnding);
-        EndingDifference = Money(scenarioEnding - baselineEnding);
         AssignmentModeText = AssignmentModeLabel(
             result.Scenario[0].PaymentAssignmentMode);
-        TightestPeriod = PeriodTitle(result.Risk.LowestPeriod.Start);
-        LowestAvailable = Money(result.Risk.LowestAvailableAfterMandatory);
-        LowestSavingsCapacity = Money(result.Risk.LowestSavingsCapacity);
-        LowestProjectedSavings = Money(result.Risk.LowestProjectedSavings);
-        FirstNegativePeriod =
-            result.Risk.FirstDeficitPeriod is { } negative
-                ? PeriodTitle(negative.Start)
-                : "12 dönemlik görünümde finansman açığı oluşmuyor.";
-        MaximumCarryOverDeficit = Money(
-            result.Risk.MaximumCarryOverDeficit);
-        RecoveryPeriod = result.Risk.RecoveryPeriod is { } recovery
-            ? PeriodTitle(recovery.Start)
-            : result.Risk.MaximumCarryOverDeficit > 0m
-                ? "Gösterilen dönemde kapanmıyor"
-                : "Gerekmedi";
-        TotalScenarioCost = Money(result.Risk.TotalScenarioCost);
-        var monthlyBurden = ResolveMonthlyBurden(_lastRequests, result);
-        HasMonthlyBurden = monthlyBurden is not null;
-        MonthlyBurden = monthlyBurden is decimal burden
-            ? Money(burden)
-            : string.Empty;
-        HasFinancingCost = result.Risk.FinancingCost is not null;
-        FinancingCost = result.Risk.FinancingCost is decimal cost
-            ? Money(cost)
-            : string.Empty;
-        BaselineInterest = Money(
-            result.BaselineInterest.TotalInterestCost);
-        ScenarioInterest = Money(
-            result.ScenarioInterest.TotalInterestCost);
-        InterestDifferenceTitle = result.AdditionalInterestCost < 0m
-            ? "Faiz Tasarrufu"
-            : "Ek Faiz Yükü";
-        InterestDifference = Money(
-            result.AdditionalInterestCost < 0m
-                ? result.InterestSaving
-                : result.AdditionalInterestCost);
         InterestComparison.Clear();
         foreach (var row in SimulatorInsightService.BuildInterestComparison(
                      result.BaselineInterest,
@@ -1147,21 +1083,6 @@ public partial class SimulationViewModel(
         PopulateLoanImpacts(result.LoanImpacts);
         _lastBaselineProjection = result.Baseline;
         _lastScenarioProjection = result.Scenario;
-        FriendlySummary = string.Join(Environment.NewLine,
-            projectionSummary.NarrativeInsights);
-        var transition = result.Scenario.FirstOrDefault(x =>
-            x.IsStrategyTransition);
-        HasStrategyTransitionSummary = transition is not null;
-        StrategyTransitionSummary = transition is null
-            ? string.Empty
-            : string.Join(Environment.NewLine,
-                $"Geçiş dönemi: {PeriodTitle(transition.PeriodStart)}",
-                $"Normal zorunlu ödemeler: {Money(result.Baseline.Single(x => x.PeriodStart == transition.PeriodStart).MandatoryOutflow)}",
-                $"Geçmiş düzenden kapanacak: {Money(transition.TransitionCatchUpAmount)}",
-                $"İleri dönem için ayrılacak: {Money(transition.ForwardFundedAmount)}",
-                $"Toplam geçiş yükü: {Money(transition.MandatoryOutflow)}",
-                $"Dönem neti: {Money(transition.EstimatedSavingsCapacity)}",
-                $"Dönem sonu durumu: {Money(transition.EndingProjectedSavings)}");
 
         NarrativeInsights.Clear();
         foreach (var insight in projectionSummary.NarrativeInsights)
@@ -1197,14 +1118,6 @@ public partial class SimulationViewModel(
         LoanImpacts.Clear();
         HasLoanImpacts = false;
         InterestComparison.Clear();
-        HasMonthlyBurden = false;
-        MonthlyBurden = string.Empty;
-        HasFinancingCost = false;
-        FinancingCost = string.Empty;
-        HasStrategyTransitionSummary = false;
-        StrategyTransitionSummary = string.Empty;
-        FriendlySummary = string.Join(Environment.NewLine,
-            projectionSummary.NarrativeInsights);
 
         NarrativeInsights.Clear();
         foreach (var insight in projectionSummary.NarrativeInsights)
@@ -1256,9 +1169,6 @@ public partial class SimulationViewModel(
         HasLoanImpacts = LoanImpacts.Count > 0;
     }
 
-    private static string PeriodTitle(DateOnly salaryDate) =>
-        $"{salaryDate.ToString("dd MMMM yyyy", TurkishCulture)} Dönemi";
-
     private static string TargetPeriodText(SalaryPeriod period) =>
         period.Start.ToString("MMMM yyyy", TurkishCulture);
 
@@ -1267,40 +1177,4 @@ public partial class SimulationViewModel(
             ? "Gelir kullanımı: Geçmiş dönemi kapatırım"
             : "Gelir kullanımı: Gelecek dönemi karşılarım";
 
-    private static decimal? ResolveMonthlyBurden(
-        IReadOnlyList<SimulationRequest> requests,
-        SimulationResult result)
-    {
-        var request = requests.Count == 1 ? requests[0] : null;
-        if (request is null || request.PaymentCount <= 1)
-        {
-            return null;
-        }
-
-        return request.Type switch
-        {
-            SimulationScenarioType.CreditCardInstallmentPurchase or
-                SimulationScenarioType.FinancingLoan or
-                SimulationScenarioType.CashDebt or
-                SimulationScenarioType.RecurringPayment =>
-                result.Risk.TotalScenarioCost / request.PaymentCount,
-            _ => null
-        };
-    }
-
-    private static string AssignmentText(SalaryPeriodProjection row)
-    {
-        var action = row.PaymentAssignmentMode ==
-                     PaymentAssignmentMode.PreviousPeriod
-            ? "ödemelerini kapatır"
-            : "ödemelerini karşılar";
-        return $"{row.PaymentWindowStart.ToString("dd MMM", TurkishCulture)}–" +
-               $"{row.PaymentWindowEnd.ToString("dd MMM", TurkishCulture)} {action}";
-    }
-
-    private static string SignedMoney(decimal value)
-    {
-        var formatted = Money(value);
-        return value > 0m ? $"+{formatted}" : formatted;
-    }
 }

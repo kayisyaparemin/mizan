@@ -177,7 +177,6 @@ public sealed class PeriodReviewService(
             true);
         var instruments = instrumentService.Apply(
             financialPlan,
-            plan,
             paymentLines,
             provisional.Payments,
             plan.ReviewAvailableFrom);

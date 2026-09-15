@@ -28,12 +28,7 @@ public sealed record CreditCardStatementProjection(
     CreditCardPaymentResolution PaymentResolution,
     CreditCardPaymentType? AppliedPaymentType,
     bool IsActualStatement = false,
-    CreditCardStatementSource? StatementSource = null)
-{
-    public bool IsPaymentDetermined => Payment is not null;
-    public bool UsesProjectionFallback =>
-        PaymentResolution == CreditCardPaymentResolution.ProjectionFallback;
-}
+    CreditCardStatementSource? StatementSource = null);
 
 public sealed class CreditCardStatementCalculator
 {

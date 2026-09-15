@@ -17,7 +17,6 @@ public sealed class FinancialInstrumentReconciliationService(
 {
     public ReconciledFinancialInstruments Apply(
         FinancialPlan data,
-        PeriodPlanSnapshot plan,
         IReadOnlyList<PeriodPlanPaymentLine> paymentLines,
         IReadOnlyList<ActualPayment> actualPayments,
         DateOnly newAnchor)

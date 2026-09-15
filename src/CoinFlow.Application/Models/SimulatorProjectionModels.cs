@@ -13,10 +13,7 @@ public sealed record SimulatorProjectionSummary(
     SimulatorPeriodView? FirstDeficitPeriod,
     SimulatorPeriodView? DeficitRecoveryPeriod,
     SimulatorPeriodView? BurdenReliefPeriod,
-    decimal EndingSituation)
-{
-    public bool HasKeyMetrics => KeyMetrics.Count > 0;
-}
+    decimal EndingSituation);
 
 // Faiz karşılaştırma tablosunun tek satırı. Motor kart faizi ile finansman
 // açığı faizini ayrı tutar (I8); sunumda da ayrı kalmaları gerekiyor, çünkü
@@ -65,7 +62,6 @@ public sealed record SimulatorPeriodView(
     private static readonly CultureInfo TurkishCulture =
         CultureInfo.GetCultureInfo("tr-TR");
 
-    public string OpeningText => Money(OpeningSituation);
     public string IncomeText => Money(Income);
     public string NeedText => Money(NeedTotal);
     public string CoverageAmountText => Money(Math.Abs(IncomeCoverage));
@@ -73,7 +69,6 @@ public sealed record SimulatorPeriodView(
     public string CoverageLabel => IncomeCoverage >= 0m
         ? "Gelirlerden kalan"
         : "Gelirlerin karşılamadığı";
-    public bool CoverageIsNegative => IncomeCoverage < 0m;
     public bool EndingIsNegative => EndingSituation < 0m;
     public string PrimaryInsight => InsightChips.FirstOrDefault() ?? string.Empty;
     public bool HasPrimaryInsight => InsightChips.Count > 0;

@@ -743,7 +743,6 @@ public partial class OnboardingViewModel : ViewModelBase
         {
             DraftIncomes.Add(new FinancialRecordLine(
                 salary.Id,
-                ManagementSection.Income,
                 FinancialRecordKind.Salary,
                 salary.Description,
                 $"Geçerli: {salary.EffectiveDate:dd.MM.yyyy}",
@@ -759,7 +758,6 @@ public partial class OnboardingViewModel : ViewModelBase
                 : $"Kesim {card.StatementClosingDay}. gün • Son ödeme {card.PaymentDueDay}. gün";
             DraftCards.Add(new FinancialRecordLine(
                 card.Id,
-                ManagementSection.Payment,
                 FinancialRecordKind.CreditCard,
                 $"{card.Bank} {card.Name}".Trim(),
                 subtitle,
@@ -774,7 +772,6 @@ public partial class OnboardingViewModel : ViewModelBase
         {
             DraftLoans.Add(new FinancialRecordLine(
                 loan.Id,
-                ManagementSection.Payment,
                 FinancialRecordKind.Loan,
                 $"{loan.Bank} {loan.Name}".Trim(),
                 $"Sonraki: {loan.NextPaymentDate:dd.MM.yyyy} • {loan.RemainingInstallmentCount} ödeme",
@@ -787,7 +784,6 @@ public partial class OnboardingViewModel : ViewModelBase
         {
             DraftPayments.Add(new FinancialRecordLine(
                 payment.Id,
-                ManagementSection.Payment,
                 FinancialRecordKind.LargeExpense,
                 payment.Name,
                 payment.ExactDate.ToString("dd.MM.yyyy"),
@@ -800,7 +796,6 @@ public partial class OnboardingViewModel : ViewModelBase
         {
             DraftPayments.Add(new FinancialRecordLine(
                 plan.Id,
-                ManagementSection.Payment,
                 FinancialRecordKind.TemporaryPlan,
                 plan.Name,
                 $"{plan.Installments.Min(x => x.DueDate):dd.MM.yyyy} • {plan.Installments.Count} ödeme",

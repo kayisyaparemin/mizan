@@ -11,7 +11,6 @@ public partial class HistoryViewModel(CoinFlowService service) : ViewModelBase
 {
     public ObservableCollection<HistoryCardItem> Periods { get; } = [];
 
-    [ObservableProperty] private bool hasHistory;
     [ObservableProperty] private bool hasSummary;
     [ObservableProperty] private string summaryTitle = string.Empty;
     [ObservableProperty] private string summaryPlanned = string.Empty;
@@ -51,7 +50,6 @@ public partial class HistoryViewModel(CoinFlowService service) : ViewModelBase
                     }));
             }
 
-            HasHistory = Periods.Count > 0;
             var summary = await service.GetHistorySummaryAsync();
             HasSummary = summary is not null;
             if (summary is not null)

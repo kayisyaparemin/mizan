@@ -1,7 +1,6 @@
 using CoinFlow.App.Services;
 using CoinFlow.App.ViewModels;
 using CoinFlow.Application.Services;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace CoinFlow.App.Pages;
 
