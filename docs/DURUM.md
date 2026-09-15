@@ -1,11 +1,11 @@
 # Mizan — Proje Durumu ve Devir Notu
 
-> Son güncelleme: 15.09.2026 · Son sürüm `v1.15.0`
+> Son güncelleme: 15.09.2026 · Son sürüm `v1.16.0`
 >
 > **Yeni bir sohbet/geliştirici buradan başlar.** Bu dosya tek devir
 > belgesidir; eski `HANDOFF.md` ve `TODO.md` kaldırıldı, hâlâ geçerli olan kısımları
 > burada (TODO tamamen bitmişti). Önce "Devir" bölümünü, sonra "Açık işler"i ve "Ürün invariant'ları"nı
-> oku. Sürüm bölümleri (v1.2.0 → v1.15.0) geriye dönük kayıttır; yalnız
+> oku. Sürüm bölümleri (v1.2.0 → v1.16.0) geriye dönük kayıttır; yalnız
 > dokunacağın alanın bölümünü oku.
 
 ## Devir
@@ -15,17 +15,18 @@
 | | |
 |---|---|
 | Branch | `main`, `origin/main` ile eşit, worktree yok (`git worktree list` yalnız `main`) |
-| Son sürüm | `v1.15.0` — plan türleri gruplandı, Finansal Yapı'dan doğrudan giriş (`Mizan-1.15.0.apk`, release iş akışı başarılı) |
-| Testler | 454/454 (`dotnet test`, ~8 sn) |
+| Son sürüm | `v1.16.0` — ödeme günü hatırlatıcısı, Finansal Yapı ekleme alanı, placeholder'lar, atıl kod temizliği, devreden borç düzeltmesi (`Mizan-1.16.0.apk`) |
+| Testler | 543/543 (`dotnet test`, ~9 sn) |
 | Android Release build | 0 uyarı, 0 hata |
-| Şema | v15 (`SqliteCoinFlowStore.CurrentSchemaVersion`) |
+| Şema | v16 (`SqliteCoinFlowStore.CurrentSchemaVersion`) |
 | Veri yeri | profil başına `files/profiles/{id:N}/coinflow.db3` (v1.12.0'dan beri) |
 | Yedek yeri | `/storage/emulated/0/Mizan/Mizan-yedek-YYYY-MM-DD.zip` (dev build: `Mizan Dev`), v1.13.0'dan beri |
 
-**Devralırken bekleyen iş yok.** `v1.15.0` önce v1.14.0'ın sürüm notuyla
-yayınlandı, çünkü not `release.yml`'de elle yazılıyor ve güncellenmemişti.
-15.09.2026'da `gh release edit` ile düzeltildi. Kontrol listesinin 3. adımı bu
-yüzden var.
+**Devralırken bekleyen iş yok.** v1.16.0 beş isteği tek turda, riske göre
+beş fazda getirdi (ayrıntı "v1.16.0 ne getirdi"). Bu turda kullanıcı soru
+sorulmamasını, önerilen seçeneklerle ilerlenmesini istedi; alınan ürün
+kararları o bölümde "Kararlar" altında yazılı, kullanıcı değiştirmek
+isteyebilir. Yeni açık işler 16–17.
 
 ### Kullanıcıyla çalışma biçimi
 
@@ -56,7 +57,7 @@ repo dışından çalıştırırsan makinedeki .NET 10 seçilir.
 dotnet test tests/CoinFlow.Tests/CoinFlow.Tests.csproj -c Release
 dotnet build src/CoinFlow.App/CoinFlow.App.csproj -c Release
 # Dev build'i açık emülatöre kur (paket: com.coinflow.mobile.dev, ad "Mizan Dev")
-dotnet build src/CoinFlow.App/CoinFlow.App.csproj -f net8.0-android -c Debug -p:CoinFlowDevBuild=true -t:Install
+dotnet build src/CoinFlow.App/CoinFlow.App.csproj -f net8.0-android -c Debug -p:CoinFlowDevBuild=true -p:EmbedAssembliesIntoApk=true -t:Install
 emulator -avd mizan34
 adb shell monkey -p com.coinflow.mobile.dev -c android.intent.category.LAUNCHER 1
 ```
@@ -108,9 +109,12 @@ Commit mesajları İngilizce özet satırı + Türkçe gövde biçiminde (`git l
 | `src/CoinFlow.Application/Services/CoinFlowService.cs` | UI'ın gördüğü cephe (~1.900 satır): plan okuma, projeksiyon, simüle/uygula, doğrudan giriş, review |
 | `src/CoinFlow.Application/Services/` | `PeriodProgressService` (Ana Sayfa), `PeriodReviewService`, `LoanPayoffService` / `LoanPayoffAdvisor`, `BackupService`, `ProfileService` |
 | `src/CoinFlow.Application/Models/SimulationScenarioCatalog.cs` | Plan türü grupları, tür çözümü, türün simülatör dışındaki yeri (v1.15.0) |
+| `src/CoinFlow.Application/Models/FinancialRecordEntryCatalog.cs` | Finansal Yapı "+ Ekle" türleri ve grupları (v1.16.0) |
+| `src/CoinFlow.Application/Services/PaymentReminderPlanner.cs` | Ödeme hatırlatıcısı takvimi (saf); ödemeleri `CoinFlowService.GetUpcomingPaymentDuesAsync` toplar (v1.16.0) |
 | `src/CoinFlow.Infrastructure/Persistence/` | `SqliteCoinFlowStore` (şema + migration), `ProfileScopedCoinFlowStore` (açık profile iletir), `DevelopmentDataSeeder`, `FileSystemProfileRepository`, `ProfileBackupArchive` |
-| `src/CoinFlow.App/Pages` · `ViewModels` · `Controls` | MAUI sayfaları ve MVVM (CommunityToolkit). `Controls/ScenarioConditionFormView` Simülatör ile Finansal Yapı'nın ortak koşul formu |
-| `tests/CoinFlow.Tests/` | Domain, SQLite entegrasyon ve kaynak testleri. Sözleşme testleri: `ProductContractInvariantTests`, `CultureFormattingSourceTests`, `ScenarioDirectEntryTests` (parite) |
+| `src/CoinFlow.App/Pages` · `ViewModels` · `Controls` | MAUI sayfaları ve MVVM (CommunityToolkit). `Controls/ScenarioConditionFormView` Simülatör ile Finansal Yapı'nın ortak koşul formu; `EntryTypePickerView` ikisinin ortak tür seçicisi; `PaymentReminderCardView` hatırlatıcı kartı |
+| `src/CoinFlow.App/Platforms/Android/PaymentReminders.cs` | Hatırlatıcı alarmı, bildirimi ve yeniden başlatma alıcısı (v1.16.0) |
+| `tests/CoinFlow.Tests/` | Domain, SQLite entegrasyon ve kaynak testleri. Sözleşme testleri: `ProductContractInvariantTests`, `CultureFormattingSourceTests`, `ScenarioDirectEntryTests` (parite), `PlaceholderSourceTests`, `PeriodHistoryTests` (geçmiş dönem tarih/tutar) |
 
 ### Tuzaklar (bu projede gerçekten yaşandı)
 
@@ -132,6 +136,20 @@ Commit mesajları İngilizce özet satırı + Türkçe gövde biçiminde (`git l
 - **Fixture'ın sıfırladığı risk test edilmez:** kanonik seed'de faiz sıfırdı ve
   gidişat hatası testlere düşmedi. Riski taşıyan senaryoyu bilerek kur. Yeni bir
   testi bir kez bilerek bozup düştüğünü gör.
+- **Pencere sınırı günleri:** donmuş plan `(snapshot, checkpoint]` okur,
+  projeksiyon `>= çapa`. Bir kaydı tam checkpoint gününe taşıyan kod onu yeni
+  dönemin planından düşürür (v1.16.0'da bulunan hata). Tarih taşıyan her
+  değişiklikte iki ucu da test et.
+- **Debug derlemesini emülatöre kurmak:** `-t:Install` assembly'leri cihazdaki
+  `files/.__override__` klasörüne yazar (fast deployment). O klasörü silersen
+  uygulama açılışta *"No assemblies found"* diye kapanır; derleme değişmediyse
+  yeniden kurmak da doldurmaz. `-p:EmbedAssembliesIntoApk=true` ile kur.
+- **Alarm penceresi:** `SetAndAllowWhileIdle` Android 14'te bir saatlik pencere
+  alıyor (`adb shell dumpsys alarm` → `window=+1h`). Kesin alarm izni olmadan
+  `SetWindow` ile 10 dakika. Emülatörde saati ilerletmek için `adb root` +
+  `adb shell settings put global auto_time 0` + `adb shell "date MMDDhhmmYYYY.ss"`.
+- **Bash heredoc'ta `\\`:** araç çift ters eğik çizgiyi teke indirebiliyor;
+  C# regex içeren dosyaları heredoc yerine dosya yazma aracıyla yaz.
 - **Dönem içinde `RefreshCurrentFinancialStateAsync` çağırma:** checkpoint
   işlemidir, açık planı bozar (I14).
 - Aşağıdaki sürüm bölümlerinde anılan `PLAN-*.md`, `DEVIR-FAZ3.md`,
@@ -144,8 +162,9 @@ Commit mesajları İngilizce özet satırı + Türkçe gövde biçiminde (`git l
 Öncelik kullanıcının. Somut adayları "Açık işler" altında: Geçmiş ekranı (2),
 gecikmiş yükümlülüğün temsili (5, ürün kararı bekliyor), dönem sonunun kart
 borcunu göstermemesi (7), kredide "bu taksiti ödedim" (8), simülatörde ilk maaş
-öncesi gider uyarısı (9), kart başına faiz oranı (11). Akbank PDF içe aktarma
-(6) kullanıcı tarafından ertelendi.
+öncesi gider uyarısı (9), kart başına faiz oranı (11), hatırlatıcının gece
+yenilenmesi (16), dönem sihirbazının gözlemi kullanmaması (17). Akbank PDF içe
+aktarma (6) kullanıcı tarafından ertelendi.
 
 ## Sürüm geçmişi
 
@@ -181,6 +200,7 @@ ekran doğruydu ama okunmuyordu; v1.5.0 ise eksik olan bir şeyi ekledi.
 | **v1.13.0** | **Gece otomatik yedek** ve yeniden kurulumda geri yükleme |
 | **v1.14.0** | **Yedekten ekle** — profil varken yedekteki profili kopya olarak ekleme |
 | **v1.15.0** | **Plan türleri gruplandı, Finansal Yapı'dan doğrudan giriş** — simüle edilen her tür aynı sonuçla doğrudan girilebiliyor |
+| **v1.16.0** | **Ödeme günü hatırlatıcısı** (rahat / agresif) · Finansal Yapı ekleme alanı simülatör tasarımında · placeholder'lar · atıl kod temizliği · ödenmeyen borç yeni dönemin planından düşüyordu |
 
 Grafik çalışması (Faz 1–4, v1.1.0–v1.2.0) v1.3.0'da geri alındı; ayrıntı
 aşağıdaki sürüm bölümlerinde. Anılan `DEVIR-FAZ3.md` repoda yok.
@@ -918,6 +938,140 @@ Bu projede sekizinci kez yalnız ekranda görülen kusur.
 - Finansal Yapı formundaki "Vazgeç" butonu mavi zeminde zayıf görünüyor. Bu
   sürümden önce de böyleydi, dokunulmadı.
 
+### v1.16.0 ne getirdi (hatırlatıcı, ekleme alanı, placeholder, temizlik)
+
+Kullanıcı beş istek verdi ve **soru sorulmamasını, önerilen seçeneklerle
+ilerlenmesini, işin riske göre fazlara bölünmesini** istedi:
+
+1. Simülatördeki yeni ekleme tasarımı Finansal Yapı'ya taşınsın.
+2. Ödeme günü geldiğinde hatırlatıcı bildirim; Ana Sayfa'dan ve/veya "Bu dönem
+   nasıl oluşuyor" ekranından kurulsun; **agresif** ve **rahat** iki davranış;
+   UI/UX tasarımı geliştiriciye bırakıldı.
+3. Atıl / kullanılmayan kod kaldırılsın.
+4. Metin kutuları otomatik dolmasın; dolanlar genel kullanıcıya yazılmış
+   placeholder'a dönsün.
+5. Geçmiş dönemlerin tutulduğu business için tarih ve tutar ağırlıklı ayrıntılı
+   testler.
+
+Fazlar düşük riskten yükseğe sıralandı; her faz ayrı commit, testler yeşil:
+**1** testler → **2** atıl kod → **3** placeholder → **4** ekleme alanı →
+**5** hatırlatıcı (yeni izin, alarm, şema).
+
+**Kararlar (önerilen seçenekle alındı; kullanıcı değiştirebilir).**
+- Hatırlatıcı profil başına tek ayar: Kapalı · Rahat · Agresif. Ödeme başına
+  aç/kapa yok.
+- Rahat: ödeme günü 09:00, tek bildirim. Agresif: 3 gün önce 10:00, bir gün
+  önce 20:00, ödeme günü 09:00 ve 18:00. Aynı güne düşen ödemeler tek
+  bildirimde toplanır (ilk üç ad + "ve N ödeme daha").
+- Kaynak: açık dönemde donmuş planın satırları (Ana Sayfa ile aynı; ödendi
+  işaretlenen hatırlatılmaz, **bugün vadesi gelen hatırlatılır** — Ana Sayfa
+  onu ödenmiş sayar), dönem sonrası projeksiyon. Ufuk 35 gün.
+- Kart Ana Sayfa'da KALAN'ın altında; "Bu dönem nasıl oluşuyor" ekranında
+  yalnız Ana Sayfa'dan açılınca (12 Dönem ve Simülatör'den açılınca yok).
+- Finansal Yapı'da dört grup: Harcama · Borç / Kredi · Gelir · **Hesap**
+  (kredi kartı, bankadaki kredi, değişken ödeme planı). Tür değiştirmek
+  yazılanı silmez.
+- Dönem sihirbazında boş alan planlananı kabul eder (placeholder "Boş
+  bırakırsan planlanan: …"); "Her şey planlandığı gibi" kısayolu aynen çalışır.
+- Düzenleme ekranları (kart, kredi, Ayarlar) kaydın kendi değerlerini
+  göstermeye devam eder; bu otomatik doldurma sayılmadı.
+
+**Faz 1 — geçmiş dönem testleri ve bulunan hata.** `PeriodHistoryTests` (48):
+donmuş planın penceresi (maaş günü 31, Şubat, artık yıl, yıl dönümü), kısmi
+dönem yaşam gideri ve yarım kuruş (`1.000,01 × 15/30 = 500,005 → 500,01`),
+açık faizi `AwayFromZero` (`617,285 → 617,29`), checkpoint maaşı,
+plan/gerçek karşılaştırmasının her satırı ve özet cümlesi, elle hesaplanan
+gerçekleşen (`110.150`), tarih doğrulamasının dört sınır günü, üç ardışık
+dönem zinciri, maaş günü 31 zinciri, geç kapanış ve geçmiş sorgusunda
+revizyon seçimi (UTC tarih sınırı, eşit zamanda revizyon numarası).
+
+Testler bir **hata** buldu: ödenmeyen kredi taksiti, geçici ödeme ve büyük
+gider dönem kapanışında **checkpoint gününe** taşınıyordu. Yeni dönemin donmuş
+planı `(checkpoint, sonraki checkpoint]` penceresini okuduğu için bu borç Ana
+Sayfa'da hiç görünmüyordu (kanonik veride 14.501,23 TL'lik taksit ölçüldü);
+geçici ödeme ve büyük gider hiçbir review'da kapatılamıyor, her checkpoint'te
+yeniden taşınıyordu. Projeksiyon `>= çapa` okuduğu için 12 Dönem onu sayıyordu —
+iki ekran farklı söylüyordu. Düzeltme: ödenmeyen yükümlülük **yeni dönemin ilk
+gününe** devreder; checkpoint gününde vadesi olup ödenmeyen de. Snapshot günü
+(çapa) tarihli, hiçbir plana girmemiş kalem de ilk kapanışta devreder. Açık
+iş 5'in (gecikmenin temsili) ürün kararı hâlâ açık; bu düzeltme yalnız borcun
+görünmesini sağlar. Düzeltme bilerek geri alınınca 4 test düştü.
+
+**Faz 2 — atıl kod.** Analizör (IDE0051/0052/0060/0005) ve tanım–referans
+taraması. Kaldırılanlar: Finansal Yapı'daki eski kart ödeme planı dalı
+(komut, koleksiyon, alanlar, işleyici — kart düzenlenirken kartın ödeme
+kararları artık ayrı alanda korunup geri yazılıyor), bölüm listesi, v1.3.0'da
+ekrandan kalkan Simülatör özet alanları, bağlanmayan Ana Sayfa/Geçmiş/12 Dönem
+özellikleri, çağrılmayan domain özellikleri, `CalendarRules.MonthlyDates`,
+ekstre içe aktarmada hiç doldurulmayan gelecek taksit ve faiz alanları,
+`ToStatement`, gereksiz `using`'ler. ~450 satır. Servis cephesindeki yalnız
+testlerin kullandığı metotlar (`SaveOtherIncomeAsync`, `ObservePaymentAsync`
+…) bilinçli bırakıldı: test kurulumu onları kullanıyor.
+
+**Faz 3 — placeholder.** Ortak formdaki "Beyaz eşya · 120000 · 9 · 145000" ve
+"Yeni koşul", Finansal Yapı ve ilk kurulumdaki günler (10/12/25/5/40), "0"
+tutarlar, kart adı tahmini ("Axess"/"Bonus"), Ana Sayfa'da son gözlemle dolan
+mevcut tutar, profil adı penceresinin başlangıç değeri kalktı. Krediye erken
+ödemede ad alana yazılmıyor; krediden türeyen ad placeholder'da, boş bırakılırsa
+o ad kullanılıyor. Yeni form önceki kaydın değerlerini taşımıyor. Ana Sayfa'da
+son gözlemin tutarı artık "Son gözlem" satırında. `PlaceholderSourceTests` (9)
+her `Entry`'nin placeholder'ı olduğunu ve Entry'ye bağlı alanların boş
+başladığını sabitler.
+
+**Faz 4 — Finansal Yapı ekleme alanı.** "+ Ekle" menü yerine formun üstünde
+`EntryTypePickerView` (Simülatör'ün koşul formu da aynı kontrolü kullanıyor).
+`FinancialRecordEntryCatalog` ortak formdan girilen türleri simülatör
+seçeneğinin kendisiyle taşır. `RecordTypes` / `IsIncomeSection` kalktı;
+yönlendirmeyle gelinince açık form kapanır. v1.15.0'dan kalan "Vazgeç" ve kart
+formundaki "Hayır" butonları mavi zeminde görünür oldu.
+
+**Faz 5 — ödeme günü hatırlatıcısı.**
+- **Şema v16:** `settings.PaymentReminderMode` (0 kapalı). Sütun yalnız
+  kendi metoduyla yazılır; finans ayarlarını kaydetmek onu sıfırlamaz,
+  "Verileri Sil" kapatır. Eski veritabanı açılınca sütun eklenir (test sütunu
+  silip v15'e indirerek doğruluyor). Yedeğe girer.
+- `PaymentReminderPlanner` (Application, saf) takvimi üretir;
+  `CoinFlowService.GetPaymentRemindersAsync(now)` ödemeleri toplar.
+- Android (`Platforms/Android/PaymentReminders.cs`): `AlarmManager` +
+  `BroadcastReceiver` + bildirim kanalı "Ödeme hatırlatıcısı".
+  `POST_NOTIFICATIONS` Android 13+'ta kart ilk açılınca sorulur; izin yoksa
+  kartta uyarı + "Bildirimleri Aç". Kurulan bildirimler
+  `files/payment-reminders.txt`'de de tutulur; `BOOT_COMPLETED` ve
+  `MY_PACKAGE_REPLACED` alıcısı veritabanını açmadan oradan geri kurar. İstek
+  kodu profil + anahtardan FNV-1a (süreçten bağımsız). Profil silinince
+  bildirimleri de silinir.
+- Eşitleme: Ana Sayfa her yüklenişte ve davranış değişince açık profilin
+  bildirimleri güncel planla değiştirilir (diğer profillere dokunulmaz).
+- Testler: `PaymentReminderTests` (23), `PaymentReminderAppSourceTests` (5).
+
+**Emülatörde (Android 14) doğrulandı.** Ana Sayfa'da kart; Agresif → izin
+penceresi → İzin ver → "Önümüzdeki 35 gün için 24 bildirim kuruldu"; dosyada
+24 satır, `dumpsys alarm`'da kayıtlar. Saat alarmın öncesine alınınca bildirim
+10 dakikalık pencerede düştü ("3 gün sonra ödeme var · Eminevim · 28.167,40
+TL · 20 Eylül Pazar"). Uygulama güncellenince (`MY_PACKAGE_REPLACED`) alarmlar
+dosyadan yeni pencereyle geri kuruldu. Yeniden açılışta ayar kalıcı; "Bu dönem
+nasıl oluşuyor" ekranında aynı kart. Finansal Yapı'da çipler ve kartlar,
+Hesap grubu, krediye erken ödemede krediden türeyen ad placeholder'ı;
+Simülatör aynı seçiciyle.
+
+**Emülatörde yakalanan üç kusur.**
+1. `SetAndAllowWhileIdle` Android 14'te **bir saatlik** pencere aldı (09:00
+   bildirimi 10:00'a kayabilirdi). Kesin alarm izni yoksa `SetWindow` ile 10
+   dakika; varsa ya da Android 12 öncesinde tam saatinde.
+2. Ana Sayfa'daki mevcut tutar placeholder'ı ("Bugün hesabındaki toplam para")
+   kutuya sığmıyordu → "Bugünkü tutar".
+3. Kart formundaki "Hayır" butonu mavi zeminde görünmüyordu.
+
+Bu projede on birinci kez yalnız ekranda görülen kusur.
+
+**Testler 454 → 543.**
+
+**Bilinen.**
+- Uygulama 35 günden uzun açılmazsa yeni bildirim kurulmaz (açık iş 16).
+- Birden fazla profil varsa her profilin bildirimi, o profil son açıldığında
+  kurulan takvimle çalar.
+- Bildirim küçük simgesi uygulama simgesi; tek renkli ayrı simge yok.
+
 ## Açık işler
 
 1. **Yetim plan satırları (🟠 ölçülmedi).** `v1.3.0`–`v1.5.0` arasında ana
@@ -947,6 +1101,8 @@ Bu projede sekizinci kez yalnız ekranda görülen kusur.
 5. **Gecikmiş yükümlülük (🟠 bilinen sapma).** Bir krediyi/taksiti ödemezsen
    finalize sırasında gerçek vadesi sessizce yeni döneme kaydırılıyor; kullanıcı
    "gecikmiş" olduğunu göremiyor. Borç kaybolmuyor, sadece tarih bilgisi yok oluyor.
+   v1.16.0: kayma hedefi checkpoint günü değil **yeni dönemin ilk günü** (I19);
+   önceden borç yeni dönemin planında hiç görünmüyordu. Gecikmenin temsili hâlâ açık.
    Düzeltmek için `Loan`, `TemporaryPaymentInstallment`, `PlannedLargeExpense`
    kayıtlarına gecikme alanı + yeni bir şema sürümü + UI rozeti gerekiyor.
    (Eski notta "şema v12" yazıyordu; v12 geçici planlara gitti, v13 izolasyona
@@ -1014,11 +1170,25 @@ Bu projede sekizinci kez yalnız ekranda görülen kusur.
 15. **v1.15.0'dan kalan küçükler.**
    - Ortak formdan girilen kayıtta eski formdaki "Not" alanı yok; açıklama plan
      adı.
-   - Finansal Yapı formunda "Vazgeç" (`SecondaryButton`) `SoftSky` zeminde
-     zayıf görünüyor; v1.15.0 öncesinden beri.
+   - ~~Finansal Yapı formunda "Vazgeç" `SoftSky` zeminde zayıf görünüyor.~~ ✅
+     v1.16.0.
    - Eski "Tek seferlik ödeme" (`FutureOneTimePayment`) ile uygulanmış
      kayıtlar Finansal Yapı'da "Düzenli Ödemeler" altında "Planlı ödeme"
      rozetiyle duruyor. Yeni kayıt bu türde oluşmuyor; eskileri taşınmadı.
+
+16. **Hatırlatıcı yalnız uygulama açılınca yenilenir.** Takvim 35 gün ileriyi
+   kurar ve Ana Sayfa her yüklenişte eşitlenir. Uygulama 35 günden uzun
+   açılmazsa yeni bildirim kurulmaz. Çözüm adayı: gece yedek görevi
+   (`NightlyBackupJob`) her profil için takvimi de yenilesin — profil
+   veritabanını arka planda açmak gerekiyor, bu yüzden bu tura alınmadı.
+
+17. **Dönem sihirbazı gözlem defterini okumuyor (🟠 koddan, ekranda
+   ölçülmedi).** `CoinFlowService.GetObservedReviewDraftAsync` var ve testli,
+   ama App tarafında hiçbir yerden çağrılmıyor: `PeriodReviewWizardViewModel`
+   taslağı yalnız donmuş plandan kuruyor. I15'in "gözlem checkpoint'te
+   review'ı doldurur" cümlesi servis düzeyinde doğru, ekranda değil; Ana
+   Sayfa'da işaretlenen ödeme sihirbazda yeniden işaretlenmek zorunda. Karar
+   kullanıcının: sihirbaz gözlemle açılsın mı (önerilen).
 
 ## Bilinen sadeleştirmeler (bug değil, kasıtlı)
 
@@ -1052,6 +1222,7 @@ Bu projede sekizinci kez yalnız ekranda görülen kusur.
 | I16 | Her ekran tek zaman dilimine sahiptir; Ana Sayfa mevcut dönemin dışından rakam göstermez |
 | I17 | Kredi taksiti ödenince kalan anaparadan yalnız anapara payı düşer; faiz türetilemiyorsa anaparaya dokunulmaz |
 | I18 | Erken ödeme krediyi değiştirmez, üstüne oynatılan bir olaydır; checkpoint'te ödendiyse krediye işlenir, ödenmediyse iptal olur |
+| I19 | Ödenmeyen yükümlülük dönem kapanışında yeni dönemin **ilk gününe** devreder; donmuş plan checkpoint gününü dışarıda bıraktığı için checkpoint gününe taşınamaz |
 
 ## Bu turda öğrenilen dokuz ürün kuralı
 

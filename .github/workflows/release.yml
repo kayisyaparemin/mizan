@@ -201,36 +201,42 @@ jobs:
           cat > release-notes.md <<NOTES
           # Mizan $version
 
-          İki iyileştirme: Simülatörde plan türünü bulmak kolaylaştı ve
-          simüle edebildiğin her şeyi **Finansal Yapı'dan doğrudan**
-          girebiliyorsun.
+          Ödeme günü hatırlatıcısı, Finansal Yapı'da yeni ekleme alanı ve
+          dönem kapanışında bulunan bir hatanın düzeltmesi.
 
-          ### Plan türleri gruplandı
+          ### Ödeme günü hatırlatıcısı
 
-          Simülatördeki uzun tür listesi kalktı. Önce bir grup seçersin —
-          **Harcama**, **Borç / Kredi**, **Gelir**, **Ayar** — sonra o grubun
-          en fazla üç türü açıklamalarıyla kart olarak gelir.
+          Ana Sayfa'da ve "Bu dönem nasıl oluşuyor" ekranında **Ödeme günü
+          hatırlatıcısı** kartı var. Üç seçenek:
 
-          - **Kartla harcama:** taksit sayısını 1 yazarsan tek çekim olur.
-          - **Krediye erken ödeme:** "Tamamen kapat" ya da ara ödeme (vadeyi
-            kısalt / taksiti azalt) aynı yerden seçilir.
-          - **Nakit ödeme:** eski "Nakit satın alma" ve "Tek seferlik ödeme"
-            tek türde birleşti.
+          - **Kapalı:** bildirim yok.
+          - **Rahat:** ödeme günü sabah 09:00'da tek bildirim.
+          - **Agresif:** 3 gün önce, bir gün önce akşam, ödeme günü sabah ve
+            akşam.
 
-          Kaydettiğin geçici planlar olduğu gibi yüklenir.
+          Aynı güne düşen ödemeler tek bildirimde toplanır. İlk açtığında
+          telefon bildirim izni sorar. Kart sıradaki bildirimleri gösterir;
+          uygulamayı her açtığında takvim güncel planınla eşitlenir.
 
-          ### Finansal Yapı'dan doğrudan giriş
+          ### Finansal Yapı'da ekleme
 
-          **+ Ekle** menüsünde artık **Harcama**, **Borç / Kredi** ve **Tek
-          Seferlik Gelir** var. Simülatördeki formun aynısı açılır; Kaydet
-          dediğinde kayıt doğrudan finans planına eklenir. Taksitli kart
-          harcaması, taksitli nakit borç, kredi / finansman çekme, krediye
-          erken ödeme ve tek seferlik gelir için artık simülasyon yapıp
-          "Planı Uygula" demen gerekmiyor. Doğrudan girdiğin kayıt,
-          simülasyonda gördüğün sonucun aynısını üretir.
+          **+ Ekle** artık menü açmıyor; Simülatördeki gibi grup çipleri ve
+          açıklamalı kartlar geliyor: **Harcama**, **Borç / Kredi**,
+          **Gelir**, **Hesap** (kredi kartı, bankadaki kredi, değişken ödeme
+          planı). Türü değiştirince yazdıkların silinmez.
 
-          Tutarı ya da tarihi aydan aya değişen ödemeler için **Tarihleri
-          Farklı Ödeme Planı** seçeneği geri geldi.
+          ### Kutular kendiliğinden dolmuyor
+
+          Formlar örnek değerlerle dolu gelmiyor; örnekler kutunun içinde
+          soluk yazı olarak duruyor. Dönem kapatırken boş bıraktığın tutar
+          planlananı kabul eder.
+
+          ### Düzeltme
+
+          Dönem kapanırken **ödenmedi** işaretlediğin kredi taksiti, ödeme
+          planı ya da büyük gider yeni dönemin planında görünmüyordu ve bir
+          sonraki dönemde de kapatılamıyordu. Artık yeni dönemin ilk gününe
+          devrediyor ve Ana Sayfa'da kalan ödemeler arasında görünüyor.
           NOTES
 
       - name: Upload signed APK artifact

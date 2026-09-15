@@ -32,7 +32,7 @@ Current/future query'leri, latest current snapshot ve history üzerinden runtime
 |---|---|
 | `CoinFlow.Domain` | Saf modeller, tarih kuralları, projection ve simulation motorları |
 | `CoinFlow.Application` | Kullanım senaryoları, CRUD, açık onaylı scenario apply ve store sözleşmesi |
-| `CoinFlow.Infrastructure` | SQLite şema v15, profil klasörleri, legacy upgrade ve deterministik development seed |
+| `CoinFlow.Infrastructure` | SQLite şema v16, profil klasörleri, legacy upgrade ve deterministik development seed |
 | `CoinFlow.App` | .NET MAUI Android görünümü ve servis sonuçlarını sunan MVVM katmanı |
 | `CoinFlow.Tests` | Domain regression, kanonik veri ve SQLite entegrasyon testleri |
 
@@ -107,6 +107,8 @@ Enum değişmez; kayıtlı taslak koşulları enum değerini sakladığı için 
 `ScenarioConditionForm` (App) alanları, görünürlük kurallarını ve `SimulationRequest` üretimini tutar; `ScenarioConditionFormView` onu çizer. Simülatör (`directEntryOnly: false`) ve Finansal Yapı (`true`, yalnız `SharedForm` seçenekleri) aynı formu kullanır.
 
 **Doğrudan giriş.** Finansal Yapı'da ortak formdan kaydedilen kayıt `CoinFlowService.AddRecordFromScenarioAsync` ile yazılır. Metot `ApplySimulationAsync` ile aynı `ApplyScenarioRequestsAsync` gövdesinden geçer: doğrulama (çapa kuralı dahil), idempotency, çakışma kontrolü, `BuildScenarioPlan` → persistence batch ve plan revizyonu; yalnız tetikleyici "Finansal Yapı'dan eklendi"dir. Böylece doğrudan girilen kayıt, simülasyonda görülen 12 dönemi birebir üretir (`ScenarioDirectEntryTests`). `SharedForm` dışındaki türler bu yoldan reddedilir. Formun kimliği form açılınca üretilir; çift dokunuş ikinci kayıt oluşturmaz. Tutarı ya da tarihi aydan aya değişen ödeme planı ise elle takvim giren `TemporaryPaymentPlan` formunda kalır.
+
+**Finansal Yapı'nın ekleme alanı (v1.16.0).** "+ Ekle" simülatördeki tür seçimiyle aynı `EntryTypePickerView`'u formun üstünde açar: grup çipleri ve en fazla üç açıklamalı kart. `FinancialRecordEntryCatalog` (Application) grupları tanımlar — Harcama, Borç / Kredi, Gelir, Hesap. Ortak formdan girilen seçenekler `SimulationScenarioCatalog`'daki seçeneğin kendisini taşır (`RecordEntryForm.SharedForm`); Maaş / gelir değişikliği, Kredi kartı, Bankadaki kredi ve Değişken ödeme planı kendi formlarını açar. Ortak form Finansal Yapı'da kendi seçicisini gizler (`ScenarioConditionForm.ShowsTypePicker`). Tür değiştirmek yazılmış alanları silmez; kaydedilen yalnız görünen formdur. Düzenleme (kart, kredi) seçiciyi göstermez.
 
 ### Üç zaman dilimi
 
@@ -188,7 +190,7 @@ New Current FinancialSnapshot + New Frozen Plan
 - `ProjectionBoundaryResolver`, latest current snapshot'ın bir `PeriodActual.ResultFinancialSnapshotId` sonucu olup olmadığını history'den anlık çözer. Actual-generated snapshot için closed checkpoint `PeriodActual.PeriodEnd`, first unrealized salary ise salary calendar'da strictly sonraki maaştır.
 - `FinancialStateReconciliationService`, başlangıç durumu semantiğini değiştirmeden dönem sonu önerisini hesaplar.
 - `CreditCardActualPaymentReconciler`, actual kart ödemesini exact due-date statement ile eşler; canonical karta yalnız kalan principal'i yazar. Faizi kapitalize etmez — onu bir sonraki ekstre işler, aksi halde aynı faiz iki kez sayılır.
-- `FinancialInstrumentReconciliationService`, ödenen kredi/taksitleri ilerletir; ödenmeyen veya kaçırılmış yükümlülükleri yeni anchor'a taşıyarak gelecek plandan kaybolmalarını engeller.
+- `FinancialInstrumentReconciliationService`, ödenen kredi/taksitleri ilerletir; ödenmeyen veya kaçırılmış yükümlülükleri **yeni dönemin ilk gününe** (yeni anchor + 1 gün) taşıyarak gelecek plandan kaybolmalarını engeller (I19). Anchor gününe taşınamaz: yeni donmuş plan `(anchor, sonraki checkpoint]` penceresini okur, projeksiyon ise `>= anchor`; v1.16.0 öncesinde borç 12 Dönem'de görünüp Ana Sayfa planında görünmüyor, geçici ödeme ve büyük gider hiçbir review'da kapatılamıyordu.
 - `PlanActualComparisonCalculator` ve `HistoryQueryService` yalnız frozen tarihsel veriyi okur. Gelecek ayar değişiklikleri eski planı yeniden hesaplamaz.
 
 SQLite finalization transaction'ı source snapshot'ın hâlâ current olduğunu ve plan için actual bulunmadığını kontrol eder. Unique `PeriodPlanSnapshotId` indeksi hızlı çift dokunma/retry durumunda ikinci actual ve snapshot oluşmasını engeller.
@@ -197,7 +199,7 @@ Normal veya gecikmiş finalization yeni snapshot'ı cihazın açıldığı güne
 
 ## Veri ve migration
 
-Store tüm entity'leri exact-date alanlarıyla round-trip eder. Güncel şema v15'tir (`SqliteCoinFlowStore.CurrentSchemaVersion`); v12 geçici planları, v13 dönem gözlemini ekler (yukarıdaki bölümler). Şema v9 `financial_snapshots`, frozen plan/satırları, revision, actual, actual payment/flow ve optional living breakdown tablolarını additive olarak ekler. Existing kullanıcı ilk normal plan okumasında mevcut canonical durumundan initial current snapshot alır; geçmiş actual üretilmez. Şema v7'de eklenen iki global planlama faiz oranı ve eski strategy/card migration davranışları korunur. SQLite-net additive migration finansman planlarına ana tutar ve toplam geri ödeme alanlarını eski kayıtları bozmadan ekler. Legacy upgrade sırasında eksik `ProjectionAnchorDate` bir kez oluşturulur; fresh veritabanında ise ilk maaş planlamasına kadar boş kalır. Fresh development veritabanı otomatik seed edilmez. Clear aksiyonu yeni history tablolarını da temizler. Şema v14 `loans` tablosuna `Kind` (varsayılan tüketici kredisi) ve `EarlyClosureAmountAsOf` sütunlarını additive ekler; tarihsiz eski kapatma tutarları hiçbir şeyi kalibre etmez. Şema v15 `loan_prepayments` tablosunu, `loans.FinalPaymentAmount` ve simülasyon taslak koşullarına `LoanId` / `PrepaymentMode` sütunlarını additive ekler; bir kredi silinince olayları da silinir.
+Store tüm entity'leri exact-date alanlarıyla round-trip eder. Güncel şema v16'dır (`SqliteCoinFlowStore.CurrentSchemaVersion`); v12 geçici planları, v13 dönem gözlemini ekler (yukarıdaki bölümler). Şema v9 `financial_snapshots`, frozen plan/satırları, revision, actual, actual payment/flow ve optional living breakdown tablolarını additive olarak ekler. Existing kullanıcı ilk normal plan okumasında mevcut canonical durumundan initial current snapshot alır; geçmiş actual üretilmez. Şema v7'de eklenen iki global planlama faiz oranı ve eski strategy/card migration davranışları korunur. SQLite-net additive migration finansman planlarına ana tutar ve toplam geri ödeme alanlarını eski kayıtları bozmadan ekler. Legacy upgrade sırasında eksik `ProjectionAnchorDate` bir kez oluşturulur; fresh veritabanında ise ilk maaş planlamasına kadar boş kalır. Fresh development veritabanı otomatik seed edilmez. Clear aksiyonu yeni history tablolarını da temizler. Şema v14 `loans` tablosuna `Kind` (varsayılan tüketici kredisi) ve `EarlyClosureAmountAsOf` sütunlarını additive ekler; tarihsiz eski kapatma tutarları hiçbir şeyi kalibre etmez. Şema v15 `loan_prepayments` tablosunu, `loans.FinalPaymentAmount` ve simülasyon taslak koşullarına `LoanId` / `PrepaymentMode` sütunlarını additive ekler; bir kredi silinince olayları da silinir. Şema v16 `settings.PaymentReminderMode` sütununu ekler (0 = kapalı); sütun yalnız kendi metoduyla yazılır, finans ayarlarının kaydı ona dokunmaz.
 
 ## Profiller
 
@@ -207,7 +209,7 @@ Profil = ayrı veritabanı dosyası. Finans verisinin tamamı zaten tek SQLite d
 AppDataDirectory/
   profiles/
     {profileId:N}/
-      coinflow.db3    ← o profilin bütün finans verisi (şema v15)
+      coinflow.db3    ← o profilin bütün finans verisi (şema v16)
       profile.json    ← ad, oluşturulma, son açılış
 ```
 
@@ -235,3 +237,31 @@ Uygulama kaldırılınca Android uygulamanın kendi klasörünü (bütün profil
 - **`NightlyBackupJob`** — JobScheduler, ek kütüphane yok. Tek seferlik görev 23:30'dan önce başlamaz, en geç 3 saat içinde çalışır, bitince ertesi gece için yeniden kurulur; `persisted` olduğu için telefon yeniden başlayınca da durur. Uygulama açılışında (`MainApplication.OnCreate`) kurulu değilse kurulur. Java adı sabittir (`com.coinflow.mobile.NightlyBackupJob`); kalıcı görev sınıf adıyla saklanır.
 - **Akış.** Profil seçim ekranı izin yoksa kurulum başına bir kez izin ister (sayfa pencereye bağlandıktan sonra; ilk sayfada erken gösterilen uyarı Android'de düşüyor). Hiç profil yokken "Yedekten Geri Yükle / Temiz Başla"; geri yükleme klasördeki yedekleri tarihleriyle listeler, "Başka bir dosya seç…" sistem seçicisini `Mizan` klasöründe açar (`ActivityResults` + `EXTRA_INITIAL_URI`). Ayarlar'da son yedek, "Şimdi Yedekle" ve izin yoksa "İzin Ver".
 - **Profil varken "Yedekten Ekle"** (`BackupService.AddFromBackupAsync`). Önce yedek seçilir, sonra içindeki profil (tek profilse sorulmaz; birden fazlaysa biri ya da "Hepsi"). Mevcut hiçbir profile dokunulmaz: yedekteki profil telefonda zaten varsa (aynı kimlik) yeni kimlikle "Ad (14 Eylül yedeği)" adıyla **kopya** olarak eklenir; ad başka bir profille çakışırsa "Ad 2". Ad sınırına sığmazsa ad kısaltılır. İlk kurulumdaki geri yükleme ile ekleme aynı `ProfileBackupArchive.ImportAsync` yolunu kullanır: hedef kimlik ve ad dışarıdan verilir, hepsi doğrulanmadan hiçbiri taşınmaz, hedef klasör varsa hiçbir şeyin üzerine yazılmaz. Yedek iki kez okunduğu (özet, sonra içe aktarma) için önce önbelleğe kopyalanır.
+
+## Ödeme hatırlatıcısı
+
+Ödeme günü geldiğinde telefon bildirimi. Ayar profil başınadır (`settings.PaymentReminderMode`, şema v16): **Kapalı**, **Rahat** (ödeme günü 09:00), **Agresif** (3 gün önce 10:00, bir gün önce 20:00, ödeme günü 09:00 ve 18:00). Saatler telefonun yerel saatidir.
+
+```text
+CoinFlowService.GetUpcomingPaymentDuesAsync(now)
+   ├─ açık dönem: donmuş planın (varsa son revizyonun) satırları
+   │    − gözlem defterinde ödendi / farklı tutar işaretlenenler
+   │    + bugün vadesi gelenler (Ana Sayfa onları ödenmiş sayar, hatırlatıcı saymaz)
+   └─ dönem sonrası: projeksiyonun MandatoryItems'ı + planlı büyük giderler
+            ↓ 35 günlük ufuk, kaynak kimliği + tarih ile tekil
+PaymentReminderPlanner.Plan(mode, dues, now)   ← saf, Application
+            ↓ aynı güne düşen ödemeler tek bildirimde; geçmiş saatler atlanır
+PaymentReminderCoordinator (App) → IPaymentReminderScheduler.Replace(profilId, …)
+            ↓
+AndroidPaymentReminderScheduler: AlarmManager + payment-reminders.txt
+PaymentReminderReceiver: bildirim kanalı "Ödeme hatırlatıcısı"
+PaymentReminderBootReceiver: BOOT_COMPLETED / MY_PACKAGE_REPLACED → dosyadan geri kur
+```
+
+- **Eşitleme.** Ana Sayfa her yüklendiğinde ve davranış değişince açık profilin bildirimleri tamamen yeniden kurulur; diğer profillerin kayıtlarına dokunulmaz. Profil silinince bildirimleri de silinir. Planın kendisi hiçbir yerde saklanmaz; her seferinde güncel veriden türetilir.
+- **Anahtar ve istek kodu.** Bildirim anahtarı `yyyyMMdd-slot` (profil içinde tekil). Android istek kodu profil kimliği + anahtarın FNV-1a özetidir; .NET string hash kodu süreç başına rastgele olduğu için yeniden başlatmadan sonra aynı alarmı iptal edemezdi.
+- **Alarm türü.** Kesin alarm izni (`SCHEDULE_EXACT_ALARM`) istenmez. Android 12+ ve izin yoksa `SetWindow` 10 dakikalık pencere; aksi hâlde `SetExactAndAllowWhileIdle`. `SetAndAllowWhileIdle` Android 14'te bir saatlik pencere aldığı için kullanılmaz (emülatörde ölçüldü).
+- **Dosya.** `files/payment-reminders.txt`, satır başına bir bildirim, sekmeyle ayrılmış, metinler Base64. Reflection kullanan JSON, kırpılan Release derlemesinde risk taşıdığı için seçilmedi.
+- **İzin.** `POST_NOTIFICATIONS` Android 13+'ta hatırlatıcı ilk açılınca istenir; izin yoksa kart uyarır ve uygulamanın bildirim ayarlarını açar.
+- **Ekran.** `PaymentReminderCardView` Ana Sayfa'da KALAN'ın altında ve Ana Sayfa'dan açılan Dönem Detayı'nda (`SalaryPeriodDetailRequest.IsCurrentPeriod`) aynı view model türüyle durur.
+- **Sınır.** Ufuk 35 gün; uygulama o süreden uzun açılmazsa yeni bildirim kurulmaz (DURUM, açık iş 16).
