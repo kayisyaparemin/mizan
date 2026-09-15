@@ -29,3 +29,14 @@ public sealed record PaymentReminder(
     string Message,
     DateOnly DueDate,
     IReadOnlyList<PaymentDue> Payments);
+
+/// <summary>
+/// Kartta gösterilen bir ödeme günü. Bildirimin başlığı çaldığı ana göre
+/// yazılır ("Bugün ödeme günü"); kart ise bugüne göre konuşur ("3 gün sonra").
+/// </summary>
+public sealed record PaymentReminderDay(
+    DateOnly DueDate,
+    string When,
+    string What,
+    string Schedule,
+    IReadOnlyList<PaymentDue> Payments);

@@ -71,6 +71,19 @@ public sealed class PaymentReminderAppSourceTests
     }
 
     [Fact]
+    public void CardPreview_IsGroupedByDueDay_AndDoesNotEchoTheNotificationTitle()
+    {
+        var card = Read("ViewModels", "PaymentReminderCardViewModel.cs");
+        var view = Read("Controls", "PaymentReminderCardView.xaml");
+
+        // Bildirim başlığı ("Bugün ödeme günü") çaldığı ana göre yazılır;
+        // kart onu bugünkü önizlemede göstermemeli.
+        Assert.Contains("PaymentReminderPlanner.Preview(", card);
+        Assert.DoesNotContain("reminder.Title", card);
+        Assert.DoesNotContain("{Binding Title}", view);
+    }
+
+    [Fact]
     public void DeletedProfile_ForgetsItsReminders()
     {
         var profiles = Read("ViewModels", "ProfileSelectionViewModel.cs");

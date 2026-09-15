@@ -70,10 +70,11 @@
                             <VerticalStackLayout Spacing="2">
                                 <Label Text="{Binding When}"
                                        Style="{StaticResource Eyebrow}" />
-                                <Label Text="{Binding Title}"
+                                <Label Text="{Binding What}"
                                        FontFamily="OpenSansSemibold" />
-                                <Label Text="{Binding Message}"
-                                       Style="{StaticResource MutedText}" />
+                                <Label Text="{Binding Schedule}"
+                                       Style="{StaticResource MutedText}"
+                                       FontSize="12" />
                             </VerticalStackLayout>
                         </Border>
                     </DataTemplate>

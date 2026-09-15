@@ -197,6 +197,75 @@ public sealed class PaymentReminderTests
         }
     }
 
+    // ---------------------------------------------------------------
+    // Kart önizlemesi: bugüne göre konuşur (15.09'da 18.09 "bugün" değil)
+    // ---------------------------------------------------------------
+
+    [Fact]
+    public void Preview_SpeaksRelativeToToday_NotToTheNotificationMoment()
+    {
+        // Kullanıcının ekranı: 15 Eylül'de 18 Eylül satırı "Bugün ödeme günü"
+        // diyordu. Bildirimin kendi başlığı doğru (o gün çalınca), kart yanlıştı.
+        var now = At(2026, 9, 15, 14, 37);
+        var reminders = PaymentReminderPlanner.Plan(
+            PaymentReminderMode.Relaxed,
+            [
+                Payment("Burgan Ameliyat", Due, 7_375m),
+                Payment("Eminevim", new DateOnly(2026, 9, 20), 28_167m),
+                Payment("Akbank Axess", new DateOnly(2026, 10, 5), 14_000m),
+                Payment("Garanti Bonus", new DateOnly(2026, 10, 5), 10_233m)
+            ],
+            now);
+
+        var days = PaymentReminderPlanner.Preview(reminders, now);
+
+        Assert.Equal(
+            new[]
+            {
+                "18 Eylül Cuma · 3 gün sonra",
+                "20 Eylül Pazar · 5 gün sonra",
+                "5 Ekim Pazartesi · 20 gün sonra"
+            },
+            days.Select(x => x.When));
+        Assert.All(days, x => Assert.DoesNotContain("Bugün", x.When + x.What + x.Schedule));
+        Assert.Equal("Burgan Ameliyat · 7.375,00 TL", days[0].What);
+        Assert.Equal("Bildirim: ödeme günü 09:00", days[0].Schedule);
+        Assert.Equal("2 ödeme · toplam 24.233,00 TL: Akbank Axess, Garanti Bonus", days[2].What);
+    }
+
+    [Fact]
+    public void Preview_OnTheDueDay_SaysToday_AndAggressiveListsEveryNotification()
+    {
+        var reminders = PaymentReminderPlanner.Plan(
+            PaymentReminderMode.Aggressive,
+            [Payment("Kredi", Due, 1_000m)],
+            At(2026, 9, 14, 8, 0));
+
+        var early = Assert.Single(PaymentReminderPlanner.Preview(reminders, At(2026, 9, 14, 8, 0)));
+        Assert.Equal("18 Eylül Cuma · 4 gün sonra", early.When);
+        Assert.Equal(
+            "Bildirimler: 3 gün önce 10:00 · bir gün önce 20:00 · ödeme günü 09:00 ve 18:00",
+            early.Schedule);
+
+        var onTheDay = Assert.Single(PaymentReminderPlanner.Preview(
+            reminders.Where(x => x.NotifyAt > At(2026, 9, 18, 8, 0)),
+            At(2026, 9, 18, 8, 0)));
+        Assert.Equal("18 Eylül Cuma · bugün", onTheDay.When);
+        Assert.Equal("Bildirimler: ödeme günü 09:00 ve 18:00", onTheDay.Schedule);
+    }
+
+    [Theory]
+    [InlineData(0, "bugün")]
+    [InlineData(1, "yarın")]
+    [InlineData(2, "2 gün sonra")]
+    [InlineData(-1, "dün")]
+    [InlineData(-3, "3 gün önce")]
+    public void RelativeDay_NamesTheDayFromToday(int offset, string expected)
+    {
+        var today = new DateOnly(2026, 9, 15);
+        Assert.Equal(expected, PaymentReminderPlanner.RelativeDay(today.AddDays(offset), today));
+    }
+
     [Theory]
     [InlineData(PaymentReminderMode.Off, "gönderilmez")]
     [InlineData(PaymentReminderMode.Relaxed, "tek bildirim")]

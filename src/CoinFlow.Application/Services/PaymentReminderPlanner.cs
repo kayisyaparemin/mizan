@@ -86,6 +86,73 @@ public static class PaymentReminderPlanner
             .ToArray();
     }
 
+    /// <summary>
+    /// Kurulan bildirimleri kartta ödeme günü başına bir satıra toplar. Satır
+    /// bildirimin başlığını değil, ödemenin bugüne göre ne zaman olduğunu
+    /// söyler: 15 Eylül'de 18 Eylül'ün bildirimi "Bugün ödeme günü" diye
+    /// görünüyordu.
+    /// </summary>
+    public static IReadOnlyList<PaymentReminderDay> Preview(
+        IEnumerable<PaymentReminder> reminders,
+        DateTime now)
+    {
+        var today = DateOnly.FromDateTime(now);
+        return reminders
+            .GroupBy(x => x.DueDate)
+            .OrderBy(x => x.Key)
+            .Select(day =>
+            {
+                var ordered = day.OrderBy(x => x.NotifyAt).ToArray();
+                var payments = ordered[0].Payments;
+                return new PaymentReminderDay(
+                    day.Key,
+                    $"{day.Key.ToString("d MMMM dddd", TurkishCulture)} · {RelativeDay(day.Key, today)}",
+                    What(payments),
+                    Schedule(day.Key, ordered),
+                    payments);
+            })
+            .ToArray();
+    }
+
+    /// <summary>Bir günün bugüne göre adı: bugün, yarın, 3 gün sonra, dün, 2 gün önce.</summary>
+    public static string RelativeDay(DateOnly date, DateOnly today) =>
+        (date.DayNumber - today.DayNumber) switch
+        {
+            0 => "bugün",
+            1 => "yarın",
+            -1 => "dün",
+            > 1 and var ahead => $"{ahead} gün sonra",
+            var behind => $"{-behind} gün önce"
+        };
+
+    /// <summary>"Burgan · 7.375,00 TL" ya da "2 ödeme · toplam …: A, B".</summary>
+    public static string What(IReadOnlyList<PaymentDue> payments) =>
+        payments.Count == 1
+            ? $"{payments[0].Name} · {AmountText(payments[0].Amount)}"
+            : $"{payments.Count} ödeme · toplam {Money(payments.Sum(x => x.Amount ?? 0m))}: {Names(payments)}";
+
+    private static string Schedule(
+        DateOnly dueDate,
+        IReadOnlyList<PaymentReminder> reminders)
+    {
+        var parts = reminders
+            .GroupBy(x => dueDate.DayNumber - DateOnly.FromDateTime(x.NotifyAt).DayNumber)
+            .Select(group =>
+            {
+                var label = group.Key switch
+                {
+                    0 => "ödeme günü",
+                    1 => "bir gün önce",
+                    var days => $"{days} gün önce"
+                };
+                var times = string.Join(
+                    " ve ",
+                    group.Select(x => x.NotifyAt.ToString("HH:mm", TurkishCulture)));
+                return $"{label} {times}";
+            });
+        return $"{(reminders.Count == 1 ? "Bildirim" : "Bildirimler")}: {string.Join(" · ", parts)}";
+    }
+
     private static PaymentReminder Build(
         DateOnly dueDate,
         IReadOnlyList<PaymentDue> payments,
@@ -94,9 +161,7 @@ public static class PaymentReminderPlanner
         var notifyAt = dueDate
             .AddDays(-slot.DaysBefore)
             .ToDateTime(slot.At);
-        var what = payments.Count == 1
-            ? $"{payments[0].Name} · {AmountText(payments[0].Amount)}"
-            : $"{payments.Count} ödeme · toplam {Money(payments.Sum(x => x.Amount ?? 0m))}: {Names(payments)}";
+        var what = What(payments);
         var message = slot.DaysBefore == 0
             ? what
             : $"{what} · {dueDate.ToString("d MMMM dddd", TurkishCulture)}";

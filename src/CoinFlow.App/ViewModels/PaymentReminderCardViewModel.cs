@@ -18,8 +18,11 @@ public sealed partial class ReminderModeOption(PaymentReminderMode mode, string 
     private bool isSelected;
 }
 
-/// <summary>Sıradaki bildirimlerden biri: ne zaman, ne yazacak.</summary>
-public sealed record ReminderPreviewLine(string When, string Title, string Message);
+/// <summary>
+/// Sıradaki ödeme günlerinden biri: bugüne göre ne zaman, hangi ödeme ve
+/// hangi saatlerde bildirim gelecek.
+/// </summary>
+public sealed record ReminderPreviewLine(string When, string What, string Schedule);
 
 /// <summary>
 /// Ödeme günü hatırlatıcısı kartı. Ana Sayfa'da ve oradan açılan "Bu dönem
@@ -120,12 +123,10 @@ public sealed partial class PaymentReminderCardViewModel(
     private void Present(IReadOnlyList<PaymentReminder> reminders)
     {
         Upcoming.Clear();
-        foreach (var reminder in reminders.Take(PreviewCount))
+        // Bildirimin başlığı çaldığı ana göre yazılır; kart bugüne göre konuşur.
+        foreach (var day in PaymentReminderPlanner.Preview(reminders, DateTime.Now).Take(PreviewCount))
         {
-            Upcoming.Add(new ReminderPreviewLine(
-                reminder.NotifyAt.ToString("d MMMM dddd · HH:mm", TurkishCulture),
-                reminder.Title,
-                reminder.Message));
+            Upcoming.Add(new ReminderPreviewLine(day.When, day.What, day.Schedule));
         }
 
         HasUpcoming = Upcoming.Count > 0;
@@ -135,7 +136,7 @@ public sealed partial class PaymentReminderCardViewModel(
             ? string.Empty
             : reminders.Count == 0
                 ? $"Önümüzdeki {PaymentReminderPlanner.HorizonDays} günde hatırlatılacak ödeme yok."
-                : $"Önümüzdeki {PaymentReminderPlanner.HorizonDays} gün için {reminders.Count} bildirim kuruldu. Sıradakiler:";
+                : $"Önümüzdeki {PaymentReminderPlanner.HorizonDays} gün için {reminders.Count} bildirim kuruldu. Sıradaki ödemeler:";
         HasSummary = SummaryText.Length > 0;
     }
 }
