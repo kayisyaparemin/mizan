@@ -1,11 +1,11 @@
 # Mizan — Proje Durumu ve Devir Notu
 
-> Son güncelleme: 15.09.2026 · Son sürüm `v1.16.0`
+> Son güncelleme: 15.09.2026 · Son sürüm `v1.17.0`
 >
 > **Yeni bir sohbet/geliştirici buradan başlar.** Bu dosya tek devir
 > belgesidir; eski `HANDOFF.md` ve `TODO.md` kaldırıldı, hâlâ geçerli olan kısımları
 > burada (TODO tamamen bitmişti). Önce "Devir" bölümünü, sonra "Açık işler"i ve "Ürün invariant'ları"nı
-> oku. Sürüm bölümleri (v1.2.0 → v1.16.0) geriye dönük kayıttır; yalnız
+> oku. Sürüm bölümleri (v1.2.0 → v1.17.0) geriye dönük kayıttır; yalnız
 > dokunacağın alanın bölümünü oku.
 
 ## Devir
@@ -15,18 +15,18 @@
 | | |
 |---|---|
 | Branch | `main`, `origin/main` ile eşit, worktree yok (`git worktree list` yalnız `main`) |
-| Son sürüm | `v1.16.0` — ödeme günü hatırlatıcısı, Finansal Yapı ekleme alanı, placeholder'lar, atıl kod temizliği, devreden borç düzeltmesi (`Mizan-1.16.0.apk`) |
-| Testler | 543/543 (`dotnet test`, ~9 sn) |
+| Son sürüm | `v1.17.0` — bildirimde "Ödedim" / "Ertele", ertelenenler kırmızı, "Ödediklerin" yeşil, deneme bildirimi, kartın "bugün" hatası (`Mizan-1.17.0.apk`) |
+| Testler | 576/576 (`dotnet test`, ~9 sn) |
 | Android Release build | 0 uyarı, 0 hata |
-| Şema | v16 (`SqliteCoinFlowStore.CurrentSchemaVersion`) |
+| Şema | v17 (`SqliteCoinFlowStore.CurrentSchemaVersion`) |
 | Veri yeri | profil başına `files/profiles/{id:N}/coinflow.db3` (v1.12.0'dan beri) |
 | Yedek yeri | `/storage/emulated/0/Mizan/Mizan-yedek-YYYY-MM-DD.zip` (dev build: `Mizan Dev`), v1.13.0'dan beri |
 
-**Devralırken bekleyen iş yok.** v1.16.0 beş isteği tek turda, riske göre
-beş fazda getirdi (ayrıntı "v1.16.0 ne getirdi"). Bu turda kullanıcı soru
-sorulmamasını, önerilen seçeneklerle ilerlenmesini istedi; alınan ürün
-kararları o bölümde "Kararlar" altında yazılı, kullanıcı değiştirmek
-isteyebilir. Yeni açık işler 16–17.
+**Devralırken bekleyen iş yok.** v1.17.0 hatırlatıcıya iki isteği riske
+göre dört fazda getirdi (ayrıntı "v1.17.0 ne getirdi"). v1.16.0'da olduğu
+gibi kullanıcı soru sorulmamasını, önerilen seçeneklerle ilerlenmesini
+istedi; alınan ürün kararları o bölümde "Kararlar" altında yazılı,
+kullanıcı değiştirmek isteyebilir. Yeni açık işler 18–19.
 
 ### Kullanıcıyla çalışma biçimi
 
@@ -110,10 +110,11 @@ Commit mesajları İngilizce özet satırı + Türkçe gövde biçiminde (`git l
 | `src/CoinFlow.Application/Services/` | `PeriodProgressService` (Ana Sayfa), `PeriodReviewService`, `LoanPayoffService` / `LoanPayoffAdvisor`, `BackupService`, `ProfileService` |
 | `src/CoinFlow.Application/Models/SimulationScenarioCatalog.cs` | Plan türü grupları, tür çözümü, türün simülatör dışındaki yeri (v1.15.0) |
 | `src/CoinFlow.Application/Models/FinancialRecordEntryCatalog.cs` | Finansal Yapı "+ Ekle" türleri ve grupları (v1.16.0) |
-| `src/CoinFlow.Application/Services/PaymentReminderPlanner.cs` | Ödeme hatırlatıcısı takvimi (saf); ödemeleri `CoinFlowService.GetUpcomingPaymentDuesAsync` toplar (v1.16.0) |
+| `src/CoinFlow.Application/Services/PaymentReminderPlanner.cs` | Ödeme hatırlatıcısı takvimi, kartın gün satırları, erteleme saati, `DueKey` (saf); ödemeleri `CoinFlowService.GetUpcomingPaymentDuesAsync`, kartın tamamını `GetPaymentReminderBoardAsync` toplar (v1.16.0, v1.17.0) |
+| `src/CoinFlow.Application/Services/PaymentReminderPayload.cs` | Bildirimin taşıdığı ödemeler ve "Ödedim" / "Ertele" cevap kuyruğunun düz metin biçimi (v1.17.0) |
 | `src/CoinFlow.Infrastructure/Persistence/` | `SqliteCoinFlowStore` (şema + migration), `ProfileScopedCoinFlowStore` (açık profile iletir), `DevelopmentDataSeeder`, `FileSystemProfileRepository`, `ProfileBackupArchive` |
-| `src/CoinFlow.App/Pages` · `ViewModels` · `Controls` | MAUI sayfaları ve MVVM (CommunityToolkit). `Controls/ScenarioConditionFormView` Simülatör ile Finansal Yapı'nın ortak koşul formu; `EntryTypePickerView` ikisinin ortak tür seçicisi; `PaymentReminderCardView` hatırlatıcı kartı |
-| `src/CoinFlow.App/Platforms/Android/PaymentReminders.cs` | Hatırlatıcı alarmı, bildirimi ve yeniden başlatma alıcısı (v1.16.0) |
+| `src/CoinFlow.App/Pages` · `ViewModels` · `Controls` | MAUI sayfaları ve MVVM (CommunityToolkit). `Controls/ScenarioConditionFormView` Simülatör ile Finansal Yapı'nın ortak koşul formu; `EntryTypePickerView` ikisinin ortak tür seçicisi; `PaymentReminderCardView` hatırlatıcı kartı; `PaymentReminderPaidView` "Ödediklerin" |
+| `src/CoinFlow.App/Platforms/Android/PaymentReminders.cs` | Hatırlatıcı alarmı, bildirimi ve düğmeleri, cevap alıcısı ve kuyruğu, yeniden başlatma alıcısı (v1.16.0, v1.17.0) |
 | `tests/CoinFlow.Tests/` | Domain, SQLite entegrasyon ve kaynak testleri. Sözleşme testleri: `ProductContractInvariantTests`, `CultureFormattingSourceTests`, `ScenarioDirectEntryTests` (parite), `PlaceholderSourceTests`, `PeriodHistoryTests` (geçmiş dönem tarih/tutar) |
 
 ### Tuzaklar (bu projede gerçekten yaşandı)
@@ -152,6 +153,19 @@ Commit mesajları İngilizce özet satırı + Türkçe gövde biçiminde (`git l
   C# regex içeren dosyaları heredoc yerine dosya yazma aracıyla yaz.
 - **Dönem içinde `RefreshCurrentFinancialStateAsync` çağırma:** checkpoint
   işlemidir, açık planı bozar (I14).
+- **Plan revizyonu satır kimliklerini yeniler.** `HistoricalPlanRevisionService`
+  revizyon satırlarına `Guid.NewGuid()` verir. Bir plan satırına kimlikle
+  bağlanan her kayıt (gözlem defteri dahil) ilk revizyonda eşleşmesini
+  kaybeder; v1.17.0'ın hatırlatıcı defteri bu yüzden kaynak + vadeyle
+  bağlanır (açık iş 18).
+- **Testi bilerek bozarken dosyayı `git checkout` ile geri alma.** Dosyadaki
+  commit'lenmemiş değişiklikleri de siler (v1.17.0'da yaşandı; bozmadan önce
+  alınan yedekle kurtarıldı). Önce kopyala ya da commit'le.
+- **`ProfileTests` sarmalayıcı testi** her store metodunu sentinel
+  argümanlarla çağırır; yeni bir parametre türü (v1.17.0'da `string` ve
+  `IReadOnlyList<T>`) eklenirse `SentinelFor`'a da ekle.
+- **Emülatörde uzun sayfada hedef bulmak:** kaydırma adımı kaba;
+  `adb shell uiautomator dump /sdcard/ui.xml` ile metnin `bounds`'unu oku.
 - Aşağıdaki sürüm bölümlerinde anılan `PLAN-*.md`, `DEVIR-FAZ3.md`,
   `BULGU-KART-FAIZI.md`, `agents/*.md` ve `CLAUDE.md` **repoda yok** (hiç
   commit'lenmemiş yerel dosyalardı). Gerekli bilgi bu dosyada ve
@@ -163,8 +177,10 @@ Commit mesajları İngilizce özet satırı + Türkçe gövde biçiminde (`git l
 gecikmiş yükümlülüğün temsili (5, ürün kararı bekliyor), dönem sonunun kart
 borcunu göstermemesi (7), kredide "bu taksiti ödedim" (8), simülatörde ilk maaş
 öncesi gider uyarısı (9), kart başına faiz oranı (11), hatırlatıcının gece
-yenilenmesi (16), dönem sihirbazının gözlemi kullanmaması (17). Akbank PDF içe
-aktarma (6) kullanıcı tarafından ertelendi.
+yenilenmesi (16), dönem sihirbazının gözlemi kullanmaması (17), gözlem
+defterinin plan revizyonunda eşleşmesini kaybetmesi (18), Dönem Detayı'nda
+ödenen satırın işaretsiz görünmesi (19). Akbank PDF içe aktarma (6)
+kullanıcı tarafından ertelendi.
 
 ## Sürüm geçmişi
 
@@ -201,6 +217,7 @@ ekran doğruydu ama okunmuyordu; v1.5.0 ise eksik olan bir şeyi ekledi.
 | **v1.14.0** | **Yedekten ekle** — profil varken yedekteki profili kopya olarak ekleme |
 | **v1.15.0** | **Plan türleri gruplandı, Finansal Yapı'dan doğrudan giriş** — simüle edilen her tür aynı sonuçla doğrudan girilebiliyor |
 | **v1.16.0** | **Ödeme günü hatırlatıcısı** (rahat / agresif) · Finansal Yapı ekleme alanı simülatör tasarımında · placeholder'lar · atıl kod temizliği · ödenmeyen borç yeni dönemin planından düşüyordu |
+| **v1.17.0** | **Bildirimde "Ödedim" / "Ertele"** · ertelenenler kartta kırmızı, ödenenler "Ödediklerin"de yeşil · deneme bildirimi · kart 15 Eylül'de 18 Eylül'e "bugün" diyordu |
 
 Grafik çalışması (Faz 1–4, v1.1.0–v1.2.0) v1.3.0'da geri alındı; ayrıntı
 aşağıdaki sürüm bölümlerinde. Anılan `DEVIR-FAZ3.md` repoda yok.
@@ -1079,6 +1096,146 @@ bağlı içe aktarma testlerinde süreyi bekleme koşulu yapma.
   kurulan takvimle çalar.
 - Bildirim küçük simgesi uygulama simgesi; tek renkli ayrı simge yok.
 
+### v1.17.0 ne getirdi (hatırlatıcıya cevap: Ödedim / Ertele)
+
+Kullanıcı v1.16.0'ı gerçek telefonunda açtı ve iki şey söyledi; v1.16.0'daki
+gibi **soru sorulmamasını, önerilen seçeneklerle ilerlenmesini, işin riske
+göre fazlara bölünmesini** istedi:
+
+1. *"Bugün 15 Eylül ama bugün diyor."* Kartta 18 Eylül satırı "Bugün ödeme
+   günü" yazıyordu.
+2. *"Bildirimi test edemedim."* Bildirim **Ödedim / Ertele** şeklinde olsun.
+   Ödedim → ilgili yerler güncellensin. Ertele → uygulamada hatırlatıcı
+   alanında kayıt saydam kırmızı, sağda "Ertelendi"; dokununca "Bu ödeme
+   yapıldı mı?", Evet → tebrik mesajı, listeden kalksın, parametreler
+   güncellensin (Ana Sayfa ve ayrı sayfadaki durum değişebiliyorsa
+   geliştirici ayarlasın). Dönem içinde böyle ödenenler Ana Sayfa'da ve
+   mevcut dönemin detayında saydam yeşille gösterilebilir, **ama
+   hatırlatıcının listesiyle karışmasın**.
+
+Fazlar düşük riskten yükseğe; her faz ayrı commit, testler yeşil:
+**1** kartın metni → **2** hatırlatıcı defteri (şema v17, Ana Sayfa hesabı)
+→ **3** uygulama içi ekran → **4** Android bildirim düğmeleri (arka plan
+alıcısı, dosya kuyruğu).
+
+**Faz 1 — "bugün" hatası.** Kök neden: kart, kurulan bildirimin *çaldığı
+andaki* başlığını ("Bugün ödeme günü") bugünkü önizlemede aynen
+gösteriyordu. Bildirim doğruydu, kart yanlış soruyu cevaplıyordu. Kart
+artık ödeme günü başına bir satır (`PaymentReminderPlanner.Preview`):
+"18 Eylül Cuma · 3 gün sonra", ödeme ve tutar, "Bildirimler: 3 gün önce
+10:00 · bir gün önce 20:00 · ödeme günü 09:00 ve 18:00".
+
+**Kararlar (önerilen seçenekle alındı; kullanıcı değiştirebilir).**
+- **"Ertele" 3 saat sonra yeniden hatırlatır.** 22:00'ye ya da sonrasına
+  düşerse ertesi sabah 09:00, 08:00'den önceye düşerse aynı sabah 09:00.
+  Yeniden hatırlatmanın da düğmeleri var; ertelemeye devam edilebilir.
+- **Aynı güne düşen ödemeler tek bildirimde kaldı** (v1.16.0 kararı). O
+  bildirimde düğme "Hepsini ödedim"; biri ödenmediyse Ertele → kartta tek
+  tek çözülür.
+- **Ertelenen ödeme ödenmemiş sayılır.** Ana Sayfa normalde vadesi geçen
+  satırı ödenmiş sayar; ertelenen satır vadesi geçse de KALAN'da kalır ve
+  "Ertelendi" yazar. Kullanıcı "ödemedim" demiş; bakiye o parayı hâlâ
+  içeriyor.
+- **Ödendi geri alınabilir.** "Ödediklerin" satırına dokununca "Ödendi işareti
+  kaldırılsın mı?". Bildirimde yanlış düğmeye basmak finans uygulamasında
+  kalıcı olmamalı; deneme bildirimi de bunu gerektiriyor.
+- **Geç gelen "Ertele" ödendi kaydını geri almaz** (aynı bildirimin eski
+  kopyası).
+- **"Ödediklerin" kartın dışında** ayrı blok: Ana Sayfa'da KALAN ile kart
+  arasında, Ana Sayfa'dan açılan Dönem Detayı'nda kartın altında.
+- **Dönem Detayı'nın rakamları değişmedi.** O ekran projeksiyondur (I1);
+  cevaplar yalnız Ana Sayfa'nın donmuş plan hesabına girer. Loan'ın
+  `NextPaymentDate`'i ya da kartın ekstresi checkpoint'e kadar değişmez
+  (I14).
+- **Dönem sihirbazı ertelenen ödemeyi "Ödenmedi" açar** (not: "Hatırlatıcıda
+  ertelendi"). Ödenenler zaten "Ödendi" açılıyordu. "Her şey planlandığı
+  gibi" kısayolu hepsini ödendi yapar, aynen.
+- **"Deneme bildirimi gönder"** sıradaki ödeme gününün bildirimini gerçek
+  düğmeleriyle hemen düşürür — kullanıcının "test edemedim" dediği şey.
+  "Ödedim" gerçekten işaretler; geri alma buradan.
+- Tebrik mesajı beş cümleden rastgele biri ("Ödemeleri yapmak böyledir:
+  zamanında, dert etmeden." …).
+
+**Faz 2 — hatırlatıcı defteri.**
+- **Şema v17:** `payment_reminder_responses` (yalnız yeni tablo). Satır:
+  anahtar, ad, vade, tutar, tür (ertelendi/ödendi), cevap zamanı, erteleme
+  saati. "Verileri Sil" temizler, yedeğe girer (parmak izi tabloları genel
+  tarıyor).
+- **Anahtar kaynak + vade, satır kimliği değil.** Önce cevabı gözlem
+  defterine (`ObservePaymentAsync`, satır kimliğiyle) yazmak düşünüldü.
+  Ölçüldü: plan revizyonu satırlara yeni kimlik veriyor, dönem sonrasındaki
+  ödemelerin henüz satırı yok. Kimlikle bağlanan cevap ilk revizyonda
+  kaybolurdu. Test bunu düzen değişikliğiyle revizyon üretip ölçüyor.
+  Aynı sebeple gözlem defterinin kendisinde gizli bir eşleşme sorunu var
+  (açık iş 18).
+- Servis: `GetPaymentReminderBoardAsync` (bildirimler + yeniden hatırlatmalar
+  + gün satırları + ertelenenler + ödenenler + deneme), `RecordPaymentReminderAnswerAsync`,
+  `UndoPaymentReminderAnswerAsync`. Kapanmış dönemin (vadesi açık dönemin
+  başlangıç gününe eşit ya da önce) cevapları kartta gösterilmez.
+- `PeriodProgressService.Build` kural sırası: gözlem defteri → hatırlatıcı
+  cevabı → vade kuralı.
+
+**Faz 3 — ekran.** Kartta ertelenenler (`SnoozedSurface`, #AARRGGBB saydam
+kırmızı; ilk hâli lavanta kartın üstünde mor okunduğu için emülatörde
+koyulaştırıldı), "Ödediklerin" (`PaidSurface`, `PaymentReminderPaidView`).
+Ana Sayfa kartın `AnswersChanged` olayında yeniden hesaplar.
+
+**Faz 4 — bildirim düğmeleri.**
+- `PaymentReminderActionReceiver` **veritabanını açmaz**: başka profil açıkken
+  ya da süreç ölüyken de çalışıyor ve `ProfileScopedCoinFlowStore` yalnız açık
+  profili tanıyor. Cevabı `files/payment-reminder-answers.txt`'ye ekler,
+  "Ödedim"de o ödemelerin kalan alarmlarını iptal eder, "Ertele"de
+  `yyyyMMdd-ertele` alarmını kurar, bildirimi kapatır, Toast gösterir
+  ("Tebrikler! Ödendi olarak kaydedildi." / "Ertelendi. Yeniden hatırlatma:
+  yarın 09:00") ve `WeakReferenceMessenger` ile açık ekranlara haber verir.
+- Ana Sayfa kuyruğu **kalan ödemeleri hesaplamadan önce** işler; satırlar
+  deftere yazıldıktan sonra silinir. Uygulama açıksa kart mesajla hemen
+  yenilenir.
+- Alarm dosyasına ödemeler altıncı sütun olarak eklendi; v1.16.0'ın beş
+  sütunlu satırları düğmesiz bildirim olarak okunur (güncellemeden sonra
+  `MY_PACKAGE_REPLACED` onları geri kurar, ilk Ana Sayfa açılışı düğmeli
+  hâlleriyle değiştirir).
+
+**Testler 543 → 576.** `PaymentReminderAnswerTests` (yeni): erteleme saati
+(gece, ay/yıl sonu), yeniden hatırlatma, deneme bildirimi, anahtar, bildirim
+verisi ve cevap satırının gidiş-dönüşü (Türkçe ad, sekme, satır sonu, bozuk
+veri), ödendi → KALAN'dan düşer ve hatırlatılmaz, ertelendi → vadesi geçse de
+KALAN'da + yeniden hatırlatma, ertelendi → ödendi → geç ertele → geri al,
+**revizyondan sonra ödendi hâlâ eşleşiyor**, kapanmış dönemin cevabı
+gizli / erken ödenen gelecek ödeme görünür / kapalı modda da liste, kalıcılık
++ "Verileri Sil" + v16'dan yükseltme. `PaymentReminderTests`'e kartın gün
+satırları (kullanıcının ekranındaki rakamlarla), `PaymentReminderAppSourceTests`'e
+kırmızı/yeşil, ayrı liste, sihirbaz, bildirim düğmeleri, kuyruğun sırası.
+Ana Sayfa'daki cevap eşlemesi bilerek kapatılınca 3 test düştü.
+
+**Emülatörde (Android 14) doğrulandı.** Kart "20 Eylül Pazar · 5 gün sonra".
+Deneme bildirimi → Ödedim / Ertele düğmeli bildirim → Ertele (uygulama arka
+planda) → bildirim kapandı, kuyruk anında işlendi, kartta kırmızı "Ertelendi"
+satırı, "Yeniden hatırlatma: yarın 09:00" (19:37 + 3 saat gece), alarm
+dosyasında `20260918-ertele` → dokun → "Bu ödeme yapıldı mı?" → Evet → tebrik
+→ "Ödediklerin"de yeşil, bildirim sayısı 24 → 20 → dokun → geri al.
+**Süreç öldürülmüşken** (`am kill`) bildirimde Ödedim → kuyruk dosyasına
+satır yazıldı, o günün üç alarmı dosyadan ve AlarmManager'dan kalktı →
+soğuk açılışta kuyruk boşaldı, "Ödediklerin"de satır. Dönem Detayı'nda da
+"Ödediklerin" kartın altında.
+
+**Emülatörde yakalanan iki kusur.**
+1. Saydam kırmızı lavanta kartın üstünde mor okunuyordu; alfa ve ton
+   artırıldı.
+2. "Deneme bildirimi gönderildi" bilgisi sonraki işlemlerden sonra da
+   duruyordu; kart yenilenince siliniyor.
+
+Bu projede on üçüncü kez yalnız ekranda görülen kusur.
+
+**Bilinen.**
+- Dönem Detayı'nın "Ödeme ayrıntıları" ödenen satırı işaretsiz gösteriyor
+  (açık iş 19).
+- Aynı güne düşen iki ödemeden yalnız biri ödendiyse bildirimden ayrı
+  cevaplanamaz; Ertele → kartta tek tek.
+- Uygulama hiç açılmazsa kuyruk büyür ama kaybolmaz; profil silinince
+  kuyruğu da silinir.
+- Kapanmış dönemlerin cevapları tabloda kalır (küçük; temizlik yok).
+
 ## Açık işler
 
 1. **Yetim plan satırları (🟠 ölçülmedi).** `v1.3.0`–`v1.5.0` arasında ana
@@ -1133,6 +1290,9 @@ bağlı içe aktarma testlerinde süreyi bekleme koşulu yapma.
 8. **Kredilerde "bu taksiti ödedim" eylemi yok.** Erken ödediğin bir taksiti
    düşürmek için `NextPaymentDate`'i elle ileri alıp `RemainingInstallmentCount`'u
    1 azaltmak gerekiyor. Nakit ödeme planlarında `IsPaid` var, kredilerde yok.
+   v1.17.0: hatırlatıcıdaki "Ödedim" taksiti Ana Sayfa'da ödenmiş sayar ve
+   hatırlatmayı durdurur, ama krediyi checkpoint'e kadar değiştirmez (I14);
+   12 Dönem ve Dönem Detayı taksiti hâlâ sayar.
 
 9. **Simülatörde ilk maaş öncesi tarihli gider sessizce hesaba girmiyor.**
    v1.0.5'te *gelir* için düzeltilen boşluğun *gider* karşılığı. `CashPurchase`
@@ -1195,7 +1355,23 @@ bağlı içe aktarma testlerinde süreyi bekleme koşulu yapma.
    taslağı yalnız donmuş plandan kuruyor. I15'in "gözlem checkpoint'te
    review'ı doldurur" cümlesi servis düzeyinde doğru, ekranda değil; Ana
    Sayfa'da işaretlenen ödeme sihirbazda yeniden işaretlenmek zorunda. Karar
-   kullanıcının: sihirbaz gözlemle açılsın mı (önerilen).
+   kullanıcının: sihirbaz gözlemle açılsın mı (önerilen). v1.17.0: sihirbaz
+   hatırlatıcı defterini okuyor (ertelenen "Ödenmedi" açılır); gözlem
+   defteri hâlâ okunmuyor.
+
+18. **Gözlem defteri plan revizyonunda eşleşmesini kaybeder (🟠 koddan,
+   ekranda ölçülmedi).** `ObservePaymentAsync` ödemeyi orijinal planın satır
+   kimliğine yazar; `PeriodProgressService` ve `GetUpcomingPaymentDuesAsync`
+   son revizyonun satırlarıyla eşler. Revizyon satırlara yeni kimlik
+   verdiği için revizyondan sonra gözlem işareti hiçbir satıra oturmaz.
+   Uygulama bugün gözlem ödemesi yazmadığı için (yalnız testler) kullanıcıya
+   görünmüyor; biri o yolu ekrana bağlarsa görünür. Çözüm adayı: hatırlatıcı
+   defteri gibi kaynak + vadeyle eşlemek.
+
+19. **Dönem Detayı ödenen satırı işaretsiz gösteriyor.** Hatırlatıcıdan ödendi
+   denen ödeme "Ödeme ayrıntıları"nda aynen duruyor (rakamı projeksiyondan).
+   "Ödediklerin" hemen üstünde, bilgi kaybolmuyor. Aday: satıra küçük
+   "Ödendi" rozeti (rakam değişmeden).
 
 ## Bilinen sadeleştirmeler (bug değil, kasıtlı)
 
@@ -1230,6 +1406,7 @@ bağlı içe aktarma testlerinde süreyi bekleme koşulu yapma.
 | I17 | Kredi taksiti ödenince kalan anaparadan yalnız anapara payı düşer; faiz türetilemiyorsa anaparaya dokunulmaz |
 | I18 | Erken ödeme krediyi değiştirmez, üstüne oynatılan bir olaydır; checkpoint'te ödendiyse krediye işlenir, ödenmediyse iptal olur |
 | I19 | Ödenmeyen yükümlülük dönem kapanışında yeni dönemin **ilk gününe** devreder; donmuş plan checkpoint gününü dışarıda bıraktığı için checkpoint gününe taşınamaz |
+| I20 | Hatırlatıcı cevabı ("Ödedim" / "Ertele") ödemenin kaynağı + vadesiyle tutulur, plan satırı kimliğiyle değil; snapshot zincirine ve projeksiyona girmez, yalnız Ana Sayfa'nın açık dönem hesabına ve review'ın başlangıç değerine girer |
 
 ## Bu turda öğrenilen dokuz ürün kuralı
 

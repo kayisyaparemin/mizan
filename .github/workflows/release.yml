@@ -201,42 +201,36 @@ jobs:
           cat > release-notes.md <<NOTES
           # Mizan $version
 
-          Ödeme günü hatırlatıcısı, Finansal Yapı'da yeni ekleme alanı ve
-          dönem kapanışında bulunan bir hatanın düzeltmesi.
+          Ödeme hatırlatıcısına cevap verebiliyorsun: bildirimde **Ödedim** ve
+          **Ertele** düğmeleri var.
 
-          ### Ödeme günü hatırlatıcısı
+          ### Ödedim
 
-          Ana Sayfa'da ve "Bu dönem nasıl oluşuyor" ekranında **Ödeme günü
-          hatırlatıcısı** kartı var. Üç seçenek:
+          Ödeme kalan ödemelerinden düşer, bir daha hatırlatılmaz ve Ana
+          Sayfa'da **Ödediklerin** listesinde yeşil görünür. Yanlışlıkla
+          bastıysan satıra dokunup geri alabilirsin. Aynı güne düşen birden
+          fazla ödemede düğme "Hepsini ödedim" olur.
 
-          - **Kapalı:** bildirim yok.
-          - **Rahat:** ödeme günü sabah 09:00'da tek bildirim.
-          - **Agresif:** 3 gün önce, bir gün önce akşam, ödeme günü sabah ve
-            akşam.
+          ### Ertele
 
-          Aynı güne düşen ödemeler tek bildirimde toplanır. İlk açtığında
-          telefon bildirim izni sorar. Kart sıradaki bildirimleri gösterir;
-          uygulamayı her açtığında takvim güncel planınla eşitlenir.
+          Ödeme hatırlatıcı kartında kırmızı bir **Ertelendi** satırı olur ve
+          3 saat sonra yeniden hatırlatılır (gece saatine düşerse ertesi sabah
+          09:00). Vadesi geçse de kalan ödemelerinde durur. Ödediğinde satıra
+          dokun: "Bu ödeme yapıldı mı?" sorusuna Evet de, listeden kalksın.
+          Dönemi kapatırken ertelenen ödeme "Ödenmedi" olarak gelir.
 
-          ### Finansal Yapı'da ekleme
+          ### Deneme bildirimi
 
-          **+ Ekle** artık menü açmıyor; Simülatördeki gibi grup çipleri ve
-          açıklamalı kartlar geliyor: **Harcama**, **Borç / Kredi**,
-          **Gelir**, **Hesap** (kredi kartı, bankadaki kredi, değişken ödeme
-          planı). Türü değiştirince yazdıkların silinmez.
-
-          ### Kutular kendiliğinden dolmuyor
-
-          Formlar örnek değerlerle dolu gelmiyor; örnekler kutunun içinde
-          soluk yazı olarak duruyor. Dönem kapatırken boş bıraktığın tutar
-          planlananı kabul eder.
+          Kartta **Deneme bildirimi gönder** düğmesi sıradaki ödeme gününün
+          bildirimini hemen gösterir; ödeme gününü beklemeden düğmeleri
+          deneyebilirsin. Buradaki "Ödedim" de gerçekten işaretler.
 
           ### Düzeltme
 
-          Dönem kapanırken **ödenmedi** işaretlediğin kredi taksiti, ödeme
-          planı ya da büyük gider yeni dönemin planında görünmüyordu ve bir
-          sonraki dönemde de kapatılamıyordu. Artık yeni dönemin ilk gününe
-          devrediyor ve Ana Sayfa'da kalan ödemeler arasında görünüyor.
+          Kart, önümüzdeki bir ödeme için "Bugün ödeme günü" yazıyordu (15
+          Eylül'de 18 Eylül için). Artık ödeme günlerini bugüne göre
+          gösteriyor: "18 Eylül Cuma · 3 gün sonra" ve o gün için hangi
+          saatlerde bildirim geleceği.
           NOTES
 
       - name: Upload signed APK artifact

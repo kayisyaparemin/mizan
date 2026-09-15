@@ -32,7 +32,7 @@ Current/future query'leri, latest current snapshot ve history üzerinden runtime
 |---|---|
 | `CoinFlow.Domain` | Saf modeller, tarih kuralları, projection ve simulation motorları |
 | `CoinFlow.Application` | Kullanım senaryoları, CRUD, açık onaylı scenario apply ve store sözleşmesi |
-| `CoinFlow.Infrastructure` | SQLite şema v16, profil klasörleri, legacy upgrade ve deterministik development seed |
+| `CoinFlow.Infrastructure` | SQLite şema v17, profil klasörleri, legacy upgrade ve deterministik development seed |
 | `CoinFlow.App` | .NET MAUI Android görünümü ve servis sonuçlarını sunan MVVM katmanı |
 | `CoinFlow.Tests` | Domain regression, kanonik veri ve SQLite entegrasyon testleri |
 
@@ -199,7 +199,7 @@ Normal veya gecikmiş finalization yeni snapshot'ı cihazın açıldığı güne
 
 ## Veri ve migration
 
-Store tüm entity'leri exact-date alanlarıyla round-trip eder. Güncel şema v16'dır (`SqliteCoinFlowStore.CurrentSchemaVersion`); v12 geçici planları, v13 dönem gözlemini ekler (yukarıdaki bölümler). Şema v9 `financial_snapshots`, frozen plan/satırları, revision, actual, actual payment/flow ve optional living breakdown tablolarını additive olarak ekler. Existing kullanıcı ilk normal plan okumasında mevcut canonical durumundan initial current snapshot alır; geçmiş actual üretilmez. Şema v7'de eklenen iki global planlama faiz oranı ve eski strategy/card migration davranışları korunur. SQLite-net additive migration finansman planlarına ana tutar ve toplam geri ödeme alanlarını eski kayıtları bozmadan ekler. Legacy upgrade sırasında eksik `ProjectionAnchorDate` bir kez oluşturulur; fresh veritabanında ise ilk maaş planlamasına kadar boş kalır. Fresh development veritabanı otomatik seed edilmez. Clear aksiyonu yeni history tablolarını da temizler. Şema v14 `loans` tablosuna `Kind` (varsayılan tüketici kredisi) ve `EarlyClosureAmountAsOf` sütunlarını additive ekler; tarihsiz eski kapatma tutarları hiçbir şeyi kalibre etmez. Şema v15 `loan_prepayments` tablosunu, `loans.FinalPaymentAmount` ve simülasyon taslak koşullarına `LoanId` / `PrepaymentMode` sütunlarını additive ekler; bir kredi silinince olayları da silinir. Şema v16 `settings.PaymentReminderMode` sütununu ekler (0 = kapalı); sütun yalnız kendi metoduyla yazılır, finans ayarlarının kaydı ona dokunmaz.
+Store tüm entity'leri exact-date alanlarıyla round-trip eder. Güncel şema v17'dir (`SqliteCoinFlowStore.CurrentSchemaVersion`); v12 geçici planları, v13 dönem gözlemini ekler (yukarıdaki bölümler). Şema v9 `financial_snapshots`, frozen plan/satırları, revision, actual, actual payment/flow ve optional living breakdown tablolarını additive olarak ekler. Existing kullanıcı ilk normal plan okumasında mevcut canonical durumundan initial current snapshot alır; geçmiş actual üretilmez. Şema v7'de eklenen iki global planlama faiz oranı ve eski strategy/card migration davranışları korunur. SQLite-net additive migration finansman planlarına ana tutar ve toplam geri ödeme alanlarını eski kayıtları bozmadan ekler. Legacy upgrade sırasında eksik `ProjectionAnchorDate` bir kez oluşturulur; fresh veritabanında ise ilk maaş planlamasına kadar boş kalır. Fresh development veritabanı otomatik seed edilmez. Clear aksiyonu yeni history tablolarını da temizler. Şema v14 `loans` tablosuna `Kind` (varsayılan tüketici kredisi) ve `EarlyClosureAmountAsOf` sütunlarını additive ekler; tarihsiz eski kapatma tutarları hiçbir şeyi kalibre etmez. Şema v15 `loan_prepayments` tablosunu, `loans.FinalPaymentAmount` ve simülasyon taslak koşullarına `LoanId` / `PrepaymentMode` sütunlarını additive ekler; bir kredi silinince olayları da silinir. Şema v16 `settings.PaymentReminderMode` sütununu ekler (0 = kapalı); sütun yalnız kendi metoduyla yazılır, finans ayarlarının kaydı ona dokunmaz. Şema v17 yalnız `payment_reminder_responses` tablosunu ekler (hatırlatıcı defteri, anahtar kaynak + vade); mevcut tablolara dokunmaz, "Verileri Sil" onu da temizler.
 
 ## Profiller
 
@@ -209,7 +209,7 @@ Profil = ayrı veritabanı dosyası. Finans verisinin tamamı zaten tek SQLite d
 AppDataDirectory/
   profiles/
     {profileId:N}/
-      coinflow.db3    ← o profilin bütün finans verisi (şema v16)
+      coinflow.db3    ← o profilin bütün finans verisi (şema v17)
       profile.json    ← ad, oluşturulma, son açılış
 ```
 
@@ -247,21 +247,40 @@ CoinFlowService.GetUpcomingPaymentDuesAsync(now)
    ├─ açık dönem: donmuş planın (varsa son revizyonun) satırları
    │    − gözlem defterinde ödendi / farklı tutar işaretlenenler
    │    + bugün vadesi gelenler (Ana Sayfa onları ödenmiş sayar, hatırlatıcı saymaz)
-   └─ dönem sonrası: projeksiyonun MandatoryItems'ı + planlı büyük giderler
+   ├─ dönem sonrası: projeksiyonun MandatoryItems'ı + planlı büyük giderler
+   └─ − hatırlatıcı defterinde "Ödedim" denenler (v1.17.0)
             ↓ 35 günlük ufuk, kaynak kimliği + tarih ile tekil
-PaymentReminderPlanner.Plan(mode, dues, now)   ← saf, Application
-            ↓ aynı güne düşen ödemeler tek bildirimde; geçmiş saatler atlanır
-PaymentReminderCoordinator (App) → IPaymentReminderScheduler.Replace(profilId, …)
+CoinFlowService.GetPaymentReminderBoardAsync(now)
+   ├─ PaymentReminderPlanner.Plan(mode, dues, now)    ← saf, Application
+   ├─ PaymentReminderPlanner.FollowUps(ertelenenler)  ← "Ertele"nin yeniden hatırlatması
+   ├─ PaymentReminderPlanner.Preview(…)               ← kartın gün satırları, bugüne göre
+   └─ Snoozed / Paid (kapanmış dönemin cevapları hariç) + Sample (deneme bildirimi)
+            ↓
+PaymentReminderCoordinator (App)
+   ├─ ApplyPendingAnswersAsync: kuyruk → RecordPaymentReminderAnswerAsync → kuyruktan sil
+   └─ IPaymentReminderScheduler.Replace(profilId, board.Reminders)
             ↓
 AndroidPaymentReminderScheduler: AlarmManager + payment-reminders.txt
-PaymentReminderReceiver: bildirim kanalı "Ödeme hatırlatıcısı"
+PaymentReminderReceiver: bildirim kanalı "Ödeme hatırlatıcısı", "Ödedim" / "Ertele" düğmeleri
+PaymentReminderActionReceiver: cevap → payment-reminder-answers.txt, alarmları düzelt,
+                               bildirimi kapat, WeakReferenceMessenger ile ekranlara haber ver
 PaymentReminderBootReceiver: BOOT_COMPLETED / MY_PACKAGE_REPLACED → dosyadan geri kur
 ```
+
+### Hatırlatıcı defteri ("Ödedim" / "Ertele", v1.17.0)
+
+- **Anahtar kaynak + vade.** `PaymentReminderResponse.DueKey` = `PaymentReminderPlanner.DueKey(kaynak kimliği, ad, vade)`; plan satırı kimliği kullanılmaz. Plan revizyonu satırlara yeni kimlik verir (`HistoricalPlanRevisionService`), dönem kapanışı yeni plan kurar; anahtar ikisinden de etkilenmez. Dönem sonrasındaki (projeksiyondan gelen) bir ödemeye verilen cevap, o ödeme yeni dönemin planına girdiğinde aynı anahtarla eşleşir.
+- **Ana Sayfa kuralı sırası** (`PeriodProgressService.Build`): 1) gözlem defterinde açık işaret, 2) hatırlatıcı cevabı — "Ödedim" ödenmiş, "Ertele" vadesi geçse de kalan, 3) vade günü geçtiyse ödenmiş. `PeriodProgress.SnoozedLineIds` KALAN'daki "Ertelendi" notunu taşır.
+- **Kurallar.** Geç gelen "Ertele" ödendi kaydını geri almaz (eski bildirim kopyası). Geri alma yalnız "Ödediklerin" listesinden (`UndoPaymentReminderAnswerAsync`). Cevap açık dönemin başlangıç gününden sonraki bir vadeye aitse kartta görünür; kapanmış dönemin cevapları gösterilmez, silinmez. Dönem sihirbazı ertelenen ödemeyi "Ödenmedi" açar.
+- **Erteleme saati.** `SnoozeUntil`: 3 saat sonra; 22:00'ye ya da sonrasına düşerse ertesi gün 09:00, 08:00'den önceye düşerse aynı gün 09:00.
+- **Bildirim düğmeleri veritabanı açmaz.** Alıcı başka profil açıkken ya da süreç ölüyken çalışabilir. Cevap `files/payment-reminder-answers.txt`'ye `PaymentReminderPayload.EncodeAnswer` biçiminde eklenir; "Ödedim" o ödemeleri kapsayan alarmları iptal eder, "Ertele" `yyyyMMdd-ertele` anahtarlı yeniden hatırlatmayı kurar. Açık profil kuyruğunu Ana Sayfa kalan ödemeleri hesaplamadan önce işler; satırlar deftere yazıldıktan sonra silinir (kayıt tekrarlanabilir). Profil silinince kuyruğu da silinir.
+- **Alarm dosyası** v1.17.0'da altıncı sütun (ödemeler, `PaymentReminderPayload.EncodePayments`) aldı; beş sütunlu eski satırlar düğmesiz bildirim olarak okunur.
+- **Ekran.** Kartta ertelenenler saydam kırmızı (`SnoozedSurface`), dokununca "Bu ödeme yapıldı mı?". Ödenenler kartın dışında `PaymentReminderPaidView`'da ("Ödediklerin") saydam yeşil (`PaidSurface`), Ana Sayfa'da KALAN ile kart arasında ve Ana Sayfa'dan açılan Dönem Detayı'nda. Dönem Detayı'nın rakamları projeksiyondur; cevaplarla değişmez.
 
 - **Eşitleme.** Ana Sayfa her yüklendiğinde ve davranış değişince açık profilin bildirimleri tamamen yeniden kurulur; diğer profillerin kayıtlarına dokunulmaz. Profil silinince bildirimleri de silinir. Planın kendisi hiçbir yerde saklanmaz; her seferinde güncel veriden türetilir.
 - **Anahtar ve istek kodu.** Bildirim anahtarı `yyyyMMdd-slot` (profil içinde tekil). Android istek kodu profil kimliği + anahtarın FNV-1a özetidir; .NET string hash kodu süreç başına rastgele olduğu için yeniden başlatmadan sonra aynı alarmı iptal edemezdi.
 - **Alarm türü.** Kesin alarm izni (`SCHEDULE_EXACT_ALARM`) istenmez. Android 12+ ve izin yoksa `SetWindow` 10 dakikalık pencere; aksi hâlde `SetExactAndAllowWhileIdle`. `SetAndAllowWhileIdle` Android 14'te bir saatlik pencere aldığı için kullanılmaz (emülatörde ölçüldü).
 - **Dosya.** `files/payment-reminders.txt`, satır başına bir bildirim, sekmeyle ayrılmış, metinler Base64. Reflection kullanan JSON, kırpılan Release derlemesinde risk taşıdığı için seçilmedi.
 - **İzin.** `POST_NOTIFICATIONS` Android 13+'ta hatırlatıcı ilk açılınca istenir; izin yoksa kart uyarır ve uygulamanın bildirim ayarlarını açar.
-- **Ekran.** `PaymentReminderCardView` Ana Sayfa'da KALAN'ın altında ve Ana Sayfa'dan açılan Dönem Detayı'nda (`SalaryPeriodDetailRequest.IsCurrentPeriod`) aynı view model türüyle durur.
+- **Ekran.** `PaymentReminderCardView` Ana Sayfa'da KALAN'ın altında ve Ana Sayfa'dan açılan Dönem Detayı'nda (`SalaryPeriodDetailRequest.IsCurrentPeriod`) aynı view model türüyle durur. Kartın "Sıradaki ödemeler" satırları ödeme günü başınadır ve bugüne göre konuşur ("3 gün sonra"); bildirimin kendi başlığı ("Bugün ödeme günü") çaldığı ana göredir ve kartta gösterilmez. "Deneme bildirimi gönder" sıradaki ödeme gününün bildirimini gerçek düğmeleriyle hemen gösterir.
 - **Sınır.** Ufuk 35 gün; uygulama o süreden uzun açılmazsa yeni bildirim kurulmaz (DURUM, açık iş 16).
