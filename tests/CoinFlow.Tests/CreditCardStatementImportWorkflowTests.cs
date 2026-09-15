@@ -90,10 +90,14 @@ public sealed class CreditCardStatementImportWorkflowTests
     {
         var importer = new ReleasableImporter();
         var selection = new StubSelection();
+        // Bekçi içe aktarıcıya girildikten sonra dolmalı. 75 ms yavaş CI
+        // makinesinde iş parçacığı başlamadan doluyordu: işlem iptal edilip
+        // içe aktarıcı hiç çağrılmıyordu (15.09.2026, dev derlemesi). Takılan
+        // içe aktarıcı hiç bitmediği için "beklemeden döner" sınırı yine anlamlı.
         var workflow = Workflow(
             importer,
             new StubPicker(selection),
-            timeout: TimeSpan.FromMilliseconds(75));
+            timeout: TimeSpan.FromMilliseconds(500));
         var timer = Stopwatch.StartNew();
 
         var attempt = await workflow.RunAsync();
@@ -102,7 +106,7 @@ public sealed class CreditCardStatementImportWorkflowTests
         Assert.Equal(
             CreditCardStatementImportOutcome.TimedOut,
             attempt.Outcome);
-        Assert.True(timer.Elapsed < TimeSpan.FromSeconds(1));
+        Assert.True(timer.Elapsed < TimeSpan.FromSeconds(3));
         Assert.False(workflow.IsRunning);
         Assert.Equal(1, importer.CallCount);
         Assert.Equal(1, selection.CopyCount);

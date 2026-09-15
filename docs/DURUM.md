@@ -1066,6 +1066,13 @@ Bu projede on birinci kez yalnız ekranda görülen kusur.
 
 **Testler 454 → 543.**
 
+**Sürümden sonra.** Tag'in kararlı derlemesi yeşildi (`Mizan-1.16.0.apk`),
+ama aynı commit'in `main` geliştirme derlemesinde ilgisiz ve eski bir test
+düştü: `Watchdog_ReturnsTimedOutAndDoesNotRetryHungImporter`'ın 75 ms'lik
+bekçisi yavaş CI makinesinde içe aktarıcı çağrılmadan doluyordu. Bekçi 500 ms'ye
+çıkarıldı (yalnız test). v1.11.1'deki kararsız testle aynı sınıf: zamanlamaya
+bağlı içe aktarma testlerinde süreyi bekleme koşulu yapma.
+
 **Bilinen.**
 - Uygulama 35 günden uzun açılmazsa yeni bildirim kurulmaz (açık iş 16).
 - Birden fazla profil varsa her profilin bildirimi, o profil son açıldığında
