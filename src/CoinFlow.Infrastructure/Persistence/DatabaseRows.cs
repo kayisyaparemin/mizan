@@ -430,3 +430,16 @@ internal sealed class PeriodObservationFlowRow
     public string Date { get; set; } = string.Empty;
     public decimal Amount { get; set; }
 }
+
+/// <summary>Hatırlatıcı defteri; anahtar ödemenin kaynağı + vadesi (v17).</summary>
+[Table("payment_reminder_responses")]
+internal sealed class PaymentReminderResponseRow
+{
+    [PrimaryKey] public string DueKey { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
+    public string DueDate { get; set; } = string.Empty;
+    public decimal? Amount { get; set; }
+    public int Kind { get; set; }
+    public string AnsweredAt { get; set; } = string.Empty;
+    public string? SnoozedUntil { get; set; }
+}

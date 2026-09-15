@@ -87,6 +87,20 @@ public sealed class ProfileScopedCoinFlowStore(
         CancellationToken cancellationToken = default) =>
         Current.SavePaymentReminderModeAsync(mode, cancellationToken);
 
+    public Task<IReadOnlyList<PaymentReminderResponse>> GetPaymentReminderResponsesAsync(
+        CancellationToken cancellationToken = default) =>
+        Current.GetPaymentReminderResponsesAsync(cancellationToken);
+
+    public Task UpsertPaymentReminderResponsesAsync(
+        IReadOnlyList<PaymentReminderResponse> responses,
+        CancellationToken cancellationToken = default) =>
+        Current.UpsertPaymentReminderResponsesAsync(responses, cancellationToken);
+
+    public Task DeletePaymentReminderResponseAsync(
+        string dueKey,
+        CancellationToken cancellationToken = default) =>
+        Current.DeletePaymentReminderResponseAsync(dueKey, cancellationToken);
+
     public Task<IReadOnlyList<PaymentAssignmentStrategy>>
         GetPaymentAssignmentStrategiesAsync(
             CancellationToken cancellationToken = default) =>

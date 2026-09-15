@@ -37,13 +37,15 @@ public sealed class PeriodProgressService(
             cancellationToken);
         var settings = await store.GetSettingsAsync(cancellationToken);
         var cards = await store.GetCreditCardsAsync(cancellationToken);
+        var answers = await store.GetPaymentReminderResponsesAsync(cancellationToken);
         return Build(
             history,
             openPlan,
             observation,
             settings,
             CurrentCardPayments(openPlan, cards, settings),
-            clock.Today);
+            clock.Today,
+            answers);
     }
 
     /// <summary>
@@ -94,7 +96,8 @@ public sealed class PeriodProgressService(
         PeriodObservation? observation,
         UserSettings settings,
         IReadOnlyDictionary<Guid, decimal> currentCardPayments,
-        DateOnly today)
+        DateOnly today,
+        IReadOnlyList<PaymentReminderResponse>? reminderAnswers = null)
     {
         var revisions = history.Revisions
             .Where(x => x.PeriodPlanSnapshotId == openPlan.Id)
@@ -123,16 +126,23 @@ public sealed class PeriodProgressService(
             0,
             totalDays);
 
-        // Bir plan satırı iki yoldan "yapılmış" sayılır:
+        // Bir plan satırı şu sırayla "yapılmış" ya da "kalan" sayılır:
         //  1. Gözlem defterinde açıkça işaretlenmişse (review akışından gelir),
-        //  2. Vadesi geçmişse — karta ekstre kesilmeden ödeme yapılmaz ve
+        //  2. Hatırlatıcıya cevap verilmişse: "Ödedim" yapılmış, "Ertele"
+        //     vadesi geçse de kalan. Cevap kaynak + vade anahtarıyla eşlenir;
+        //     revizyon satır kimliklerini yenilediği için kimlikle eşlenmez.
+        //  3. Vadesi geçmişse — karta ekstre kesilmeden ödeme yapılmaz ve
         //     vade günü gelen ödeme yapılır. Kullanıcıdan ayrıca işaretlemesini
         //     istemek gereksiz; planın kendi varsayımı zaten budur.
         var explicitEntries = observation?.Payments
             .ToDictionary(x => x.PeriodPlanPaymentLineId) ??
             new Dictionary<Guid, PeriodObservationPayment>();
+        var answers = (reminderAnswers ?? [])
+            .GroupBy(x => x.DueKey, StringComparer.Ordinal)
+            .ToDictionary(x => x.Key, x => x.Last().Kind, StringComparer.Ordinal);
         var settledTotal = 0m;
         var remaining = new List<PeriodPlanPaymentLine>();
+        var snoozedLineIds = new HashSet<Guid>();
         foreach (var line in planLines)
         {
             if (explicitEntries.TryGetValue(line.Id, out var entry))
@@ -144,6 +154,25 @@ public sealed class PeriodProgressService(
                 else
                 {
                     settledTotal += entry.ActualAmount;
+                }
+
+                continue;
+            }
+
+            var dueKey = PaymentReminderPlanner.DueKey(
+                line.SourceEntityId,
+                line.Name,
+                line.PlannedDate);
+            if (answers.TryGetValue(dueKey, out var answer))
+            {
+                if (answer == PaymentReminderAnswerKind.Paid)
+                {
+                    settledTotal += line.PlannedAmount ?? 0m;
+                }
+                else
+                {
+                    remaining.Add(line);
+                    snoozedLineIds.Add(line.Id);
                 }
 
                 continue;
@@ -239,7 +268,8 @@ public sealed class PeriodProgressService(
             observation,
             remainingLines,
             remainingPlannedTotal,
-            today >= openPlan.ReviewAvailableFrom);
+            today >= openPlan.ReviewAvailableFrom,
+            snoozedLineIds);
     }
 
     private static decimal RoundMoney(decimal amount) =>

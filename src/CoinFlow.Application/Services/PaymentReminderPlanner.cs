@@ -39,6 +39,107 @@ public static class PaymentReminderPlanner
         new("aksam", 0, new TimeOnly(18, 0), "Ödemeyi unutma, bugün son gün")
     ];
 
+    /// <summary>"Ertele" bu kadar sonra yeniden hatırlatır.</summary>
+    public static readonly TimeSpan SnoozeDelay = TimeSpan.FromHours(3);
+
+    /// <summary>Gece 22:00 ile sabah 08:00 arası bildirim çalmaz; sabah 09:00'a kayar.</summary>
+    private static readonly TimeOnly QuietStarts = new(22, 0);
+    private static readonly TimeOnly QuietEnds = new(8, 0);
+    private static readonly TimeOnly Morning = new(9, 0);
+
+    /// <summary>
+    /// Ödemenin hatırlatıcı defterindeki anahtarı: kaynak + vade. Plan satırı
+    /// kimliği kullanılmaz; revizyon ve dönem kapanışı onu yeniler.
+    /// </summary>
+    public static string DueKey(Guid sourceId, string name, DateOnly date) =>
+        sourceId == Guid.Empty
+            ? $"{name}-{date:yyyyMMdd}"
+            : $"{sourceId:N}-{date:yyyyMMdd}";
+
+    /// <summary>"Ertele"ye basılınca yeniden hatırlatma zamanı; gece saatine düşmez.</summary>
+    public static DateTime SnoozeUntil(DateTime now)
+    {
+        var candidate = now + SnoozeDelay;
+        var time = TimeOnly.FromDateTime(candidate);
+        var date = DateOnly.FromDateTime(candidate);
+        if (time >= QuietStarts)
+        {
+            return date.AddDays(1).ToDateTime(Morning);
+        }
+
+        return time < QuietEnds
+            ? date.ToDateTime(Morning)
+            : candidate;
+    }
+
+    /// <summary>Ertelenen ödemenin ne zaman yeniden hatırlatılacağı, kullanıcıya.</summary>
+    public static string SnoozeText(DateTime until, DateTime now) =>
+        $"Yeniden hatırlatma: {RelativeDay(DateOnly.FromDateTime(until), DateOnly.FromDateTime(now))} {until.ToString("HH:mm", TurkishCulture)}";
+
+    /// <summary>
+    /// Ertelenen ödemelerin yeniden hatırlatması: vade günü başına tek bildirim,
+    /// o günün en geç erteleme saatinde. Saati geçmiş olan kurulmaz.
+    /// </summary>
+    public static IReadOnlyList<PaymentReminder> FollowUps(
+        IEnumerable<PaymentReminderResponse> snoozed,
+        DateTime now) =>
+        snoozed
+            .Where(x => x.Kind == PaymentReminderAnswerKind.Snoozed &&
+                        x.SnoozedUntil is { } until &&
+                        until > now)
+            .GroupBy(x => x.DueDate)
+            .Select(day =>
+            {
+                var payments = day
+                    .Select(x => new PaymentDue(x.DueKey, x.Name, x.DueDate, x.Amount))
+                    .OrderByDescending(x => x.Amount ?? 0m)
+                    .ThenBy(x => x.Name, StringComparer.Create(TurkishCulture, false))
+                    .ToArray();
+                return new PaymentReminder(
+                    $"{day.Key:yyyyMMdd}-ertele",
+                    day.Max(x => x.SnoozedUntil!.Value),
+                    "Ertelediğin ödeme",
+                    $"{What(payments)} · {day.Key.ToString("d MMMM dddd", TurkishCulture)}",
+                    day.Key,
+                    payments);
+            })
+            .OrderBy(x => x.NotifyAt)
+            .ToArray();
+
+    /// <summary>
+    /// "Deneme bildirimi gönder": sıradaki ödeme gününün bildirimi, hemen.
+    /// Gerçek ödemelerle kurulur; "Ödedim" gerçekten ödendi işaretler.
+    /// </summary>
+    public static PaymentReminder? Sample(
+        IEnumerable<PaymentDue> dues,
+        DateTime now)
+    {
+        var today = DateOnly.FromDateTime(now);
+        var day = dues
+            .Where(x => x.DueDate >= today)
+            .GroupBy(x => x.DueDate)
+            .OrderBy(x => x.Key)
+            .FirstOrDefault();
+        if (day is null)
+        {
+            return null;
+        }
+
+        var payments = day
+            .GroupBy(x => x.Key)
+            .Select(x => x.First())
+            .OrderByDescending(x => x.Amount ?? 0m)
+            .ThenBy(x => x.Name, StringComparer.Create(TurkishCulture, false))
+            .ToArray();
+        return new PaymentReminder(
+            $"{day.Key:yyyyMMdd}-deneme",
+            now,
+            "Deneme bildirimi",
+            $"{What(payments)} · {day.Key.ToString("d MMMM dddd", TurkishCulture)} ({RelativeDay(day.Key, today)})",
+            day.Key,
+            payments);
+    }
+
     /// <summary>Kullanıcıya gösterilen davranış açıklaması.</summary>
     public static string Describe(PaymentReminderMode mode) => mode switch
     {

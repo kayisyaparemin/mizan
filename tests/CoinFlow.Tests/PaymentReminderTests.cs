@@ -336,7 +336,7 @@ public sealed class PaymentReminderTests
                 SqliteCoinFlowStore.CurrentSchemaVersion,
                 await check.ExecuteScalarAsync<int>("SELECT SchemaVersion FROM settings"));
             await check.CloseAsync();
-            Assert.Equal(16, SqliteCoinFlowStore.CurrentSchemaVersion);
+            Assert.Equal(17, SqliteCoinFlowStore.CurrentSchemaVersion);
         }
         finally
         {

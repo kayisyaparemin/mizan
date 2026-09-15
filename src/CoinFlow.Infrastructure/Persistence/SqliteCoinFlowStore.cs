@@ -13,7 +13,8 @@ public sealed class SqliteCoinFlowStore : ICoinFlowStore, IAsyncDisposable
     // v12: kaydedilmiş simülasyon taslakları.
     // v13: açık dönemin gözlem defteri (I14/I15). Her ikisi de yalnız yeni
     // tablo ekler; mevcut tabloların hiçbirine dokunmaz, veri taşınmaz.
-    public const int CurrentSchemaVersion = 16;
+    // v17: hatırlatıcı defteri (payment_reminder_responses); yalnız yeni tablo.
+    public const int CurrentSchemaVersion = 17;
     private const int CurrentCardStatementModelVersion = 7;
     private const decimal DefaultPlanningInterestRate = 0.05m;
     private static readonly Guid LegacyInitialAssignmentStrategyId =
@@ -91,6 +92,7 @@ public sealed class SqliteCoinFlowStore : ICoinFlowStore, IAsyncDisposable
             await _database.CreateTableAsync<PeriodObservationRow>();
             await _database.CreateTableAsync<PeriodObservationPaymentRow>();
             await _database.CreateTableAsync<PeriodObservationFlowRow>();
+            await _database.CreateTableAsync<PaymentReminderResponseRow>();
 
             await MigratePeriodPlanRevisionSchemaAsync();
             await MigrateLegacyCreditCardsAsync();
@@ -176,6 +178,7 @@ public sealed class SqliteCoinFlowStore : ICoinFlowStore, IAsyncDisposable
             connection.DeleteAll<PeriodObservationPaymentRow>();
             connection.DeleteAll<PeriodObservationFlowRow>();
             connection.DeleteAll<PeriodObservationRow>();
+            connection.DeleteAll<PaymentReminderResponseRow>();
             var settings = connection.Table<SettingsRow>().First();
             settings.SalaryDay = 10;
             settings.MonthlyLivingBudget = 0m;
@@ -770,6 +773,79 @@ public sealed class SqliteCoinFlowStore : ICoinFlowStore, IAsyncDisposable
             "DELETE FROM period_observations WHERE PeriodPlanSnapshotId = ?",
             key);
     }
+
+    public async Task<IReadOnlyList<PaymentReminderResponse>> GetPaymentReminderResponsesAsync(
+        CancellationToken cancellationToken = default)
+    {
+        await InitializeAsync(cancellationToken);
+        var rows = await _database.Table<PaymentReminderResponseRow>().ToListAsync();
+        return rows
+            .Select(x => new PaymentReminderResponse(
+                x.DueKey,
+                x.Name,
+                ParseDate(x.DueDate),
+                x.Amount,
+                x.Kind == (int)PaymentReminderAnswerKind.Paid
+                    ? PaymentReminderAnswerKind.Paid
+                    : PaymentReminderAnswerKind.Snoozed,
+                ParseLocalTime(x.AnsweredAt),
+                string.IsNullOrWhiteSpace(x.SnoozedUntil)
+                    ? null
+                    : ParseLocalTime(x.SnoozedUntil)))
+            .OrderBy(x => x.DueDate)
+            .ThenBy(x => x.Name, StringComparer.Ordinal)
+            .ToArray();
+    }
+
+    public async Task UpsertPaymentReminderResponsesAsync(
+        IReadOnlyList<PaymentReminderResponse> responses,
+        CancellationToken cancellationToken = default)
+    {
+        await InitializeAsync(cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        await _database.RunInTransactionAsync(connection =>
+        {
+            foreach (var response in responses)
+            {
+                connection.InsertOrReplace(new PaymentReminderResponseRow
+                {
+                    DueKey = response.DueKey,
+                    Name = response.Name,
+                    DueDate = FormatDate(response.DueDate),
+                    Amount = response.Amount,
+                    Kind = (int)response.Kind,
+                    AnsweredAt = LocalTime(response.AnsweredAt),
+                    SnoozedUntil = response.SnoozedUntil is { } until
+                        ? LocalTime(until)
+                        : null
+                });
+            }
+        });
+    }
+
+    public async Task DeletePaymentReminderResponseAsync(
+        string dueKey,
+        CancellationToken cancellationToken = default)
+    {
+        await InitializeAsync(cancellationToken);
+        await _database.ExecuteAsync(
+            "DELETE FROM payment_reminder_responses WHERE DueKey = ?",
+            dueKey);
+    }
+
+    // Hatırlatıcı saatleri telefonun yerel saatidir; bölge bilgisi taşımaz.
+    private static string LocalTime(DateTime value) =>
+        value.ToString("yyyy-MM-ddTHH:mm:ss", CultureInfo.InvariantCulture);
+
+    private static DateTime ParseLocalTime(string value) =>
+        DateTime.TryParseExact(
+            value,
+            "yyyy-MM-ddTHH:mm:ss",
+            CultureInfo.InvariantCulture,
+            DateTimeStyles.None,
+            out var parsed)
+            ? parsed
+            : DateTime.MinValue;
 
     public async Task<IReadOnlyList<SimulationDraft>> GetSimulationDraftsAsync(
         CancellationToken cancellationToken = default)

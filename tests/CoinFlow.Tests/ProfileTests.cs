@@ -244,6 +244,18 @@ public sealed class ProfileTests
             return new CancellationTokenSource().Token;
         }
 
+        if (type == typeof(string))
+        {
+            // Aynı referansın iletildiğini ölçmek için yeni bir örnek.
+            return new string('k', 3);
+        }
+
+        if (type.IsInterface && type.IsGenericType)
+        {
+            // IReadOnlyList<T> gibi koleksiyon parametreleri: yeni bir dizi.
+            return Array.CreateInstance(type.GetGenericArguments()[0], 1);
+        }
+
         return type.IsValueType
             ? Activator.CreateInstance(type)
             : RuntimeHelpers.GetUninitializedObject(type);

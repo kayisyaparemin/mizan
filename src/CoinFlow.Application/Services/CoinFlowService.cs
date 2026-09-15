@@ -1305,22 +1305,126 @@ public sealed class CoinFlowService(
     /// </summary>
     public async Task<IReadOnlyList<PaymentReminder>> GetPaymentRemindersAsync(
         DateTime now,
+        CancellationToken cancellationToken = default) =>
+        (await GetPaymentReminderBoardAsync(now, cancellationToken)).Reminders;
+
+    /// <summary>
+    /// Hatırlatıcı kartının tamamı: kurulacak bildirimler, sıradaki ödeme
+    /// günleri, ertelenenler ve bildirimden "Ödedim" denenler.
+    /// </summary>
+    /// <remarks>
+    /// Kapanmış dönemin cevapları gösterilmez: o dönemin ödemeleri
+    /// checkpoint'teki review'da netleşti. Cevap açık dönemin başlangıcından
+    /// sonraki bir vadeye aitse (sonraki dönemlere erken ödenenler dahil)
+    /// görünür.
+    /// </remarks>
+    public async Task<PaymentReminderBoard> GetPaymentReminderBoardAsync(
+        DateTime now,
         CancellationToken cancellationToken = default)
     {
         var mode = await store.GetPaymentReminderModeAsync(cancellationToken);
-        return mode == PaymentReminderMode.Off
-            ? []
-            : PaymentReminderPlanner.Plan(
+        var history = await store.GetFinancialHistoryAsync(cancellationToken);
+        var openPlan = PeriodProgressService.ResolveOpenPlan(history);
+        var responses = (await store.GetPaymentReminderResponsesAsync(cancellationToken))
+            .Where(x => openPlan is null || x.DueDate > openPlan.PeriodStart)
+            .ToArray();
+        var snoozed = responses
+            .Where(x => x.Kind == PaymentReminderAnswerKind.Snoozed)
+            .ToArray();
+        var paid = responses
+            .Where(x => x.Kind == PaymentReminderAnswerKind.Paid)
+            .ToArray();
+        if (mode == PaymentReminderMode.Off)
+        {
+            return new PaymentReminderBoard(mode, [], [], snoozed, paid, null);
+        }
+
+        var dues = await GetUpcomingPaymentDuesAsync(now, cancellationToken);
+        var scheduled = PaymentReminderPlanner.Plan(mode, dues, now);
+        var reminders = scheduled
+            .Concat(PaymentReminderPlanner.FollowUps(snoozed, now))
+            .OrderBy(x => x.NotifyAt)
+            .ThenBy(x => x.Key, StringComparer.Ordinal)
+            .ToArray();
+        var snoozedKeys = snoozed.Select(x => x.DueKey).ToHashSet();
+        var upcoming = PaymentReminderPlanner.Preview(
+            PaymentReminderPlanner.Plan(
                 mode,
-                await GetUpcomingPaymentDuesAsync(now, cancellationToken),
-                now);
+                dues.Where(x => !snoozedKeys.Contains(x.Key)),
+                now),
+            now);
+        return new PaymentReminderBoard(
+            mode,
+            reminders,
+            upcoming,
+            snoozed,
+            paid,
+            PaymentReminderPlanner.Sample(dues, now));
     }
+
+    /// <summary>
+    /// Bildirimden ya da karttan gelen cevabı deftere yazar. "Ödedim" denen
+    /// ödeme artık hatırlatılmaz ve Ana Sayfa'da ödenmiş sayılır; "Ertele"
+    /// denen ödeme vadesi geçse de ödenmemiş sayılır.
+    /// </summary>
+    /// <remarks>
+    /// Ödendi kaydı geç gelen bir "Ertele" ile geri alınmaz: aynı bildirimin
+    /// eski bir kopyasına basılmış olabilir. Geri almak için
+    /// <see cref="UndoPaymentReminderAnswerAsync"/>.
+    /// </remarks>
+    public async Task RecordPaymentReminderAnswerAsync(
+        PaymentReminderAnswer answer,
+        CancellationToken cancellationToken = default)
+    {
+        if (answer.Payments.Count == 0)
+        {
+            return;
+        }
+
+        var existing = (await store.GetPaymentReminderResponsesAsync(cancellationToken))
+            .ToDictionary(x => x.DueKey, StringComparer.Ordinal);
+        var responses = answer.Payments
+            .GroupBy(x => x.Key, StringComparer.Ordinal)
+            .Select(x => x.First())
+            .Where(x => answer.Kind == PaymentReminderAnswerKind.Paid ||
+                        !existing.TryGetValue(x.Key, out var previous) ||
+                        previous.Kind != PaymentReminderAnswerKind.Paid)
+            .Select(x => new PaymentReminderResponse(
+                x.Key,
+                x.Name,
+                x.DueDate,
+                x.Amount,
+                answer.Kind,
+                answer.AnsweredAt,
+                answer.Kind == PaymentReminderAnswerKind.Snoozed
+                    ? answer.SnoozedUntil
+                    : null))
+            .ToArray();
+        if (responses.Length > 0)
+        {
+            await store.UpsertPaymentReminderResponsesAsync(
+                responses,
+                cancellationToken);
+        }
+    }
+
+    /// <summary>Cevabı siler; ödeme yeniden planın kendi varsayımına döner.</summary>
+    public Task UndoPaymentReminderAnswerAsync(
+        string dueKey,
+        CancellationToken cancellationToken = default) =>
+        store.DeletePaymentReminderResponseAsync(dueKey, cancellationToken);
+
+    /// <summary>Defterin tamamı; dönem sihirbazı ertelenenleri "ödenmedi" açar.</summary>
+    public Task<IReadOnlyList<PaymentReminderResponse>> GetPaymentReminderResponsesAsync(
+        CancellationToken cancellationToken = default) =>
+        store.GetPaymentReminderResponsesAsync(cancellationToken);
 
     /// <summary>
     /// Hatırlatma ufkundaki ödemeler. Açık dönemde kaynak Ana Sayfa'nın
     /// donmuş planıdır; ödendi işaretlenen satır hatırlatılmaz, bugün vadesi
     /// gelen satır hatırlatılır. Dönem sonrasındaki ödemeler projeksiyondan
-    /// gelir: dönem kapatılmadan da ödeme günü hatırlatılmalı.
+    /// gelir: dönem kapatılmadan da ödeme günü hatırlatılmalı. Bildirimden
+    /// "Ödedim" denen ödeme hangi kaynaktan gelirse gelsin hatırlatılmaz.
     /// </summary>
     public async Task<IReadOnlyList<PaymentDue>> GetUpcomingPaymentDuesAsync(
         DateTime now,
@@ -1386,7 +1490,12 @@ public sealed class CoinFlowService(
                     x.Amount)));
         }
 
+        var answeredPaid = (await store.GetPaymentReminderResponsesAsync(cancellationToken))
+            .Where(x => x.Kind == PaymentReminderAnswerKind.Paid)
+            .Select(x => x.DueKey)
+            .ToHashSet(StringComparer.Ordinal);
         return dues
+            .Where(x => !answeredPaid.Contains(x.Key))
             .GroupBy(x => x.Key)
             .Select(x => x.First())
             .OrderBy(x => x.DueDate)
@@ -1395,9 +1504,7 @@ public sealed class CoinFlowService(
     }
 
     private static string DueKey(Guid sourceId, string name, DateOnly date) =>
-        sourceId == Guid.Empty
-            ? $"{name}-{date:yyyyMMdd}"
-            : $"{sourceId:N}-{date:yyyyMMdd}";
+        PaymentReminderPlanner.DueKey(sourceId, name, date);
 
     /// <summary>
     /// "Bugün şu kadar param var." Dönem içi gözlem — snapshot zincirine

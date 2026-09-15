@@ -98,6 +98,16 @@ public interface ICoinFlowStore
     Task DeletePeriodObservationAsync(
         Guid periodPlanSnapshotId,
         CancellationToken cancellationToken = default);
+    // Hatırlatıcı defteri: bildirimden gelen "Ödedim" / "Ertele" cevapları.
+    // Kaynak + vade anahtarıyla tutulur; snapshot zincirinin dışındadır (I14).
+    Task<IReadOnlyList<PaymentReminderResponse>> GetPaymentReminderResponsesAsync(
+        CancellationToken cancellationToken = default);
+    Task UpsertPaymentReminderResponsesAsync(
+        IReadOnlyList<PaymentReminderResponse> responses,
+        CancellationToken cancellationToken = default);
+    Task DeletePaymentReminderResponseAsync(
+        string dueKey,
+        CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<SimulationDraft>> GetSimulationDraftsAsync(
         CancellationToken cancellationToken = default);

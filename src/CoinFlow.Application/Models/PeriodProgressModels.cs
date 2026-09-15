@@ -42,8 +42,13 @@ public sealed record PeriodProgress(
     // KALAN — plandaki, henüz ödenmiş işaretlenmemiş satırlar.
     IReadOnlyList<PeriodPlanPaymentLine> RemainingLines,
     decimal RemainingPlannedTotal,
-    bool IsClosable)
+    bool IsClosable,
+    // KALAN'daki satırlardan hatırlatıcıda "Ertele" denenler.
+    IReadOnlyCollection<Guid>? SnoozedLineIds = null)
 {
+    public bool IsSnoozed(Guid lineId) =>
+        SnoozedLineIds?.Contains(lineId) == true;
+
     public bool HasObservation => Observation is not null;
     public bool HasRemainingLines => RemainingLines.Count > 0;
     public bool WasRevised => RevisionCount > 0;
