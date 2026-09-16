@@ -20,3 +20,4 @@ Ayrıntılı rehber için [docs/ARCHITECTURAL_RULES.md](docs/ARCHITECTURAL_RULES
 | **Profil / Multi-Tenancy** | Manuel pass-through delegasyon wrapper'ları | .NET DI Container `IServiceScope` yaşam döngüsü |
 | **Test Stratejisi** | `File.ReadAllText` ile kod metni arayan testler (`*SourceTests.cs`) | Mock'lu gerçek xUnit ViewModel ve Use Case birim testleri |
 | **Platform Taşınabilirliği**| `MauiProgram.cs` içine hardcoded Android sınıfları | Saf `net8.0` çekirdek + `#if ANDROID` / platform DI modülleri |
+| **Sürüm ve CI/CD Takibi** | Tag atıp CI/CD durumunu takip etmeden bırakmak | GitHub Actions pipeline'ını başarıyla tamamlanana kadar aktif izlemek, APK release çıktısını doğrulayıp raporlamak |

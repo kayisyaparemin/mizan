@@ -148,3 +148,13 @@ Proje bağımlılıkları kesin olarak tek yönlüdür ve tersine bağımlılık
 - Tüm iş mantığı ve ViewModel katmanları saf `.NET 8` (`net8.0`) olmalıdır.
 - Platforma özel (Android) sınıflar (`AndroidStorageAccess`, `PaymentReminders` vb.) sadece `CoinFlow.App/Platforms/Android` altında kalmalı ve platform arayüzlerini (`IStorageAccess`, `IReminderScheduler`) implemente etmelidir.
 - `MauiProgram.cs` içinde platform sınıfları koşulsuz olarak kaydedilmemeli, platform DI modülleri üzerinden (`#if ANDROID` veya partial class `ConfigurePlatformServices`) bağlanmalıdır.
+
+---
+
+## 6. Sürüm Çıkma ve CI/CD Yaşam Döngüsü Standardı (Release & CI/CD Lifecycle Invariant)
+
+- **Release Talebinin Sonu Başarılı Pipeline'dır:** Kullanıcı bir sürüm çıkılmasını (release) istediğinde, süreç yalnızca `git tag` oluşturulup push edilerek sonlandırılamaz.
+- **Aktif İzleme (Active CI/CD Monitoring):** Agent veya sorumlu mühendis, GitHub Actions pipeline'ını (build, test, release-apk) API veya CLI üzerinden aktif olarak polling/webhook ile takip etmelidir (`status: completed`, `conclusion: success`).
+- **Uçtan Uca Sorumluluk:** Pipeline'da herhangi bir hata (derleme, test, paketleme, imzalama) oluşursa; hata logları derhal analiz edilmeli, kod/yapılandırma düzeltilmeli, commit & tag güncellenip süreç tekrar başlatılmalı ve pipeline başarıyla sonuçlanana kadar takip sürdürülmelidir.
+- **Doğrulama ve Raporlama:** Süreç, ancak ve ancak GitHub Releases üzerinde ilgili sürüme ait APK / release asset'i başarıyla yayınlandığında tamamlanmış sayılır. Geliştirici kullanıcıya release bağlantısını, APK detaylarını ve özet raporunu sunarak görevi noktalar.
+
