@@ -198,10 +198,10 @@ public partial class SimulationViewModel(
     }
 
     [RelayCommand]
-    private async Task ApplyLastPlanAsync()
+    public async Task<SimulationApplyResult?> ApplyLastPlanAsync()
     {
-        if (!CanApplyPlan) return;
-        if (!await _applyLock.WaitAsync(0)) return;
+        if (!CanApplyPlan) return null;
+        if (!await _applyLock.WaitAsync(0)) return null;
 
         try
         {
@@ -210,7 +210,7 @@ public partial class SimulationViewModel(
             if (requests.Count == 0)
             {
                 SetStatus("Uygulanacak geçerli bir simülasyon planı bulunamadı.");
-                return;
+                return null;
             }
 
             var plan = await service.ApplySimulationPlanAsync(
@@ -229,12 +229,14 @@ public partial class SimulationViewModel(
             ClearResults();
             NotifyDraftChanged();
             SetStatus(plan.Message);
+            return plan;
         }
         catch (Exception exception)
         {
             var message = UserFacingMessages.FromException(exception);
             SetStatus(message);
             await feedback.ShowErrorAsync(message);
+            return null;
         }
         finally
         {

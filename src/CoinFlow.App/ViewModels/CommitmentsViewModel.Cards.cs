@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CoinFlow.App.Models;
+using CoinFlow.App.Services;
 using CoinFlow.Application.Models;
 using CoinFlow.Domain.Calculations;
 using CoinFlow.Domain.Models;

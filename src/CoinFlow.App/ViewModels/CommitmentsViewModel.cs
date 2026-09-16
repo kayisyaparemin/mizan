@@ -253,16 +253,6 @@ public partial class CommitmentsViewModel(
         _cardChargeDescriptions.Clear();
     }
 
-    private void OpenRecordFormForEdit(string recordType)
-    {
-        _recordType = recordType;
-        IsScenarioEntry = false;
-        ShowEntryPicker = false;
-        RefreshRecordFormFlags();
-        NamePlaceholder = NamePlaceholderFor(recordType);
-        HasActiveForm = true;
-    }
-
     private void ResetForm()
     {
         Name = string.Empty;

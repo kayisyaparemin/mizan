@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.Input;
 using CoinFlow.App.Models;
+using CoinFlow.App.Services;
 using CoinFlow.Domain.Models;
 
 namespace CoinFlow.App.ViewModels;

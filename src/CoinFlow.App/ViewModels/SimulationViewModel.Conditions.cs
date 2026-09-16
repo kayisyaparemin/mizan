@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CoinFlow.App.Models;
+using CoinFlow.App.Services;
 using CoinFlow.Application.Models;
 using CoinFlow.Domain.Calculations;
 using CoinFlow.Domain.Models;
@@ -307,4 +308,17 @@ public partial class SimulationViewModel
 
     public void PreserveStateOnNextAppearance() =>
         _preserveOnNextAppearance = true;
+
+    public Task LoadAsync() => InitializeAsync();
+
+    public bool ConsumeDetailReturn()
+    {
+        if (!_preserveOnNextAppearance)
+        {
+            return false;
+        }
+
+        _preserveOnNextAppearance = false;
+        return true;
+    }
 }
