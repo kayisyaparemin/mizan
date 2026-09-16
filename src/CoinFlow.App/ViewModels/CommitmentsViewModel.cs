@@ -12,7 +12,6 @@ namespace CoinFlow.App.ViewModels;
 
 public partial class CommitmentsViewModel(
     CoinFlowService service,
-    CreditCardStatementCalculator cardCalculator,
     CreditCardStatementImportWorkflow statementImportWorkflow,
     LoanPayoffService loanPayoffService,
     IUserFeedbackService feedback) : ViewModelBase

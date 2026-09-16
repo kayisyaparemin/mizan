@@ -89,7 +89,7 @@ public partial class CommitmentsViewModel
                 card.Id,
                 FinancialRecordKind.CreditCard,
                 $"{card.Bank} {card.Name}".Trim(),
-                $"Limit: {Money(card.Limit)} • Güncel borç: {Money(cardCalculator.ComputeCurrentBalance(card))}",
+                $"Limit: {Money(card.Limit)} • Güncel borç: {Money(card.KnownTotalDebt)}",
                 statement is null ? "—" : Money(statement.StatementAmount),
                 "Kredi kartı",
                 detailLine));
@@ -118,7 +118,7 @@ public partial class CommitmentsViewModel
                 expense.ExactDate.ToString("dd.MM.yyyy"),
                 Money(expense.Amount),
                 "Planlı ödeme",
-                expense.Status == PlannedExpenseStatus.Realized
+                expense.Status == PlannedExpenseStatus.Completed
                     ? "Gerçekleşti olarak işaretlendi"
                     : "Planlanan büyük ödeme"));
         }

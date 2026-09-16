@@ -13,8 +13,7 @@ namespace CoinFlow.App.ViewModels;
 public partial class SimulationViewModel(
     CoinFlowService service,
     SimulatorInsightService simulatorInsightService,
-    IUserFeedbackService feedback,
-    INavigationService navigation) : ViewModelBase
+    IUserFeedbackService feedback) : ViewModelBase
 {
     public ScenarioConditionForm Form { get; } = new(directEntryOnly: false);
 
@@ -191,7 +190,7 @@ public partial class SimulationViewModel(
         ApplyButtonText = "Planı Uygula";
         LastApplyResult = null;
         ApplyConfirmationText = string.Empty;
-        PopulateBaselineOnly(baseline);
+        PopulateBaseline(baseline);
         HasResults = true;
         IsResultStale = false;
         RefreshTargetResultAfterSimulation();
@@ -213,9 +212,9 @@ public partial class SimulationViewModel(
                 return null;
             }
 
-            var plan = await service.ApplySimulationPlanAsync(
+            var plan = await service.ApplySimulationAsync(
                 _lastRequests,
-                "Simülasyondan uygulanan plan");
+                confirmed: true);
 
             IsPlanApplied = true;
             ApplyButtonText = "Plan Uygulandı ✓";

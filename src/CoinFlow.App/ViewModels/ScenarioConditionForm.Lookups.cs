@@ -48,17 +48,6 @@ public sealed partial class ScenarioConditionForm
         SelectedStrategyMode ??= StrategyModes.First(x => x.Value != currentMode);
     }
 
-    public void LoadOptions(FinancialPlan plan)
-    {
-        SetLookups(plan);
-        var futureSalaryDates = plan.Salaries
-            .Select(s => s.EffectiveDate)
-            .Where(d => plan.Settings.ProjectionAnchorDate == default || d >= plan.Settings.ProjectionAnchorDate)
-            .Distinct()
-            .OrderBy(d => d);
-        SetStrategyLookups(futureSalaryDates, plan.InitialPaymentAssignmentMode);
-    }
-
     public void ClearLookups()
     {
         CreditCards.Clear();
