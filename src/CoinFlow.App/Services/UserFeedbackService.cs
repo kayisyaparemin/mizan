@@ -20,7 +20,8 @@ public sealed class UserFeedbackService : IUserFeedbackService
         string message,
         string accept,
         string cancel) =>
-        CurrentPage().DisplayAlert(title, message, accept, cancel);
+        MainThread.InvokeOnMainThreadAsync(() =>
+            CurrentPage().DisplayAlert(title, message, accept, cancel));
 
     public Task<string?> PromptAsync(
         string title,
@@ -29,33 +30,36 @@ public sealed class UserFeedbackService : IUserFeedbackService
         string cancel,
         string placeholder = "",
         int maxLength = -1) =>
-        CurrentPage().DisplayPromptAsync(
-            title,
-            message,
-            accept,
-            cancel,
-            maxLength: maxLength,
-            placeholder: placeholder);
+        MainThread.InvokeOnMainThreadAsync(() =>
+            CurrentPage().DisplayPromptAsync(
+                title,
+                message,
+                accept,
+                cancel,
+                maxLength: maxLength,
+                placeholder: placeholder));
 
-    public async Task<string?> ChooseAsync(
+    public Task<string?> ChooseAsync(
         string title,
         string cancel,
         string? destruction,
-        params string[] options)
-    {
-        var choice = await CurrentPage().DisplayActionSheet(
-            title,
-            cancel,
-            destruction,
-            options);
-        return choice is null || choice == cancel ? null : choice;
-    }
+        params string[] options) =>
+        MainThread.InvokeOnMainThreadAsync(async () =>
+        {
+            var choice = await CurrentPage().DisplayActionSheet(
+                title,
+                cancel,
+                destruction,
+                options);
+            return choice is null || choice == cancel ? null : choice;
+        });
 
     private static Task ShowAlertAsync(
         string title,
         string message,
         string button) =>
-        CurrentPage().DisplayAlert(title, message, button);
+        MainThread.InvokeOnMainThreadAsync(() =>
+            CurrentPage().DisplayAlert(title, message, button));
 
     private static Page CurrentPage()
     {

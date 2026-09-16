@@ -1,145 +1,20 @@
-using CoinFlow.Application.Models;
-using CoinFlow.Domain.Models;
-
 namespace CoinFlow.Application.Abstractions;
 
-public interface ICoinFlowStore
+public interface ICoinFlowStore :
+    ISettingsRepository,
+    ISalaryRepository,
+    IIncomeRepository,
+    ILoanRepository,
+    IPaymentPlanRepository,
+    ICreditCardRepository,
+    IExpenseRepository,
+    IObservationRepository,
+    ISimulationRepository,
+    IFinancialSnapshotRepository
 {
     Task InitializeAsync(CancellationToken cancellationToken = default);
     Task ClearAllFinancialDataAsync(
         CancellationToken cancellationToken = default);
     Task LoadCanonicalDevelopmentDataAsync(
-        CancellationToken cancellationToken = default);
-
-    Task<UserSettings> GetSettingsAsync(CancellationToken cancellationToken = default);
-    Task SaveSettingsAsync(
-        UserSettings settings,
-        CancellationToken cancellationToken = default);
-
-    /// <summary>Ödeme günü hatırlatıcısı; profil başına, finans ayarlarından ayrı.</summary>
-    Task<PaymentReminderMode> GetPaymentReminderModeAsync(
-        CancellationToken cancellationToken = default);
-    Task SavePaymentReminderModeAsync(
-        PaymentReminderMode mode,
-        CancellationToken cancellationToken = default);
-
-    Task<IReadOnlyList<PaymentAssignmentStrategy>>
-        GetPaymentAssignmentStrategiesAsync(
-            CancellationToken cancellationToken = default);
-    Task UpsertPaymentAssignmentStrategyAsync(
-        PaymentAssignmentStrategy strategy,
-        CancellationToken cancellationToken = default);
-    Task DeletePaymentAssignmentStrategyAsync(
-        Guid id,
-        CancellationToken cancellationToken = default);
-
-    Task<IReadOnlyList<SalaryScheduleEntry>> GetSalaryScheduleAsync(
-        CancellationToken cancellationToken = default);
-    Task UpsertSalaryAsync(
-        SalaryScheduleEntry entry,
-        CancellationToken cancellationToken = default);
-    Task DeleteSalaryAsync(Guid id, CancellationToken cancellationToken = default);
-
-    Task<IReadOnlyList<OneTimeIncome>> GetOtherIncomesAsync(
-        CancellationToken cancellationToken = default);
-    Task UpsertOtherIncomeAsync(
-        OneTimeIncome income,
-        CancellationToken cancellationToken = default);
-    Task DeleteOtherIncomeAsync(
-        Guid id,
-        CancellationToken cancellationToken = default);
-
-    Task<IReadOnlyList<Loan>> GetLoansAsync(
-        CancellationToken cancellationToken = default);
-    Task UpsertLoanAsync(Loan loan, CancellationToken cancellationToken = default);
-    Task DeleteLoanAsync(Guid id, CancellationToken cancellationToken = default);
-    Task<IReadOnlyList<LoanPrepayment>> GetLoanPrepaymentsAsync(
-        CancellationToken cancellationToken = default);
-    Task DeleteLoanPrepaymentAsync(
-        Guid id,
-        CancellationToken cancellationToken = default);
-
-    Task<IReadOnlyList<TemporaryPaymentPlan>> GetPaymentPlansAsync(
-        CancellationToken cancellationToken = default);
-    Task UpsertPaymentPlanAsync(
-        TemporaryPaymentPlan plan,
-        CancellationToken cancellationToken = default);
-    Task DeletePaymentPlanAsync(
-        Guid id,
-        CancellationToken cancellationToken = default);
-
-    Task<IReadOnlyList<CreditCard>> GetCreditCardsAsync(
-        CancellationToken cancellationToken = default);
-    Task UpsertCreditCardAsync(
-        CreditCard card,
-        CancellationToken cancellationToken = default);
-    Task DeleteCreditCardAsync(
-        Guid id,
-        CancellationToken cancellationToken = default);
-
-    Task<IReadOnlyList<PlannedLargeExpense>> GetPlannedLargeExpensesAsync(
-        CancellationToken cancellationToken = default);
-    Task UpsertPlannedLargeExpenseAsync(
-        PlannedLargeExpense expense,
-        CancellationToken cancellationToken = default);
-    Task DeletePlannedLargeExpenseAsync(
-        Guid id,
-        CancellationToken cancellationToken = default);
-    // Simülatörde kurulan koşul listesinin adlandırılmış kopyası. Projeksiyona
-    // girmez; yalnız simülatöre geri yüklenmek için saklanır.
-    // Açık dönemin gözlem defteri. Snapshot zincirinin dışındadır (I14):
-    // yazılması snapshot veya donmuş plan üretmez, projeksiyona girmez.
-    Task<PeriodObservation?> GetPeriodObservationAsync(
-        Guid periodPlanSnapshotId,
-        CancellationToken cancellationToken = default);
-    Task UpsertPeriodObservationAsync(
-        PeriodObservation observation,
-        CancellationToken cancellationToken = default);
-    Task DeletePeriodObservationAsync(
-        Guid periodPlanSnapshotId,
-        CancellationToken cancellationToken = default);
-    // Hatırlatıcı defteri: bildirimden gelen "Ödedim" / "Ertele" cevapları.
-    // Kaynak + vade anahtarıyla tutulur; snapshot zincirinin dışındadır (I14).
-    Task<IReadOnlyList<PaymentReminderResponse>> GetPaymentReminderResponsesAsync(
-        CancellationToken cancellationToken = default);
-    Task UpsertPaymentReminderResponsesAsync(
-        IReadOnlyList<PaymentReminderResponse> responses,
-        CancellationToken cancellationToken = default);
-    Task DeletePaymentReminderResponseAsync(
-        string dueKey,
-        CancellationToken cancellationToken = default);
-
-    Task<IReadOnlyList<SimulationDraft>> GetSimulationDraftsAsync(
-        CancellationToken cancellationToken = default);
-    Task UpsertSimulationDraftAsync(
-        SimulationDraft draft,
-        CancellationToken cancellationToken = default);
-    Task DeleteSimulationDraftAsync(
-        Guid id,
-        CancellationToken cancellationToken = default);
-
-    Task ApplySimulationBatchAsync(
-        SimulationPersistenceBatch batch,
-        CancellationToken cancellationToken = default);
-    Task ApplyOnboardingSetupAsync(
-        OnboardingPersistenceBatch batch,
-        CancellationToken cancellationToken = default);
-
-    Task<FinancialHistoryData> GetFinancialHistoryAsync(
-        CancellationToken cancellationToken = default);
-    Task SaveCurrentFinancialSnapshotAsync(
-        FinancialSnapshot snapshot,
-        PeriodPlanSnapshot plan,
-        UserSettings? updatedSettings = null,
-        CancellationToken cancellationToken = default);
-    Task ReplacePendingFinancialSnapshotPlanAsync(
-        FinancialSnapshot snapshot,
-        PeriodPlanSnapshot plan,
-        CancellationToken cancellationToken = default);
-    Task SavePeriodPlanRevisionAsync(
-        PeriodPlanRevision revision,
-        CancellationToken cancellationToken = default);
-    Task FinalizeFinancialReviewAsync(
-        FinancialReviewCommit commit,
         CancellationToken cancellationToken = default);
 }

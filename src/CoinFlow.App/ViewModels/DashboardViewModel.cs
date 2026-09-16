@@ -1,10 +1,8 @@
 using System.Collections.ObjectModel;
-using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CoinFlow.App.Services;
 using CoinFlow.App.Models;
-using CoinFlow.App.Pages;
 using CoinFlow.Application.Models;
 using CoinFlow.Application.Services;
 using CoinFlow.Domain.Calculations;
@@ -13,47 +11,30 @@ namespace CoinFlow.App.ViewModels;
 
 public partial class DashboardViewModel(
     CoinFlowService service,
-    IServiceProvider services,
+    INavigationService navigation,
     PaymentReminderCardViewModel reminders) : ViewModelBase
 {
-    /// <summary>Ödeme günü hatırlatıcısı; bu dönemin kalan ödemelerinin altında.</summary>
     public PaymentReminderCardViewModel Reminders { get; } = reminders;
 
-    /// <summary>
-    /// Açık dönemin donmuş planında kalan ödemeler. Gelecek projeksiyonundan
-    /// değil, dönemin kendi planından gelir (I16).
-    /// </summary>
-    public ObservableCollection<RemainingPaymentLine>
-        RemainingLines
-    { get; } = [];
+    public ObservableCollection<RemainingPaymentLine> RemainingLines { get; } = [];
 
-    // --- Dönem kimliği ve ilerlemesi ---
     [ObservableProperty] private string currentPeriodText = "—";
     [ObservableProperty] private string periodElapsedText = string.Empty;
     [ObservableProperty] private double periodElapsedRatio;
 
-    // --- Mevcut tutar (gözlem) ---
-    [ObservableProperty] private string lastObservationText =
-        "Henüz gözlem girmedin.";
+    [ObservableProperty] private string lastObservationText = "Henüz gözlem girmedin.";
     [ObservableProperty] private bool hasObservation;
     [ObservableProperty] private string observationDateText = string.Empty;
 
-    // --- PLAN bloğu ---
     [ObservableProperty] private string planFrozenText = "—";
     [ObservableProperty] private string plannedEndingText = "—";
 
-    // --- GİDİŞAT bloğu ---
-    /// <summary>
-    /// Yaşam gideri bir havuz: planlanan / harcanan / kalan. Günlere
-    /// bölünmez — 20.000 planlanıp 15.000 harcandıysa 5.000 kalmıştır.
-    /// </summary>
     [ObservableProperty] private string plannedLivingText = "—";
     [ObservableProperty] private string spentLivingText = "—";
     [ObservableProperty] private string remainingLivingText = "—";
     [ObservableProperty] private bool hasLivingOverspend;
     [ObservableProperty] private string livingOverspendText = string.Empty;
 
-    /// <summary>Kartlar: planlanan ödeme ile kartın şu anki hâli.</summary>
     public ObservableCollection<CardProgressLine> CardLines { get; } = [];
     [ObservableProperty] private bool hasCardLines;
 
@@ -65,9 +46,7 @@ public partial class DashboardViewModel(
     [ObservableProperty] private string projectedEndingText = "—";
     [ObservableProperty] private bool isProjectedEndingNegative;
 
-    // --- KALAN bloğu ---
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasNoRemainingLines))]
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(HasNoRemainingLines))]
     private bool hasRemainingLines;
     [ObservableProperty] private string remainingWindowText = string.Empty;
     [ObservableProperty] private string remainingTotalText = "—";
@@ -75,67 +54,44 @@ public partial class DashboardViewModel(
 
     [ObservableProperty] private bool isPeriodClosable;
 
-    // --- Durum / boş ekran ---
     [ObservableProperty] private bool hasUndeterminedCardPayment;
     [ObservableProperty] private string calculationDetails = string.Empty;
     [ObservableProperty] private bool hasPendingStrategy;
     [ObservableProperty] private bool hasFinancialPlan;
     [ObservableProperty] private bool isEmptyState = true;
-    [ObservableProperty]
-    private string emptyStateMessage =
-        "Başlamak için gelirini ekle.";
+    [ObservableProperty] private string emptyStateMessage = "Başlamak için gelirini ekle.";
     [ObservableProperty] private string emptyStateAction = "Gelir Ekle";
     [ObservableProperty] private bool hasPendingReview;
     [ObservableProperty] private bool shouldShowOnboarding;
     [ObservableProperty] private bool showCalculationDetails;
 
-    /// <summary>Dönem detayına açılabilmek için tutulan mevcut dönem.</summary>
     private SalaryPeriodProjection? _currentPeriod;
-
     private bool _listensToReminderAnswers;
 
-    /// <summary>
-    /// §11 — yalnız gerçekten anlamlı olan uyarılar, önceliğe göre.
-    /// </summary>
     public ObservableCollection<DashboardAlert> Alerts { get; } = [];
     [ObservableProperty] private bool hasAlerts;
 
-    /// <summary>
-    /// Dönem içi gözlem: "bugün şu kadar param var". Uygulamaya gelen kişi
-    /// işe bunu girerek başlar.
-    /// Kaydetmek donmuş planı, review checkpointini ve geçmiş logunu
-    /// değiştirmez (I14) — yalnız açık dönemin gözlem defterine yazar.
-    /// </summary>
-    [ObservableProperty] private string currentBalanceInput = string.Empty;
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(CanSaveCurrentBalance))]
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(CanSaveCurrentBalance))]
     private bool isSavingCurrentBalance;
+    [ObservableProperty] private string currentBalanceInput = string.Empty;
 
     public bool CanSaveCurrentBalance => !IsSavingCurrentBalance;
+    public bool IsDevelopment => BuildInfo.IsDevelopment;
 
     [RelayCommand]
     private async Task SaveCurrentBalanceAsync()
     {
-        if (IsSavingCurrentBalance)
-        {
-            return;
-        }
-
+        if (IsSavingCurrentBalance) return;
         try
         {
             IsSavingCurrentBalance = true;
             SetStatus(string.Empty);
             var amount = ParseMoney(CurrentBalanceInput);
-            // Bilinçli olarak RefreshCurrentFinancialStateAsync DEĞİL: o bir
-            // checkpoint işlemidir ve dönem içinde çağrılırsa açık planın
-            // penceresini kısaltır, orijinal planı yetim bırakır (I14).
             await service.ObserveCurrentBalanceAsync(amount);
         }
         catch (Exception exception)
         {
-            SetStatus(UserFacingMessages.FromException(
-                exception,
-                "Gözlem kaydedilemedi."));
+            SetStatus(UserFacingMessages.FromException(exception, "Gözlem kaydedilemedi."));
             return;
         }
         finally
@@ -146,68 +102,25 @@ public partial class DashboardViewModel(
         await LoadAsync();
     }
 
-    /// <summary>
-    /// "Bu dönem nasıl oluşuyor" tablosu ana sayfadan kalktı; aynı kırılım
-    /// Dönem Detayı'nda zaten var ve orada daha ayrıntılı.
-    /// </summary>
     [RelayCommand]
     private Task OpenCurrentPeriodDetailAsync() =>
         _currentPeriod is null
             ? Task.CompletedTask
-            : Shell.Current.GoToAsync(
-                AppShell.PeriodDetailRoute,
-                new ShellNavigationQueryParameters
+            : navigation.NavigateToAsync(
+                NavigationRoutes.SalaryPeriodDetail,
+                new Dictionary<string, object>
                 {
                     [SalaryPeriodDetailViewModel.DetailQueryKey] =
-                        new SalaryPeriodDetailRequest(
-                            _currentPeriod,
-                            IsCurrentPeriod: true)
+                        new SalaryPeriodDetailRequest(_currentPeriod, IsCurrentPeriod: true)
                 });
 
-    private static decimal ParseMoney(string value)
-    {
-        var text = (value ?? string.Empty).Trim();
-        if (text.Length == 0 ||
-            !decimal.TryParse(
-                text,
-                NumberStyles.Number,
-                TurkishCulture,
-                out var amount))
-        {
-            throw new InvalidOperationException(
-                "Mevcut tutar geçerli bir sayı olmalıdır.");
-        }
-
-        return amount;
-    }
-
-    [RelayCommand]
-    private void ToggleCalculationDetails() =>
-        ShowCalculationDetails = !ShowCalculationDetails;
-
-    public bool IsDevelopment => BuildInfo.IsDevelopment;
-
-    /// <summary>
-    /// Ana Sayfa mevcut dönemin ekranıdır (I16). Rakamları
-    /// <c>GetPeriodProgressAsync</c> üzerinden donmuş plandan ve gözlem
-    /// defterinden okur — gelecek projeksiyonundan değil.
-    /// </summary>
-    /// <remarks>
-    /// <c>GetDashboardAsync</c> yalnız uyarı üretmek ve dönem detayına
-    /// açılabilmek için çağrılır; ekrandaki hiçbir rakam ondan gelmez.
-    /// </remarks>
     [RelayCommand]
     public async Task LoadAsync()
     {
-        if (IsBusy)
-        {
-            return;
-        }
+        if (IsBusy) return;
 
         if (!_listensToReminderAnswers)
         {
-            // Hatırlatıcıda "Ödedim" / geri al: kalan ödemeler ve dönem sonu
-            // değişir. Kart bu view model'le aynı ömürde; sızıntı yok.
             _listensToReminderAnswers = true;
             Reminders.AnswersChanged += async (_, _) => await LoadAsync();
         }
@@ -216,8 +129,7 @@ public partial class DashboardViewModel(
         {
             IsBusy = true;
             SetStatus(string.Empty);
-            ShouldShowOnboarding =
-                await service.IsOnboardingRequiredAsync();
+            ShouldShowOnboarding = await service.IsOnboardingRequiredAsync();
             if (ShouldShowOnboarding)
             {
                 ResetToEmptyState(
@@ -230,8 +142,6 @@ public partial class DashboardViewModel(
             var review = await service.GetPeriodReviewAvailabilityAsync();
             HasPendingReview = review.IsDue;
 
-            // Uygulama kapalıyken bildirimde "Ödedim" / "Ertele" denmiş olabilir;
-            // kalan ödemeler hesaplanmadan önce deftere işlenir.
             await Reminders.ApplyPendingAnswersAsync();
             var progress = await service.GetPeriodProgressAsync();
             if (progress is null)
@@ -249,19 +159,12 @@ public partial class DashboardViewModel(
             IsEmptyState = false;
             ApplyProgress(progress);
 
-            // Uyarılar ve dönem detayı bağlantısı için; ekrandaki rakamlar
-            // buradan gelmiyor.
             var dashboard = await service.GetDashboardAsync();
             _currentPeriod = dashboard?.CurrentPeriod;
-            HasUndeterminedCardPayment =
-                dashboard?.HasUndeterminedCardPayments ?? false;
+            HasUndeterminedCardPayment = dashboard?.HasUndeterminedCardPayments ?? false;
             HasPendingStrategy = dashboard?.PendingStrategy is not null;
-            CalculationDetails = _currentPeriod is null
-                ? string.Empty
-                : BuildDetails(_currentPeriod);
+            CalculationDetails = _currentPeriod is null ? string.Empty : BuildDetails(_currentPeriod);
             BuildAlerts(dashboard, review.IsDue);
-            // Ödemeler değişmiş olabilir: telefondaki bildirimler her açılışta
-            // güncel planla eşitlenir. Hata kartta söylenir, ekranı bozmaz.
             await Reminders.LoadAsync();
         }
         catch (Exception exception)
@@ -276,31 +179,24 @@ public partial class DashboardViewModel(
 
     private void ApplyProgress(PeriodProgress progress)
     {
-        CurrentPeriodText =
-            $"{progress.PeriodStart.ToString("dd MMMM yyyy", TurkishCulture)} Dönemi";
+        CurrentPeriodText = $"{progress.PeriodStart.ToString("dd MMMM yyyy", TurkishCulture)} Dönemi";
         PeriodElapsedText = progress.TotalDays > 0
-            ? $"{progress.ElapsedDays}/{progress.TotalDays} gün · " +
-              $"{progress.PeriodEnd.ToString("dd MMMM", TurkishCulture)} tarihinde kapanıyor"
+            ? $"{progress.ElapsedDays}/{progress.TotalDays} gün · {progress.PeriodEnd.ToString("dd MMMM", TurkishCulture)} tarihinde kapanıyor"
             : string.Empty;
         PeriodElapsedRatio = progress.ElapsedRatio;
 
-        // PLAN
         PlanFrozenText = progress.WasRevised
             ? $"{progress.PlanFrozenOn.ToString("dd MMMM", TurkishCulture)} tarihinde donduruldu · {progress.RevisionCount} revizyon"
             : $"{progress.PlanFrozenOn.ToString("dd MMMM", TurkishCulture)} tarihinde donduruldu";
         PlannedEndingText = Money(progress.PlannedEndingSavings);
 
-        // GİDİŞAT — gözlem yoksa blok hiç görünmez, rakam uydurulmaz.
         HasObservation = progress.HasObservation;
         if (progress.Observation is { } observation)
         {
-            // Alan son gözlemle doldurulmaz; tutar bu satırda görünür, yeni
-            // gözlem boş alana yazılır.
             LastObservationText = observation.ObservedBalance is { } observed
                 ? $"Son gözlem: {observation.ObservedOn.ToString("dd MMMM yyyy", TurkishCulture)} · {Money(observed, 2)}"
                 : $"Son gözlem: {observation.ObservedOn.ToString("dd MMMM yyyy", TurkishCulture)}";
-            ObservationDateText =
-                $"{observation.ObservedOn.ToString("dd MMMM", TurkishCulture)} gözlemi";
+            ObservationDateText = $"{observation.ObservedOn.ToString("dd MMMM", TurkishCulture)} gözlemi";
             CurrentBalanceInput = string.Empty;
         }
         else
@@ -310,23 +206,14 @@ public partial class DashboardViewModel(
             CurrentBalanceInput = string.Empty;
         }
 
-        // Parametre parametre: her bölüm planlanan ile şu anki hâli yan yana
-        // koyar. Tek bir "fark" rakamı hangi kalemin değiştiğini gizliyordu.
-
-        // YAŞAM GİDERİ — havuz
         PlannedLivingText = Money(progress.PlannedLivingBudget);
-        SpentLivingText = progress.ObservedLivingSpend is { } spent
-            ? Money(spent)
-            : "—";
-        RemainingLivingText = progress.RemainingLivingBudget is { } left
-            ? Money(left)
-            : "—";
+        SpentLivingText = progress.ObservedLivingSpend is { } spent ? Money(spent) : "—";
+        RemainingLivingText = progress.RemainingLivingBudget is { } left ? Money(left) : "—";
         HasLivingOverspend = progress.LivingOverspend is not null;
         LivingOverspendText = progress.LivingOverspend is { } over
             ? $"Havuz {Money(over)} aşıldı; fazlası dönem sonuna yansıyor."
             : string.Empty;
 
-        // KREDİ KARTLARI
         CardLines.Clear();
         foreach (var card in progress.Cards)
         {
@@ -339,47 +226,29 @@ public partial class DashboardViewModel(
 
         HasCardLines = CardLines.Count > 0;
 
-        // KMH — yalnız gerçekten açık varsa
         HasDeficitFinancing = progress.HasDeficitFinancing;
         PlannedDeficitInterestText = Money(progress.PlannedDeficitInterest);
-        ProjectedDeficitInterestText =
-            progress.ProjectedDeficitInterest is { } projectedInterest
-                ? Money(projectedInterest)
-                : "—";
-
-        // DÖNEM SONU
-        PlannedEndingCompareText = Money(progress.PlannedEndingSavings);
-        ProjectedEndingText = progress.ProjectedEndingSavings is { } projected
-            ? Money(projected)
+        ProjectedDeficitInterestText = progress.ProjectedDeficitInterest is { } projectedInterest
+            ? Money(projectedInterest)
             : "—";
+
+        PlannedEndingCompareText = Money(progress.PlannedEndingSavings);
+        ProjectedEndingText = progress.ProjectedEndingSavings is { } projected ? Money(projected) : "—";
         IsProjectedEndingNegative = progress.ProjectedEndingSavings < 0m;
 
-        // KALAN — "bugünden dönem sonuna" değil, "ödenmiş işaretlemediklerin".
-        // Vadesi geçmiş ama işaretlenmemiş satırlar da burada durur; başlığı
-        // bugünle sınırlamak ekranın kendini yalanlaması olurdu (07 Eyl tarihli
-        // satır "09 Eyl → 10 Eyl" penceresinin altında görünüyordu).
-        RemainingWindowText =
-            "Ödenmiş işaretlemediklerin · dönem " +
-            $"{progress.PeriodEnd.ToString("dd MMMM", TurkishCulture)} tarihinde kapanıyor";
+        RemainingWindowText = $"Ödenmiş işaretlemediklerin · dönem {progress.PeriodEnd.ToString("dd MMMM", TurkishCulture)} tarihinde kapanıyor";
         RemainingLines.Clear();
         foreach (var line in progress.RemainingLines)
         {
-            var detail = line.IsEstimate
-                ? $"{line.Detail} • Tahmini"
-                : line.Detail;
+            var detail = line.IsEstimate ? $"{line.Detail} • Tahmini" : line.Detail;
             if (line.PlannedDate < progress.Today)
             {
-                detail = string.IsNullOrWhiteSpace(detail)
-                    ? "Vadesi geçti"
-                    : $"{detail} • Vadesi geçti";
+                detail = string.IsNullOrWhiteSpace(detail) ? "Vadesi geçti" : $"{detail} • Vadesi geçti";
             }
 
-            // Hatırlatıcıda ertelenen ödeme vadesi geçse de burada kalır.
             if (progress.IsSnoozed(line.Id))
             {
-                detail = string.IsNullOrWhiteSpace(detail)
-                    ? "Ertelendi"
-                    : $"{detail} • Ertelendi";
+                detail = string.IsNullOrWhiteSpace(detail) ? "Ertelendi" : $"{detail} • Ertelendi";
             }
 
             RemainingLines.Add(new RemainingPaymentLine(
@@ -394,69 +263,7 @@ public partial class DashboardViewModel(
         IsPeriodClosable = progress.IsClosable;
     }
 
-    private void ResetToEmptyState(string message, string action)
-    {
-        HasFinancialPlan = false;
-        IsEmptyState = true;
-        _currentPeriod = null;
-        HasUndeterminedCardPayment = false;
-        HasPendingStrategy = false;
-        HasObservation = false;
-        HasRemainingLines = false;
-        IsPeriodClosable = false;
-        RemainingLines.Clear();
-        Alerts.Clear();
-        HasAlerts = false;
-        EmptyStateMessage = message;
-        EmptyStateAction = action;
-    }
-
-
-    [RelayCommand]
-    private Task OpenSimulationAsync() =>
-        Shell.Current.GoToAsync("//simulation/simulation-content");
-
-    [RelayCommand]
-    private Task OpenSettingsAsync() =>
-        Shell.Current.GoToAsync("//settings/settings-content");
-
-    [RelayCommand]
-    private Task OpenCommitmentsAsync() =>
-        Shell.Current.GoToAsync("//commitments/commitments-content");
-
-    [RelayCommand]
-    private Task OpenEmptyStateAsync() =>
-        ShouldShowOnboarding
-            ? OpenOnboardingAsync()
-            : OpenCommitmentsAsync();
-
-    [RelayCommand]
-    private Task OpenFutureMonthsAsync() =>
-        Shell.Current.GoToAsync("//projection/future-months-content");
-
-    [RelayCommand]
-    private Task OpenHistoryAsync() =>
-        Shell.Current.GoToAsync("//history/history-content");
-
-    [RelayCommand]
-    private async Task OpenOnboardingAsync()
-    {
-        var page = services.GetRequiredService<OnboardingPage>();
-        await Shell.Current.Navigation.PushModalAsync(
-            new NavigationPage(page));
-        if (await page.Completion)
-        {
-            await LoadAsync();
-        }
-    }
-
-    /// <summary>
-    /// §11 — uyarılar yalnız aksiyon veya gerçek dikkat gerektirdiğinde üretilir.
-    /// Her uyarı "ne oldu / neden önemli / ne yapabilirim" sorularını yanıtlar.
-    /// </summary>
-    private void BuildAlerts(
-        DashboardSnapshot? dashboard,
-        bool reviewIsDue)
+    private void BuildAlerts(DashboardSnapshot? dashboard, bool reviewIsDue)
     {
         Alerts.Clear();
 
@@ -480,10 +287,6 @@ public partial class DashboardViewModel(
                 OpenCommitmentsCommand));
         }
 
-        // Dönem açığı uyarısı burada değil: aynı cümleyi ana sayfadaki durum
-        // özeti zaten söylüyordu ve rakam üç yerde birden duruyordu. Uyarı
-        // listesi yalnız başka yerde görünmeyen, aksiyon bekleyen şeyler için.
-
         if (dashboard?.PendingStrategy is { } pending)
         {
             Alerts.Add(new DashboardAlert(
@@ -494,63 +297,4 @@ public partial class DashboardViewModel(
 
         HasAlerts = Alerts.Count > 0;
     }
-
-    [RelayCommand]
-    public Task OpenPeriodReviewAsync()
-    {
-        var page = services.GetRequiredService<PeriodReviewPage>();
-        return Shell.Current.Navigation.PushModalAsync(
-            new NavigationPage(page));
-    }
-
-    private static string BuildDetails(SalaryPeriodProjection row)
-    {
-        var incomeLines = row.IncomeItems.Select(x =>
-            $"{x.SourceDate:dd.MM} {x.Name}: {Money(x.Amount, 2)}");
-        var paymentLines = row.MandatoryItems.Select(x =>
-            $"{x.DueDate:dd.MM} {x.Name}: {Money(x.Amount, 2)}" +
-            (x.IsEstimate ? " (tahmini)" : string.Empty) +
-            (x.PaymentBeforeSalary
-                ? $" • ⚠ {x.AssignedSalaryDate:dd.MM} dönemi; gerçek vade önce"
-                : string.Empty));
-        var calculation = new[]
-        {
-            $"OpeningProjectedSavings: {Money(row.OpeningProjectedSavings, 2)}",
-            $"CarryOverDeficit: {Money(row.CarryOverDeficit, 2)}",
-            $"Income: {Money(row.TotalIncome, 2)}",
-            $"MandatoryOutflow: {Money(row.MandatoryOutflow, 2)}",
-            $"AvailableAfterMandatory: {Money(row.AvailableAfterMandatory, 2)}",
-            $"AvailableAfterCarryOverDeficit: {Money(row.AvailableAfterCarryOverDeficit, 2)}",
-            $"LivingBudget: {Money(row.LivingBudget, 2)}",
-            $"LargeExpenses: {Money(row.PlannedLargeCashExpenses, 2)}",
-            $"CurrentPeriodNetContribution: {Money(row.CurrentPeriodNetContribution, 2)}",
-            $"EndingBeforeDeficitInterest: {Money(row.EndingProjectedSavingsBeforeDeficitInterest, 2)}",
-            $"DeficitPrincipal: {Money(row.DeficitPrincipal, 2)}",
-            $"DeficitInterestRate: %{(row.AppliedDeficitInterestRate * 100m).ToString("N2", TurkishCulture)}",
-            $"DeficitInterest: {Money(row.DeficitFinancingInterest, 2)}",
-            $"CardInterestGenerated: {Money(row.CardInterestGenerated, 2)}",
-            $"TotalInterestGenerated: {Money(row.TotalInterestGenerated, 2)}",
-            $"FinalEndingProjectedSavings: {Money(row.EndingProjectedSavings, 2)}",
-            string.Empty
-        };
-        var cardInterestLines = row.CardPaymentStatuses.Select(x =>
-            $"{x.CardName}: Statement={Money(x.StatementBalance ?? 0m, 2)} • " +
-            $"Payment={Money(x.Payment ?? 0m, 2)} • " +
-            $"RemainingPrincipal={Money(x.CarriedPrincipalAfterPayment ?? 0m, 2)} • " +
-            $"Rate=%{(x.AppliedInterestRate * 100m).ToString("N2", TurkishCulture)} • " +
-            $"CarryInterest={Money(x.CarryInterest, 2)} • " +
-            $"NextCarry={Money(x.NextCarriedBalance ?? 0m, 2)}");
-        return string.Join(
-            Environment.NewLine,
-            calculation.Concat(incomeLines)
-                .Concat(paymentLines)
-                .Concat(cardInterestLines));
-    }
-
-    private static string ModeText(
-        CoinFlow.Domain.Models.PaymentAssignmentMode mode) =>
-        mode == CoinFlow.Domain.Models.PaymentAssignmentMode.PreviousPeriod
-            ? "Geçmiş dönemi kapatırım"
-            : "Gelecek dönemi karşılarım";
-
 }

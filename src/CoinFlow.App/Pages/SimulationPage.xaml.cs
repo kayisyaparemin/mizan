@@ -8,16 +8,19 @@ public partial class SimulationPage : ContentPage, IQueryAttributable
 {
     private readonly SimulationViewModel _viewModel;
     private readonly IUserFeedbackService _feedback;
+    private readonly INavigationService _navigation;
     private Guid? _requestedClosureLoanId;
     private DateOnly? _requestedClosureDate;
 
     public SimulationPage(
         SimulationViewModel viewModel,
-        IUserFeedbackService feedback)
+        IUserFeedbackService feedback,
+        INavigationService navigation)
     {
         InitializeComponent();
         BindingContext = _viewModel = viewModel;
         _feedback = feedback;
+        _navigation = navigation;
     }
 
     protected override async void OnAppearing()
@@ -85,26 +88,26 @@ public partial class SimulationPage : ContentPage, IQueryAttributable
         }
     }
 
-    private static Task NavigateToAppliedRecordAsync(
+    private Task NavigateToAppliedRecordAsync(
         SimulationApplyResult result) => result.Destination switch
         {
             SimulationApplyDestination.CreditCard =>
-                Shell.Current.GoToAsync(
-                    AppShell.CardControlRoute,
-                    new ShellNavigationQueryParameters
+                _navigation.NavigateToAsync(
+                    NavigationRoutes.CardControl,
+                    new Dictionary<string, object>
                     {
                         [CardControlViewModel.CardIdQueryKey] =
                             result.EntityId.ToString("D")
                     }),
             SimulationApplyDestination.Payments =>
-                Shell.Current.GoToAsync(
-                    "//commitments/commitments-content?section=payment"),
+                _navigation.NavigateToAsync(
+                    $"{NavigationRoutes.Commitments}?section=payment"),
             SimulationApplyDestination.Income or
                 SimulationApplyDestination.SalaryHistory =>
-                Shell.Current.GoToAsync(
-                    "//commitments/commitments-content?section=income"),
+                _navigation.NavigateToAsync(
+                    $"{NavigationRoutes.Commitments}?section=income"),
             SimulationApplyDestination.Settings =>
-                Shell.Current.GoToAsync("//settings/settings-content"),
+                _navigation.NavigateToAsync(NavigationRoutes.Settings),
             _ => throw new ArgumentOutOfRangeException()
         };
 }

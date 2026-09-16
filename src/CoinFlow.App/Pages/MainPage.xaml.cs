@@ -12,17 +12,20 @@ public partial class MainPage : ContentPage
     private bool _onboardingPromptHandled;
     private readonly DashboardViewModel _viewModel;
     private readonly IUserFeedbackService _feedback;
-    private readonly IServiceProvider _services;
+    private readonly INavigationService _navigation;
+    private readonly ProfileService _profiles;
 
     public MainPage(
         DashboardViewModel viewModel,
         IUserFeedbackService feedback,
-        IServiceProvider services)
+        INavigationService navigation,
+        ProfileService profiles)
     {
         InitializeComponent();
         BindingContext = _viewModel = viewModel;
         _feedback = feedback;
-        _services = services;
+        _navigation = navigation;
+        _profiles = profiles;
     }
 
     protected override async void OnAppearing()
@@ -32,9 +35,7 @@ public partial class MainPage : ContentPage
         if (_viewModel.ShouldShowOnboarding && !_onboardingPromptHandled)
         {
             _onboardingPromptHandled = true;
-            var page = _services.GetRequiredService<OnboardingPage>();
-            await Navigation.PushModalAsync(new NavigationPage(page));
-            if (await page.Completion)
+            if (await _navigation.OpenOnboardingModalAsync())
             {
                 await _viewModel.LoadAsync();
             }
@@ -42,7 +43,7 @@ public partial class MainPage : ContentPage
             return;
         }
 
-        var session = _services.GetRequiredService<ProfileService>().SessionId;
+        var session = _profiles.SessionId;
         if (_viewModel.HasPendingReview && _reviewPromptSession != session)
         {
             _reviewPromptSession = session;

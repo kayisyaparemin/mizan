@@ -47,6 +47,16 @@ public static class MauiProgram
                     services.GetRequiredService<IClock>().Today)));
         builder.Services.AddSingleton<ICoinFlowStore>(
             services => services.GetRequiredService<ProfileScopedCoinFlowStore>());
+        builder.Services.AddSingleton<ISettingsRepository>(s => s.GetRequiredService<ICoinFlowStore>());
+        builder.Services.AddSingleton<ISalaryRepository>(s => s.GetRequiredService<ICoinFlowStore>());
+        builder.Services.AddSingleton<IIncomeRepository>(s => s.GetRequiredService<ICoinFlowStore>());
+        builder.Services.AddSingleton<ILoanRepository>(s => s.GetRequiredService<ICoinFlowStore>());
+        builder.Services.AddSingleton<IPaymentPlanRepository>(s => s.GetRequiredService<ICoinFlowStore>());
+        builder.Services.AddSingleton<ICreditCardRepository>(s => s.GetRequiredService<ICoinFlowStore>());
+        builder.Services.AddSingleton<IExpenseRepository>(s => s.GetRequiredService<ICoinFlowStore>());
+        builder.Services.AddSingleton<IObservationRepository>(s => s.GetRequiredService<ICoinFlowStore>());
+        builder.Services.AddSingleton<ISimulationRepository>(s => s.GetRequiredService<ICoinFlowStore>());
+        builder.Services.AddSingleton<IFinancialSnapshotRepository>(s => s.GetRequiredService<ICoinFlowStore>());
         builder.Services.AddSingleton<IProfileStoreSwitch>(
             services => services.GetRequiredService<ProfileScopedCoinFlowStore>());
         builder.Services.AddSingleton<ProfileService>();
@@ -117,8 +127,18 @@ public static class MauiProgram
         builder.Services.AddSingleton<SimulatorInsightService>();
         builder.Services.AddSingleton<SimulationCalculator>();
         builder.Services.AddSingleton<TargetAmountCalculator>();
+        builder.Services.AddSingleton<CreditCardObligationService>();
+        builder.Services.AddSingleton<IFinancialPlanQueryService, FinancialPlanQueryService>();
+        builder.Services.AddSingleton<FinancialPlanQueryService>();
+        builder.Services.AddSingleton<ISimulationWorkflowService, SimulationWorkflowService>();
+        builder.Services.AddSingleton<SimulationWorkflowService>();
+        builder.Services.AddSingleton<IPeriodWorkflowService, PeriodWorkflowService>();
+        builder.Services.AddSingleton<PeriodWorkflowService>();
+        builder.Services.AddSingleton<IObligationManagementService, ObligationManagementService>();
+        builder.Services.AddSingleton<ObligationManagementService>();
         builder.Services.AddSingleton<CoinFlowService>();
         builder.Services.AddSingleton<IUserFeedbackService, UserFeedbackService>();
+        builder.Services.AddSingleton<INavigationService, MauiNavigationService>();
 
         builder.Services.AddTransient<ProfileSelectionViewModel>();
         builder.Services.AddTransient<ProfileSelectionPage>();

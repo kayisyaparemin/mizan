@@ -7,14 +7,17 @@ public partial class SettingsPage : ContentPage
 {
     private readonly SettingsViewModel _viewModel;
     private readonly IUserFeedbackService _feedback;
+    private readonly INavigationService _navigation;
 
     public SettingsPage(
         SettingsViewModel viewModel,
-        IUserFeedbackService feedback)
+        IUserFeedbackService feedback,
+        INavigationService navigation)
     {
         InitializeComponent();
         BindingContext = _viewModel = viewModel;
         _feedback = feedback;
+        _navigation = navigation;
     }
 
     protected override async void OnAppearing()
@@ -66,8 +69,7 @@ public partial class SettingsPage : ContentPage
         EventArgs eventArgs)
     {
         _viewModel.PrepareStrategyEditor();
-        await Navigation.PushModalAsync(
-            new StrategyChangePage(_viewModel, _feedback));
+        await _navigation.OpenStrategyChangeModalAsync(_viewModel);
     }
 
     private async void OnDeletePendingStrategyClicked(

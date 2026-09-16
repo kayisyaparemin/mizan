@@ -1,11 +1,11 @@
 # Mizan — Proje Durumu ve Devir Notu
 
-> Son güncelleme: 15.09.2026 · Son sürüm `v1.17.0`
+> Son güncelleme: 17.09.2026 · Son sürüm `v1.18.0`
 >
 > **Yeni bir sohbet/geliştirici buradan başlar.** Bu dosya tek devir
 > belgesidir; eski `HANDOFF.md` ve `TODO.md` kaldırıldı, hâlâ geçerli olan kısımları
 > burada (TODO tamamen bitmişti). Önce "Devir" bölümünü, sonra "Açık işler"i ve "Ürün invariant'ları"nı
-> oku. Sürüm bölümleri (v1.2.0 → v1.17.0) geriye dönük kayıttır; yalnız
+> oku. Sürüm bölümleri (v1.2.0 → v1.18.0) geriye dönük kayıttır; yalnız
 > dokunacağın alanın bölümünü oku.
 
 ## Devir
@@ -15,7 +15,7 @@
 | | |
 |---|---|
 | Branch | `main`, `origin/main` ile eşit, worktree yok (`git worktree list` yalnız `main`) |
-| Son sürüm | `v1.17.0` — bildirimde "Ödedim" / "Ertele", ertelenenler kırmızı, "Ödediklerin" yeşil, deneme bildirimi, kartın "bugün" hatası (`Mizan-1.17.0.apk`) |
+| Son sürüm | `v1.18.0` — Clean Architecture & Modern MVVM mimari refactoring, 350 satır sınıf limiti (%100 uyum), ISP repository ayrıştırması, UI/Navigasyon soyutlaması (`Mizan-1.18.0.apk`) |
 | Testler | 576/576 (`dotnet test`, ~9 sn) |
 | Android Release build | 0 uyarı, 0 hata |
 | Şema | v17 (`SqliteCoinFlowStore.CurrentSchemaVersion`) |
@@ -218,6 +218,7 @@ ekran doğruydu ama okunmuyordu; v1.5.0 ise eksik olan bir şeyi ekledi.
 | **v1.15.0** | **Plan türleri gruplandı, Finansal Yapı'dan doğrudan giriş** — simüle edilen her tür aynı sonuçla doğrudan girilebiliyor |
 | **v1.16.0** | **Ödeme günü hatırlatıcısı** (rahat / agresif) · Finansal Yapı ekleme alanı simülatör tasarımında · placeholder'lar · atıl kod temizliği · ödenmeyen borç yeni dönemin planından düşüyordu |
 | **v1.17.0** | **Bildirimde "Ödedim" / "Ertele"** · ertelenenler kartta kırmızı, ödenenler "Ödediklerin"de yeşil · deneme bildirimi · kart 15 Eylül'de 18 Eylül'e "bugün" diyordu |
+| **v1.18.0** | **Clean Architecture & Modern MVVM Mimarisi** · 350 satır sınıf limiti (%100 uyum, 0 kural ihlali) · Segregated Repositories (10 ISP arayüzü) · UI/Navigasyon soyutlaması (`INavigationService`) · 576/576 test yeşil |
 
 Grafik çalışması (Faz 1–4, v1.1.0–v1.2.0) v1.3.0'da geri alındı; ayrıntı
 aşağıdaki sürüm bölümlerinde. Anılan `DEVIR-FAZ3.md` repoda yok.
@@ -1235,6 +1236,27 @@ Bu projede on üçüncü kez yalnız ekranda görülen kusur.
 - Uygulama hiç açılmazsa kuyruk büyür ama kaybolmaz; profil silinince
   kuyruğu da silinir.
 - Kapanmış dönemlerin cevapları tabloda kalır (küçük; temizlik yok).
+
+### v1.18.0 ne getirdi
+
+- **Clean Architecture & Modern MVVM Dönüşümü.** Proje vibecoding kalıntılarından
+  arındırıldı, mimari kurallar `ARCHITECTURE_RULES.md` ile kilitlendi.
+- **ViewModel UI İzolasyonu.** ViewModels katmanındaki `Shell.Current`, `IServiceProvider`
+  ve `Page` bağımlılıkları tamamen sıfırlandı. Navigasyon `INavigationService`
+  ve rota sabitleri `NavigationRoutes` üzerinden yönetiliyor; diyalog ve toast
+  bildirimleri `UserFeedbackService` ile UI thread garantisine alındı.
+- **Segregated Repositories (ISP).** 40+ metotlu monolitik `ICoinFlowStore` arayüzü
+  10 adet odaklı repository arayüzüne (`ISalaryRepository`, `ILoanRepository`,
+  `ICreditCardRepository` vb.) ayrıştırıldı.
+- **Tek Sorumluluk Prensibi (SRP).** 2.113 satırlık monolitik `CoinFlowService`,
+  4 odaklı use-case servisine (`FinancialPlanQueryService`, `SimulationWorkflowService`,
+  `PeriodWorkflowService`, `ObligationManagementService`) bölündü ve ince bir Facade
+  ile geriye dönük tam uyumlu bırakıldı.
+- **350 Satır Sınırı (%100 Uyum).** Proje genelindeki tüm büyük ViewModel, Servis,
+  Hesaplayıcı ve Store sınıfları mantıksal partial modüllere bölünerek `src/` altındaki
+  204 `.cs` dosyasının tamamı $\le 350$ satır sınırına getirildi. 350 satırı aşan dosya sayısı: 0.
+- **Testler 576/576 yeşil.** Tüm hesaplama motoru, finansal formüller, projeksiyon
+  mekanikleri ve veri tabanı entegrasyon testleri eksiksiz geçiyor.
 
 ## Açık işler
 

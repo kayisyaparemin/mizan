@@ -5,24 +5,122 @@ using CoinFlow.Domain.Models;
 
 namespace CoinFlow.Application.Services;
 
-public sealed class CoinFlowService(
+/// <summary>
+/// Finansal operasyonlar için merkezi ön cephe (Facade).
+/// Sorumluluklar odaklı domain servislerine (<see cref="IFinancialPlanQueryService"/>,
+/// <see cref="ISimulationWorkflowService"/>, <see cref="IPeriodWorkflowService"/>,
+/// <see cref="IObligationManagementService"/>) devredilmiştir.
+/// </summary>
+public sealed partial class CoinFlowService(
     ICoinFlowStore store,
-    IClock clock,
-    FinancialProjectionService projectionService,
-    SimulationCalculator simulationCalculator,
-    TargetAmountCalculator targetAmountCalculator,
-    PaymentAssignmentStrategyResolver strategyResolver,
-    CreditCardPaymentPreferenceResolver paymentPreferenceResolver,
-    SalaryPeriodCalculator salaryPeriodCalculator,
-    ProjectionBoundaryResolver projectionBoundaryResolver,
-    FinancialSnapshotService snapshotService,
-    HistoricalPlanRevisionService historicalPlanRevisionService,
-    PeriodReviewService reviewService,
-    PeriodProgressService periodProgressService,
-    HistoryQueryService historyService,
-    LoanPayoffService loanPayoffService,
-    LoanPayoffAdvisor loanPayoffAdvisor)
+    IFinancialPlanQueryService queryService,
+    ISimulationWorkflowService simulationService,
+    IPeriodWorkflowService periodService,
+    IObligationManagementService obligationService,
+    HistoryQueryService historyService)
 {
+    public CoinFlowService(
+        ICoinFlowStore store,
+        IClock clock,
+        FinancialProjectionService projectionService,
+        SimulationCalculator simulationCalculator,
+        TargetAmountCalculator targetAmountCalculator,
+        PaymentAssignmentStrategyResolver strategyResolver,
+        CreditCardPaymentPreferenceResolver paymentPreferenceResolver,
+        SalaryPeriodCalculator salaryPeriodCalculator,
+        ProjectionBoundaryResolver projectionBoundaryResolver,
+        FinancialSnapshotService snapshotService,
+        HistoricalPlanRevisionService historicalPlanRevisionService,
+        PeriodReviewService reviewService,
+        PeriodProgressService periodProgressService,
+        HistoryQueryService historyService,
+        LoanPayoffService loanPayoffService,
+        LoanPayoffAdvisor loanPayoffAdvisor) : this(
+            store,
+            new FinancialPlanQueryService(
+                store,
+                clock,
+                projectionService,
+                simulationCalculator,
+                targetAmountCalculator,
+                salaryPeriodCalculator,
+                projectionBoundaryResolver,
+                strategyResolver,
+                snapshotService,
+                historicalPlanRevisionService,
+                loanPayoffAdvisor),
+            new SimulationWorkflowService(
+                store,
+                clock,
+                simulationCalculator,
+                new FinancialPlanQueryService(
+                    store,
+                    clock,
+                    projectionService,
+                    simulationCalculator,
+                    targetAmountCalculator,
+                    salaryPeriodCalculator,
+                    projectionBoundaryResolver,
+                    strategyResolver,
+                    snapshotService,
+                    historicalPlanRevisionService,
+                    loanPayoffAdvisor)),
+            new PeriodWorkflowService(
+                store,
+                clock,
+                reviewService,
+                periodProgressService,
+                new FinancialPlanQueryService(
+                    store,
+                    clock,
+                    projectionService,
+                    simulationCalculator,
+                    targetAmountCalculator,
+                    salaryPeriodCalculator,
+                    projectionBoundaryResolver,
+                    strategyResolver,
+                    snapshotService,
+                    historicalPlanRevisionService,
+                    loanPayoffAdvisor)),
+            new ObligationManagementService(
+                store,
+                clock,
+                new FinancialPlanQueryService(
+                    store,
+                    clock,
+                    projectionService,
+                    simulationCalculator,
+                    targetAmountCalculator,
+                    salaryPeriodCalculator,
+                    projectionBoundaryResolver,
+                    strategyResolver,
+                    snapshotService,
+                    historicalPlanRevisionService,
+                    loanPayoffAdvisor),
+                snapshotService,
+                salaryPeriodCalculator,
+                strategyResolver,
+                loanPayoffService,
+                new CreditCardObligationService(
+                    store,
+                    clock,
+                    paymentPreferenceResolver,
+                    new FinancialPlanQueryService(
+                        store,
+                        clock,
+                        projectionService,
+                        simulationCalculator,
+                        targetAmountCalculator,
+                        salaryPeriodCalculator,
+                        projectionBoundaryResolver,
+                        strategyResolver,
+                        snapshotService,
+                        historicalPlanRevisionService,
+                        loanPayoffAdvisor))),
+            historyService)
+    {
+    }
+
     public Task InitializeAsync(CancellationToken cancellationToken = default) =>
         store.InitializeAsync(cancellationToken);
 
@@ -34,2079 +132,122 @@ public sealed class CoinFlowService(
         CancellationToken cancellationToken = default) =>
         store.LoadCanonicalDevelopmentDataAsync(cancellationToken);
 
-    public async Task<bool> IsOnboardingRequiredAsync(
-        CancellationToken cancellationToken = default)
-    {
-        var plan = await LoadFinancialPlanCoreAsync(cancellationToken);
-        var history = await store.GetFinancialHistoryAsync(cancellationToken);
-        if (FinancialSnapshotService.LatestCurrent(history) is not null)
-        {
-            return false;
-        }
+    public Task<bool> IsOnboardingRequiredAsync(
+        CancellationToken cancellationToken = default) =>
+        obligationService.IsOnboardingRequiredAsync(cancellationToken);
 
-        if (!CanBuildProjection(plan))
-        {
-            return true;
-        }
-
-        await snapshotService.EnsureInitialSnapshotAsync(
-            plan,
-            cancellationToken);
-        return false;
-    }
-
-    public async Task InitializeFromOnboardingAsync(
+    public Task InitializeFromOnboardingAsync(
         OnboardingDraft draft,
-        CancellationToken cancellationToken = default)
-    {
-        ValidateOnboardingDraft(draft);
+        CancellationToken cancellationToken = default) =>
+        obligationService.InitializeFromOnboardingAsync(draft, cancellationToken);
 
-        var settings = draft.Settings with
-        {
-            ProjectionAnchorDate = draft.Settings.ProjectionAnchorDate == default
-                ? clock.Today
-                : draft.Settings.ProjectionAnchorDate
-        };
-        var paymentPlans = draft.PaymentPlans
-            .Select(NormalizePaymentPlan)
-            .ToArray();
-        var cards = draft.CreditCards
-            .Select(NormalizeCreditCard)
-            .ToArray();
-        var strategy = new PaymentAssignmentStrategy
-        {
-            Mode = draft.InitialPaymentAssignmentMode,
-            EffectiveFromSalaryDate = salaryPeriodCalculator
-                .GetFirstSalaryOnOrAfter(
-                    settings.ProjectionAnchorDate,
-                    settings.SalaryDay),
-            CreatedAt = clock.UtcNow,
-            Note = "İlk gelir kullanım düzeni"
-        };
-        var plan = new FinancialPlan
-        {
-            Settings = settings,
-            Salaries = draft.Salaries
-                .OrderBy(x => x.EffectiveDate)
-                .ToArray(),
-            OtherIncomes = draft.OtherIncomes
-                .OrderBy(x => x.ExactDate)
-                .ToArray(),
-            Loans = draft.Loans
-                .OrderBy(x => x.NextPaymentDate)
-                .ToArray(),
-            PaymentPlans = paymentPlans
-                .OrderBy(x => x.Installments.Min(i => i.DueDate))
-                .ToArray(),
-            CreditCards = cards
-                .OrderBy(x => x.Bank)
-                .ThenBy(x => x.Name)
-                .ToArray(),
-            PlannedLargeExpenses = draft.PlannedLargeExpenses
-                .OrderBy(x => x.ExactDate)
-                .ToArray(),
-            PaymentAssignmentStrategies = [strategy]
-        };
-        var bundle = snapshotService.Build(
-            plan,
-            settings.ProjectionStartingSavings,
-            settings.ProjectionAnchorDate,
-            FinancialSnapshotSource.Initial,
-            string.IsNullOrWhiteSpace(draft.SnapshotNote)
-                ? "İlk güncel finansal durum"
-                : draft.SnapshotNote,
-            null);
+    public Task<FinancialPlan> GetFinancialPlanAsync(
+        CancellationToken cancellationToken = default) =>
+        queryService.GetFinancialPlanAsync(cancellationToken);
 
-        await store.ApplyOnboardingSetupAsync(
-            new OnboardingPersistenceBatch(
-                bundle.UpdatedSettings,
-                plan.Salaries,
-                plan.OtherIncomes,
-                plan.Loans,
-                plan.PaymentPlans,
-                plan.CreditCards,
-                plan.PlannedLargeExpenses,
-                plan.PaymentAssignmentStrategies,
-                bundle.Snapshot,
-                bundle.Plan),
-            cancellationToken);
-    }
-
-    public async Task<FinancialPlan> GetFinancialPlanAsync(
-        CancellationToken cancellationToken = default)
-    {
-        var plan = await LoadFinancialPlanCoreAsync(cancellationToken);
-        await snapshotService.EnsureInitialSnapshotAsync(
-            plan,
-            cancellationToken);
-        await historicalPlanRevisionService.CaptureOpenPlanRevisionAsync(
-            plan,
-            "Açık plan otomatik güncellendi",
-            cancellationToken);
-        return plan;
-    }
-
-    private async Task<FinancialPlan> LoadFinancialPlanCoreAsync(
-        CancellationToken cancellationToken = default)
-    {
-        await InitializeAsync(cancellationToken);
-        var settingsTask = store.GetSettingsAsync(cancellationToken);
-        var salariesTask = store.GetSalaryScheduleAsync(cancellationToken);
-        var incomesTask = store.GetOtherIncomesAsync(cancellationToken);
-        var loansTask = store.GetLoansAsync(cancellationToken);
-        var prepaymentsTask = store.GetLoanPrepaymentsAsync(cancellationToken);
-        var plansTask = store.GetPaymentPlansAsync(cancellationToken);
-        var cardsTask = store.GetCreditCardsAsync(cancellationToken);
-        var largeExpensesTask =
-            store.GetPlannedLargeExpensesAsync(cancellationToken);
-        var strategiesTask =
-            store.GetPaymentAssignmentStrategiesAsync(cancellationToken);
-
-        await Task.WhenAll(
-            settingsTask,
-            salariesTask,
-            incomesTask,
-            loansTask,
-            prepaymentsTask,
-            plansTask,
-            cardsTask,
-            largeExpensesTask,
-            strategiesTask);
-
-        var plan = new FinancialPlan
-        {
-            Settings = await settingsTask,
-            Salaries = await salariesTask,
-            OtherIncomes = await incomesTask,
-            Loans = await loansTask,
-            LoanPrepayments = await prepaymentsTask,
-            PaymentPlans = await plansTask,
-            CreditCards = await cardsTask,
-            PlannedLargeExpenses = await largeExpensesTask,
-            PaymentAssignmentStrategies = await strategiesTask
-        };
-        return plan;
-    }
-
-    private async Task CapturePlanningChangeAsync(
-        string trigger,
-        CancellationToken cancellationToken)
-    {
-        var plan = await LoadFinancialPlanCoreAsync(cancellationToken);
-        await snapshotService.EnsureInitialSnapshotAsync(
-            plan,
-            cancellationToken);
-        await historicalPlanRevisionService.CaptureOpenPlanRevisionAsync(
-            plan,
-            trigger,
-            cancellationToken);
-    }
-
-    public async Task<DashboardSnapshot?> GetDashboardAsync(
+    public Task<DashboardSnapshot?> GetDashboardAsync(
         DateOnly? asOf = null,
-        CancellationToken cancellationToken = default)
-    {
-        var date = asOf ?? clock.Today;
-        var query = await GetProjectionPlanAsync(date, cancellationToken);
-        if (!CanBuildProjection(query.Plan))
-        {
-            return null;
-        }
+        CancellationToken cancellationToken = default) =>
+        queryService.GetDashboardAsync(asOf, cancellationToken);
 
-        return projectionService.BuildDashboard(
-            query.Plan,
-            date,
-            query.Boundary?.FirstUnrealizedSalaryDate);
-    }
-
-    public async Task<IReadOnlyList<SalaryPeriodProjection>>
-        GetFuturePeriodsAsync(
-            DateOnly? asOf = null,
-            int periodCount = 12,
-            decimal? monthlyLivingBudgetOverride = null,
-            CancellationToken cancellationToken = default)
-    {
-        var date = asOf ?? clock.Today;
-        var query = await GetProjectionPlanAsync(date, cancellationToken);
-        if (!CanBuildProjection(query.Plan))
-        {
-            return [];
-        }
-
-        return projectionService.BuildFuturePeriods(
-            ApplyLivingBudgetOverride(
-                query.Plan,
-                monthlyLivingBudgetOverride),
-            date,
+    public Task<IReadOnlyList<SalaryPeriodProjection>> GetFuturePeriodsAsync(
+        DateOnly? asOf = null,
+        int periodCount = 12,
+        decimal? monthlyLivingBudgetOverride = null,
+        CancellationToken cancellationToken = default) =>
+        queryService.GetFuturePeriodsAsync(
+            asOf,
             periodCount,
-            query.Boundary?.FirstUnrealizedSalaryDate);
-    }
+            monthlyLivingBudgetOverride,
+            cancellationToken);
 
-    public async Task<SimulationResult> SimulateAsync(
+    public Task<SimulationResult> SimulateAsync(
         SimulationRequest request,
         DateOnly? asOf = null,
         CancellationToken cancellationToken = default) =>
-        await SimulateAsync(
-            [request],
-            asOf,
-            cancellationToken: cancellationToken);
+        simulationService.SimulateAsync(request, asOf, cancellationToken);
 
-    public async Task<SimulationResult> SimulateAsync(
+    public Task<SimulationResult> SimulateAsync(
         IReadOnlyList<SimulationRequest> requests,
         DateOnly? asOf = null,
         decimal? monthlyLivingBudgetOverride = null,
-        CancellationToken cancellationToken = default)
-    {
-        var date = asOf ?? clock.Today;
-        var query = await GetProjectionPlanAsync(date, cancellationToken);
-        if (!CanBuildProjection(query.Plan))
-        {
-            throw new InvalidOperationException(
-                "Simülasyon yapabilmek için önce gelirini ve gelir kullanım düzenini oluştur.");
-        }
-
-        // Override tek plana uygulanır; baz çizgi de senaryo da aynı plandan
-        // türediği için iki çizgi aynı harcama seviyesini varsayar ve
-        // karşılaştırma dürüst kalır.
-        return simulationCalculator.Calculate(
-            ApplyLivingBudgetOverride(
-                query.Plan,
-                monthlyLivingBudgetOverride),
-            date,
+        CancellationToken cancellationToken = default) =>
+        simulationService.SimulateAsync(
             requests,
-            firstSalaryDate: query.Boundary?.FirstUnrealizedSalaryDate);
-    }
+            asOf,
+            monthlyLivingBudgetOverride,
+            cancellationToken);
 
-    /// <summary>
-    /// 12 Dönem'in kredi kapatma önerisi. Simülatörle aynı plan ve sınır
-    /// kullanılır ki önerilen ay simülatörde denendiğinde aynı sonucu versin.
-    /// </summary>
-    public async Task<IReadOnlyList<LoanPayoffAdvice>> GetLoanPayoffAdviceAsync(
-        CancellationToken cancellationToken = default)
-    {
-        var date = clock.Today;
-        var query = await GetProjectionPlanAsync(date, cancellationToken);
-        return CanBuildProjection(query.Plan)
-            ? loanPayoffAdvisor.Advise(
-                query.Plan,
-                date,
-                query.Boundary?.FirstUnrealizedSalaryDate,
-                cancellationToken: cancellationToken)
-            : [];
-    }
+    public Task<IReadOnlyList<LoanPayoffAdvice>> GetLoanPayoffAdviceAsync(
+        CancellationToken cancellationToken = default) =>
+        queryService.GetLoanPayoffAdviceAsync(cancellationToken);
 
-    /// <summary>
-    /// Yaşam gideri simülatörde canlı olarak değiştirilebiliyor. Değer plan
-    /// nesnesinin kopyasına yazılır; <c>UserSettings</c> ve veritabanı
-    /// dokunulmadan kalır — bu bir deneme, kayıtlı bir karar değil.
-    /// </summary>
-    private static FinancialPlan ApplyLivingBudgetOverride(
-        FinancialPlan plan,
-        decimal? monthlyLivingBudget) =>
-        monthlyLivingBudget is not { } budget ||
-        budget == plan.Settings.MonthlyLivingBudget
-            ? plan
-            : plan with
-            {
-                Settings = plan.Settings with
-                {
-                    MonthlyLivingBudget = budget
-                }
-            };
-
-    public async Task<SalaryPeriodProjection?> FindTargetPeriodAsync(
+    public Task<SalaryPeriodProjection?> FindTargetPeriodAsync(
         decimal targetAmount,
         DateOnly? asOf = null,
-        CancellationToken cancellationToken = default)
-    {
-        var periods = await GetFuturePeriodsAsync(
-            asOf,
-            12,
-            cancellationToken: cancellationToken);
-        return targetAmountCalculator.FindFirstReached(periods, targetAmount);
-    }
+        CancellationToken cancellationToken = default) =>
+        queryService.FindTargetPeriodAsync(targetAmount, asOf, cancellationToken);
 
-    public async Task<TargetReachabilityResult> FindTargetReachabilityAsync(
+    public Task<TargetReachabilityResult> FindTargetReachabilityAsync(
         decimal targetAmount,
         DateOnly? asOf = null,
-        CancellationToken cancellationToken = default)
-    {
-        var periods = await GetFuturePeriodsAsync(
-            asOf,
-            12,
-            cancellationToken: cancellationToken);
-        return FindTargetReachability(periods, targetAmount);
-    }
+        CancellationToken cancellationToken = default) =>
+        queryService.FindTargetReachabilityAsync(targetAmount, asOf, cancellationToken);
 
     public TargetReachabilityResult FindTargetReachability(
         IReadOnlyList<SalaryPeriodProjection> periods,
         decimal targetAmount) =>
-        targetAmountCalculator.FindFirstReachable(periods, targetAmount);
+        queryService.FindTargetReachability(periods, targetAmount);
 
-    /// <summary>
-    /// Simülatördeki koşul listesini adlandırıp saklar. Uygulama kapansa da
-    /// kaybolmaz. Kaydetmek finansal kayıtlara dokunmaz — bu bir deneme.
-    /// </summary>
-    public async Task<SimulationDraft> SaveSimulationDraftAsync(
+    public Task<SimulationDraft> SaveSimulationDraftAsync(
         string name,
         IReadOnlyList<SimulationDraftCondition> conditions,
         Guid? draftId = null,
-        CancellationToken cancellationToken = default)
-    {
-        var trimmed = (name ?? string.Empty).Trim();
-        if (trimmed.Length == 0)
-        {
-            throw new InvalidOperationException(
-                "Geçici plana bir ad vermelisin.");
-        }
-
-        if (conditions.Count == 0)
-        {
-            throw new InvalidOperationException(
-                "Kaydedilecek en az bir koşul gerekiyor.");
-        }
-
-        var existing = draftId is { } id
-            ? (await store.GetSimulationDraftsAsync(cancellationToken))
-                .FirstOrDefault(x => x.Id == id)
-            : null;
-        var draft = new SimulationDraft(
-            existing?.Id ?? Guid.NewGuid(),
-            trimmed,
-            existing?.CreatedAt ?? clock.UtcNow,
-            clock.UtcNow,
-            conditions);
-        await store.UpsertSimulationDraftAsync(draft, cancellationToken);
-        return draft;
-    }
+        CancellationToken cancellationToken = default) =>
+        simulationService.SaveSimulationDraftAsync(
+            name,
+            conditions,
+            draftId,
+            cancellationToken);
 
     public Task<IReadOnlyList<SimulationDraft>> GetSimulationDraftsAsync(
         CancellationToken cancellationToken = default) =>
-        store.GetSimulationDraftsAsync(cancellationToken);
+        simulationService.GetSimulationDraftsAsync(cancellationToken);
 
     public Task DeleteSimulationDraftAsync(
         Guid id,
         CancellationToken cancellationToken = default) =>
-        store.DeleteSimulationDraftAsync(id, cancellationToken);
+        simulationService.DeleteSimulationDraftAsync(id, cancellationToken);
 
-    public async Task<SimulationApplyResult> ApplySimulationAsync(
+    public Task<SimulationApplyResult> ApplySimulationAsync(
         SimulationRequest request,
         bool confirmed,
         CancellationToken cancellationToken = default) =>
-        await ApplySimulationAsync(
-            [request],
-            confirmed,
-            cancellationToken);
+        simulationService.ApplySimulationAsync(request, confirmed, cancellationToken);
 
-    public async Task<SimulationApplyResult> ApplySimulationAsync(
+    public Task<SimulationApplyResult> ApplySimulationAsync(
         IReadOnlyList<SimulationRequest> requests,
         bool confirmed,
-        CancellationToken cancellationToken = default)
-    {
-        if (!confirmed)
-        {
-            throw new InvalidOperationException(
-                "Plan, açık kullanıcı onayı olmadan uygulanamaz.");
-        }
+        CancellationToken cancellationToken = default) =>
+        simulationService.ApplySimulationAsync(requests, confirmed, cancellationToken);
 
-        return await ApplyScenarioRequestsAsync(
-            requests,
-            "Simülasyon planı uygulandı",
-            cancellationToken);
-    }
-
-    /// <summary>
-    /// Finansal Yapı'dan simülatörle aynı formla girilen kayıt. Simüle edip
-    /// uygulamakla aynı yoldan yazılır; böylece doğrudan girilen kayıt,
-    /// simülasyonda görülen sonucu birebir üretir. Onay kaydet butonunun
-    /// kendisidir. Kendi ekranı olan türler (gelir değişikliği, kart ödeme
-    /// şekli, düzen değişikliği) bu yoldan kabul edilmez.
-    /// </summary>
-    public async Task<SimulationApplyResult> AddRecordFromScenarioAsync(
+    public Task<SimulationApplyResult> AddRecordFromScenarioAsync(
         SimulationRequest request,
-        CancellationToken cancellationToken = default)
-    {
-        if (!SimulationScenarioCatalog.IsDirectEntry(request.Type))
-        {
-            throw new InvalidOperationException(
-                $"{SimulationScenarioCatalog.TypeText(request.Type)} Finansal Yapı'dan bu formla girilemez.");
-        }
-
-        var anchor = (await store.GetSettingsAsync(cancellationToken))
-            .ProjectionAnchorDate;
-        SimulationCalculator.Validate(
-            request,
-            anchor == default ? null : anchor);
-        return await ApplyScenarioRequestsAsync(
-            [request],
-            "Finansal Yapı'dan eklendi",
-            cancellationToken);
-    }
-
-    private async Task<SimulationApplyResult> ApplyScenarioRequestsAsync(
-        IReadOnlyList<SimulationRequest> requests,
-        string trigger,
-        CancellationToken cancellationToken)
-    {
-        SimulationCalculator.Validate(requests);
-        if (requests.Any(x => x.ScenarioId == Guid.Empty))
-        {
-            throw new InvalidOperationException(
-                "Uygulanacak simülasyon kimliği bulunamadı. Planı yeniden simüle edin.");
-        }
-
-        var current = await GetFinancialPlanAsync(cancellationToken);
-        var existingResults = requests
-            .Select(request => FindAppliedSimulation(current, request))
-            .ToArray();
-        if (existingResults.All(x => x is not null))
-        {
-            var first = existingResults[0]!;
-            return first with
-            {
-                AlreadyApplied = true,
-                Message = requests.Count == 1
-                    ? first.Message
-                    : "Bu simülasyon planı daha önce finans planına eklendi."
-            };
-        }
-
-        if (existingResults.Any(x => x is not null))
-        {
-            throw new InvalidOperationException(
-                "Bu simülasyon planının bir kısmı daha önce uygulanmış. Tekrar kaydı önlemek için planı temizleyip yeniden oluştur.");
-        }
-
-        ValidateSimulationApplyConflicts(current, requests);
-
-        var scenario = simulationCalculator.BuildScenarioPlan(current, requests);
-        var batch = BuildSimulationPersistenceBatch(scenario, requests);
-        await store.ApplySimulationBatchAsync(batch, cancellationToken);
-
-        await CapturePlanningChangeAsync(trigger, cancellationToken);
-        return AppliedResult(requests, batch);
-    }
-
-    private static void ValidateSimulationApplyConflicts(
-        FinancialPlan current,
-        IReadOnlyList<SimulationRequest> requests)
-    {
-        var conflictingSalary = requests.FirstOrDefault(request =>
-            request.Type == SimulationScenarioType.SalaryChange &&
-            current.Salaries.Any(x => x.EffectiveDate == request.StartDate));
-        if (conflictingSalary is not null)
-        {
-            throw new InvalidOperationException(
-                "Bu tarihte zaten bir gelir kaydı var. Geçmişi korumak için farklı bir geçerlilik tarihi seçin.");
-        }
-
-        var conflictingStrategy = requests.FirstOrDefault(request =>
-            request.Type == SimulationScenarioType.PaymentStrategyChange &&
-            current.PaymentAssignmentStrategies.Any(x =>
-                x.EffectiveFromSalaryDate ==
-                (request.EffectiveSalaryDate ?? request.StartDate)));
-        if (conflictingStrategy is not null)
-        {
-            throw new InvalidOperationException(
-                "Bu dönem tarihinde zaten bir kullanım düzeni var. Önceki kayıt değiştirilemez.");
-        }
-    }
-
-    private static SimulationPersistenceBatch BuildSimulationPersistenceBatch(
-        FinancialPlan scenario,
-        IReadOnlyList<SimulationRequest> requests)
-    {
-        var requestIds = requests.Select(x => x.ScenarioId).ToHashSet();
-        var cardIds = requests
-            .Where(x => x.Type is
-                SimulationScenarioType.CreditCardSinglePayment or
-                SimulationScenarioType.CreditCardInstallmentPurchase or
-                SimulationScenarioType.CreditCardPaymentMode)
-            .Select(x => x.CreditCardId ?? throw new InvalidOperationException(
-                "Kart koşulunda kredi kartı bulunamadı."))
-            .Distinct()
-            .ToHashSet();
-
-        return new SimulationPersistenceBatch(
-            scenario.PlannedLargeExpenses
-                .Where(x => requestIds.Contains(x.Id))
-                .ToArray(),
-            scenario.PaymentPlans
-                .Where(x => requestIds.Contains(x.Id))
-                .ToArray(),
-            scenario.CreditCards
-                .Where(x => cardIds.Contains(x.Id))
-                .ToArray(),
-            scenario.OtherIncomes
-                .Where(x => requestIds.Contains(x.Id))
-                .ToArray(),
-            scenario.Salaries
-                .Where(x => requestIds.Contains(x.Id))
-                .ToArray(),
-            scenario.PaymentAssignmentStrategies
-                .Where(x => requestIds.Contains(x.Id))
-                .ToArray(),
-            scenario.LoanPrepayments
-                .Where(x => requestIds.Contains(x.Id))
-                .ToArray());
-    }
-
-    private static SimulationApplyResult AppliedResult(
-        IReadOnlyList<SimulationRequest> requests,
-        SimulationPersistenceBatch batch)
-    {
-        if (requests.Count == 1)
-        {
-            var request = requests[0];
-            return request.Type switch
-            {
-                SimulationScenarioType.CashPurchase =>
-                    AppliedResult(
-                        request,
-                        batch.PlannedLargeExpenses.Single().Id,
-                        SimulationApplyDestination.Payments,
-                        "Plan finans planına eklendi."),
-                SimulationScenarioType.CreditCardSinglePayment or
-                    SimulationScenarioType.CreditCardInstallmentPurchase or
-                    SimulationScenarioType.CreditCardPaymentMode =>
-                    AppliedResult(
-                        request,
-                        batch.CreditCards.Single().Id,
-                        SimulationApplyDestination.CreditCard,
-                        $"Plan {batch.CreditCards.Single().Bank} {batch.CreditCards.Single().Name} kartına eklendi."),
-                SimulationScenarioType.FinancingLoan or
-                    SimulationScenarioType.CashDebt or
-                    SimulationScenarioType.FutureOneTimePayment or
-                    SimulationScenarioType.RecurringPayment =>
-                    AppliedResult(
-                        request,
-                        batch.PaymentPlans.Single().Id,
-                        SimulationApplyDestination.Payments,
-                        "Plan finans planına eklendi."),
-                SimulationScenarioType.FutureIncome =>
-                    AppliedResult(
-                        request,
-                        batch.OtherIncomes.Single().Id,
-                        SimulationApplyDestination.Income,
-                        "Gelir finans planına eklendi."),
-                SimulationScenarioType.SalaryChange =>
-                    AppliedResult(
-                        request,
-                        batch.Salaries.Single().Id,
-                        SimulationApplyDestination.SalaryHistory,
-                        "Gelir değişikliği kaydedildi."),
-                SimulationScenarioType.PaymentStrategyChange =>
-                    AppliedResult(
-                        request,
-                        batch.PaymentAssignmentStrategies.Single().Id,
-                        SimulationApplyDestination.Settings,
-                        "Gelir kullanım düzeni kaydedildi."),
-                SimulationScenarioType.LoanEarlyClosure or
-                    SimulationScenarioType.LoanPartialPrepayment =>
-                    AppliedResult(
-                        request,
-                        batch.LoanPrepayments.Single().Id,
-                        SimulationApplyDestination.Payments,
-                        "Erken ödeme kredinin planına eklendi."),
-                _ => throw new ArgumentOutOfRangeException(nameof(requests))
-            };
-        }
-
-        return new SimulationApplyResult(
-            requests[0].ScenarioId,
-            Guid.Empty,
-            SimulationApplyDestination.Payments,
-            AlreadyApplied: false,
-            $"{requests.Count} koşul finans planına eklendi.");
-    }
-
-    private static SimulationApplyResult? FindAppliedSimulation(
-        FinancialPlan plan,
-        SimulationRequest request)
-    {
-        var entityId = request.ScenarioId;
-        return request.Type switch
-        {
-            SimulationScenarioType.CashPurchase
-                when plan.PlannedLargeExpenses.Any(x => x.Id == entityId) =>
-                AppliedResult(request, entityId, SimulationApplyDestination.Payments,
-                    "Plan daha önce finans planına eklendi."),
-            SimulationScenarioType.CreditCardSinglePayment or
-                SimulationScenarioType.CreditCardInstallmentPurchase
-                when plan.CreditCards.Any(card =>
-                    card.Id == request.CreditCardId &&
-                    card.Charges.Any(charge => charge.Id == entityId)) =>
-                AppliedResult(request, request.CreditCardId!.Value,
-                    SimulationApplyDestination.CreditCard,
-                    "Plan daha önce kredi kartına eklendi."),
-            SimulationScenarioType.CreditCardPaymentMode
-                when plan.CreditCards.Any(card =>
-                    card.Id == request.CreditCardId &&
-                    card.PaymentPlans.Any(payment =>
-                        payment.Id == entityId)) =>
-                AppliedResult(request, request.CreditCardId!.Value,
-                    SimulationApplyDestination.CreditCard,
-                    "Tam ödeme planı daha önce kredi kartına eklendi."),
-            SimulationScenarioType.FinancingLoan or
-                SimulationScenarioType.CashDebt or
-                SimulationScenarioType.FutureOneTimePayment or
-                SimulationScenarioType.RecurringPayment
-                when plan.PaymentPlans.Any(x => x.Id == entityId) =>
-                AppliedResult(request, entityId, SimulationApplyDestination.Payments,
-                    "Plan daha önce finans planına eklendi."),
-            SimulationScenarioType.FutureIncome
-                when plan.OtherIncomes.Any(x => x.Id == entityId) =>
-                AppliedResult(request, entityId, SimulationApplyDestination.Income,
-                    "Gelir daha önce finans planına eklendi."),
-            SimulationScenarioType.SalaryChange
-                when plan.Salaries.Any(x => x.Id == entityId) =>
-                AppliedResult(request, entityId, SimulationApplyDestination.SalaryHistory,
-                    "Gelir değişikliği daha önce kaydedildi."),
-            SimulationScenarioType.PaymentStrategyChange
-                when plan.PaymentAssignmentStrategies.Any(x => x.Id == entityId) =>
-                AppliedResult(request, entityId, SimulationApplyDestination.Settings,
-                    "Gelir kullanım düzeni değişikliği daha önce kaydedildi."),
-            SimulationScenarioType.LoanEarlyClosure or
-                SimulationScenarioType.LoanPartialPrepayment
-                when plan.LoanPrepayments.Any(x => x.Id == entityId) =>
-                AppliedResult(request, entityId, SimulationApplyDestination.Payments,
-                    "Erken ödeme daha önce kredinin planına eklendi."),
-            _ => null
-        };
-    }
-
-    private static SimulationApplyResult AppliedResult(
-        SimulationRequest request,
-        Guid entityId,
-        SimulationApplyDestination destination,
-        string message) => new(
-            request.ScenarioId,
-            entityId,
-            destination,
-            AlreadyApplied: false,
-            message);
-
-    public async Task<InitialPaymentStrategySetup?> SaveSalaryAsync(
-        SalaryScheduleEntry entry,
-        CancellationToken cancellationToken = default)
-    {
-        if (entry.Amount <= 0m)
-        {
-            throw new InvalidOperationException(
-                "Gelir tutarı sıfırdan büyük olmalıdır.");
-        }
-
-        await store.UpsertSalaryAsync(entry, cancellationToken);
-        await CapturePlanningChangeAsync(
-            "Gelir planı değişti",
-            cancellationToken);
-        return await GetInitialPaymentStrategySetupAsync(cancellationToken);
-    }
-
-    public async Task<InitialPaymentStrategySetup?>
-        GetInitialPaymentStrategySetupAsync(
-            CancellationToken cancellationToken = default)
-    {
-        var plan = await GetFinancialPlanAsync(cancellationToken);
-        if (plan.Salaries.Count == 0 ||
-            plan.PaymentAssignmentStrategies.Count > 0)
-        {
-            return null;
-        }
-
-        var settings = plan.Settings;
-        var anchor = settings.ProjectionAnchorDate;
-        if (anchor == default)
-        {
-            anchor = clock.Today;
-            settings = settings with { ProjectionAnchorDate = anchor };
-            await store.SaveSettingsAsync(settings, cancellationToken);
-        }
-
-        var effectiveSalary = salaryPeriodCalculator
-            .GetFirstSalaryOnOrAfter(anchor, settings.SalaryDay);
-        var exampleSalary = CalendarRules.AddMonthsKeepingDay(
-            effectiveSalary,
-            1,
-            settings.SalaryDay);
-        return new InitialPaymentStrategySetup(
-            anchor,
-            effectiveSalary,
-            exampleSalary,
-            effectiveSalary,
-            CalendarRules.AddMonthsKeepingDay(
-                exampleSalary,
-                1,
-                settings.SalaryDay));
-    }
-
-    public async Task CompleteInitialPaymentStrategySetupAsync(
-        PaymentAssignmentMode mode,
-        CancellationToken cancellationToken = default)
-    {
-        if (!Enum.IsDefined(mode))
-        {
-            throw new InvalidOperationException(
-                "Gelir kullanım düzeni geçersiz.");
-        }
-
-        var setup = await GetInitialPaymentStrategySetupAsync(
-            cancellationToken) ?? throw new InvalidOperationException(
-                "İlk gelir kullanım düzeni kurulumu gerekli değil veya zaten tamamlandı.");
-        await store.UpsertPaymentAssignmentStrategyAsync(
-            new PaymentAssignmentStrategy
-            {
-                Mode = mode,
-                EffectiveFromSalaryDate = setup.EffectiveSalaryDate,
-                CreatedAt = clock.UtcNow,
-                Note = "İlk gelir kullanım düzeni"
-            },
-            cancellationToken);
-        await GetFinancialPlanAsync(cancellationToken);
-    }
-
-    public async Task DeleteSalaryAsync(
-        Guid id,
-        CancellationToken cancellationToken = default)
-    {
-        await store.DeleteSalaryAsync(id, cancellationToken);
-        await CapturePlanningChangeAsync(
-            "Gelir planı değişti",
-            cancellationToken);
-    }
-
-    public async Task SaveOtherIncomeAsync(
-        OneTimeIncome income,
-        CancellationToken cancellationToken = default)
-    {
-        if (income.Amount <= 0m)
-        {
-            throw new InvalidOperationException(
-                "Gelir tutarı sıfırdan büyük olmalıdır.");
-        }
-
-        await store.UpsertOtherIncomeAsync(income, cancellationToken);
-        await CapturePlanningChangeAsync(
-            "Gelir planı değişti",
-            cancellationToken);
-    }
-
-    public async Task DeleteOtherIncomeAsync(
-        Guid id,
-        CancellationToken cancellationToken = default)
-    {
-        await store.DeleteOtherIncomeAsync(id, cancellationToken);
-        await CapturePlanningChangeAsync(
-            "Gelir planı değişti",
-            cancellationToken);
-    }
-
-    public async Task SaveLoanAsync(
-        Loan loan,
-        CancellationToken cancellationToken = default)
-    {
-        if (loan.MonthlyPayment <= 0m ||
-            loan.RemainingInstallmentCount < 1)
-        {
-            throw new InvalidOperationException(
-                "Kredi taksiti ve kalan taksit sayısı pozitif olmalıdır.");
-        }
-
-        CalendarRules.ValidateDay(loan.PaymentDay);
-        loan = loanPayoffService.PrepareForSave(loan);
-        await store.UpsertLoanAsync(loan, cancellationToken);
-        await CapturePlanningChangeAsync(
-            "Kredi planı değişti",
-            cancellationToken);
-    }
-
-    public async Task DeleteLoanAsync(
-        Guid id,
-        CancellationToken cancellationToken = default)
-    {
-        await store.DeleteLoanAsync(id, cancellationToken);
-        await CapturePlanningChangeAsync(
-            "Kredi planı değişti",
-            cancellationToken);
-    }
-
-    /// <summary>
-    /// Uygulanmış bir erken ödemeyi geri alır. Kredinin kendisi hiç
-    /// değişmediği için geri almak olayı silmekten ibarettir.
-    /// </summary>
-    public async Task DeleteLoanPrepaymentAsync(
-        Guid id,
-        CancellationToken cancellationToken = default)
-    {
-        await store.DeleteLoanPrepaymentAsync(id, cancellationToken);
-        await CapturePlanningChangeAsync(
-            "Kredi planı değişti",
-            cancellationToken);
-    }
-
-    public async Task SavePaymentPlanAsync(
-        TemporaryPaymentPlan plan,
-        CancellationToken cancellationToken = default)
-    {
-        if (plan.Installments.Count == 0 ||
-            plan.Installments.Any(x => x.Amount <= 0m))
-        {
-            throw new InvalidOperationException(
-                "Ödeme planında en az bir pozitif ödeme olmalıdır.");
-        }
-
-        await store.UpsertPaymentPlanAsync(plan, cancellationToken);
-        await CapturePlanningChangeAsync(
-            "Planlı ödeme değişti",
-            cancellationToken);
-    }
-
-    public async Task DeletePaymentPlanAsync(
-        Guid id,
-        CancellationToken cancellationToken = default)
-    {
-        await store.DeletePaymentPlanAsync(id, cancellationToken);
-        await CapturePlanningChangeAsync(
-            "Planlı ödeme değişti",
-            cancellationToken);
-    }
-
-    public async Task SavePlannedLargeExpenseAsync(
-        PlannedLargeExpense expense,
-        CancellationToken cancellationToken = default)
-    {
-        if (expense.Amount <= 0m)
-        {
-            throw new InvalidOperationException(
-                "Planlı büyük ödeme tutarı 0'dan büyük olmalı.");
-        }
-
-        await store.UpsertPlannedLargeExpenseAsync(
-            expense,
-            cancellationToken);
-        await CapturePlanningChangeAsync(
-            "Büyük ödeme planı değişti",
-            cancellationToken);
-    }
-
-    public async Task DeletePlannedLargeExpenseAsync(
-        Guid id,
-        CancellationToken cancellationToken = default)
-    {
-        await store.DeletePlannedLargeExpenseAsync(id, cancellationToken);
-        await CapturePlanningChangeAsync(
-            "Büyük ödeme planı değişti",
-            cancellationToken);
-    }
-
-    public async Task SaveCreditCardAsync(
-        CreditCard card,
-        CancellationToken cancellationToken = default)
-    {
-        var normalized = NormalizeCreditCard(card);
-        ValidateCreditCardPaymentSettings(normalized);
-        normalized = await AppendPaymentPreferenceHistoryAsync(
-            normalized,
-            cancellationToken);
-        CreditCardPaymentPreferenceResolver.Validate(
-            normalized.PaymentPreferences);
-        await store.UpsertCreditCardAsync(normalized, cancellationToken);
-        await CapturePlanningChangeAsync(
-            "Kart planı değişti",
-            cancellationToken);
-    }
-
-    /// <summary>
-    /// Ekstre ödeme tercihi değiştiyse effective-dated geçmişe yeni bir kayıt
-    /// ekler. Geçmiş kayıtlar hiçbir zaman değiştirilmez (I6). Geçmiş her zaman
-    /// store'daki canonical kayıttan okunur; böylece kartı sıfırdan kuran
-    /// onboarding/commitments ekranları geçmişi sıfırlayamaz.
-    /// </summary>
-    private async Task<CreditCard> AppendPaymentPreferenceHistoryAsync(
-        CreditCard card,
-        CancellationToken cancellationToken)
-    {
-        var existing = (await store.GetCreditCardsAsync(cancellationToken))
-            .FirstOrDefault(x => x.Id == card.Id);
-        var history = existing?.PaymentPreferences ?? [];
-
-        // Ekstre yoksa kaydedilecek bir ekstre ödeme kararı da yoktur; mevcut
-        // geçmiş aynen korunur.
-        if (card.CurrentStatement is not { } statement ||
-            card.CurrentStatementPaymentPlan is not { } plan)
-        {
-            return card with { PaymentPreferences = history };
-        }
-
-        var effective = paymentPreferenceResolver.Resolve(
-            statement.StatementDate,
-            history);
-        if (CreditCardPaymentPreferenceResolver.RepresentsSameDecision(
-                effective,
-                plan))
-        {
-            return card with { PaymentPreferences = history };
-        }
-
-        var appended = new CreditCardPaymentPreference
-        {
-            CreditCardId = card.Id,
-            Mode = plan.Mode,
-            CustomAmount = plan.Mode == CurrentStatementPaymentMode.Custom
-                ? plan.CustomAmount
-                : null,
-            EffectiveFromStatementDate = statement.StatementDate,
-            CreatedAt = clock.UtcNow
-        };
-        return card with
-        {
-            PaymentPreferences = history.Append(appended).ToArray()
-        };
-    }
-
-    public async Task SaveCreditCardStatementAsync(
-        Guid creditCardId,
-        CreditCardStatement statement,
-        CurrentStatementPaymentPlan paymentPlan,
-        CancellationToken cancellationToken = default)
-    {
-        var card = (await store.GetCreditCardsAsync(cancellationToken))
-            .SingleOrDefault(x => x.Id == creditCardId)
-            ?? throw new InvalidOperationException("Kredi kartı bulunamadı.");
-        var now = clock.UtcNow;
-        var normalizedStatement = statement with
-        {
-            CreditCardId = creditCardId,
-            CreatedAt = statement.CreatedAt == default
-                ? now
-                : statement.CreatedAt,
-            UpdatedAt = now,
-            ImportedAt = statement.Source == CreditCardStatementSource.PdfImport
-                ? statement.ImportedAt ?? now
-                : statement.ImportedAt
-        };
-        var normalizedPlan = paymentPlan.Mode == CurrentStatementPaymentMode.Custom
-            ? paymentPlan
-            : paymentPlan with { CustomAmount = null };
-        await SaveCreditCardAsync(card with
-        {
-            CurrentStatement = normalizedStatement,
-            CurrentStatementPaymentPlan = normalizedPlan
-        }, cancellationToken);
-    }
-
-    public async Task DeleteCreditCardAsync(
-        Guid id,
-        CancellationToken cancellationToken = default)
-    {
-        await store.DeleteCreditCardAsync(id, cancellationToken);
-        await CapturePlanningChangeAsync(
-            "Kart planı değişti",
-            cancellationToken);
-    }
-
-    public async Task SaveCreditCardPaymentPlanAsync(
-        Guid creditCardId,
-        DateOnly dueDate,
-        CreditCardPaymentType paymentType,
-        decimal? amount = null,
-        CancellationToken cancellationToken = default)
-    {
-        var card = (await store.GetCreditCardsAsync(cancellationToken))
-            .SingleOrDefault(x => x.Id == creditCardId)
-            ?? throw new InvalidOperationException("Kredi kartı bulunamadı.");
-        if (paymentType == CreditCardPaymentType.FixedAmount &&
-            amount is null or <= 0m)
-        {
-            throw new InvalidOperationException(
-                "Özel ödeme tutarı sıfırdan büyük olmalıdır.");
-        }
-
-        var existing = card.PaymentPlans
-            .FirstOrDefault(x => x.DueDate == dueDate);
-        var paymentPlan = new CreditCardPaymentPlan
-        {
-            Id = existing?.Id ?? Guid.NewGuid(),
-            CreditCardId = creditCardId,
-            DueDate = dueDate,
-            PaymentType = paymentType,
-            Amount = paymentType == CreditCardPaymentType.FixedAmount
-                ? amount
-                : null
-        };
-        await SaveCreditCardAsync(card with
-        {
-            PaymentPlans = card.PaymentPlans
-                .Where(x => x.DueDate != dueDate)
-                .Append(paymentPlan)
-                .OrderBy(x => x.DueDate)
-                .ToArray()
-        }, cancellationToken);
-    }
-
-    /// <summary>
-    /// Dönem detayındaki kart satırından ödeme şeklini değiştirir. Kararın
-    /// nereye yazılacağı ekstrenin durumuna bağlıdır: kesilmiş ekstrenin
-    /// kararı <see cref="CurrentStatementPaymentPlan"/>'da yaşar ve
-    /// effective-dated tercih geçmişine eklenir (I5); ileride kesilecek
-    /// ekstreler için vadeye özel override kullanılır. Çağıran hangisi
-    /// olduğunu bilmek zorunda değildir.
-    /// </summary>
-    public async Task SetStatementPaymentModeAsync(
-        Guid creditCardId,
-        DateOnly dueDate,
-        CreditCardPaymentType paymentType,
-        CancellationToken cancellationToken = default)
-    {
-        if (paymentType == CreditCardPaymentType.FixedAmount)
-        {
-            throw new InvalidOperationException(
-                "Bu ekrandan yalnızca asgari veya tamamı seçilebilir.");
-        }
-
-        var card = (await store.GetCreditCardsAsync(cancellationToken))
-            .SingleOrDefault(x => x.Id == creditCardId)
-            ?? throw new InvalidOperationException("Kredi kartı bulunamadı.");
-
-        if (card.CurrentStatement is { } statement &&
-            statement.DueDate == dueDate)
-        {
-            await SaveCreditCardAsync(
-                card with
-                {
-                    CurrentStatementPaymentPlan =
-                        new CurrentStatementPaymentPlan
-                        {
-                            Mode = paymentType ==
-                                   CreditCardPaymentType.Minimum
-                                ? CurrentStatementPaymentMode.Minimum
-                                : CurrentStatementPaymentMode.Full
-                        }
-                },
-                cancellationToken);
-            return;
-        }
-
-        await SaveCreditCardPaymentPlanAsync(
-            creditCardId,
-            dueDate,
-            paymentType,
-            cancellationToken: cancellationToken);
-    }
-
-    public async Task RemoveCreditCardPaymentPlanAsync(
-        Guid creditCardId,
-        DateOnly dueDate,
-        CancellationToken cancellationToken = default)
-    {
-        var card = (await store.GetCreditCardsAsync(cancellationToken))
-            .SingleOrDefault(x => x.Id == creditCardId)
-            ?? throw new InvalidOperationException("Kredi kartı bulunamadı.");
-        await SaveCreditCardAsync(card with
-        {
-            PaymentPlans = card.PaymentPlans
-                .Where(x => x.DueDate != dueDate)
-                .ToArray()
-        }, cancellationToken);
-    }
-
-    public async Task SaveSettingsAsync(
-        UserSettings settings,
-        CancellationToken cancellationToken = default)
-    {
-        CalendarRules.ValidateDay(settings.SalaryDay);
-        if (settings.MonthlyLivingBudget < 0m)
-        {
-            throw new InvalidOperationException(
-                "Tahmini yaşam bütçesi negatif olamaz.");
-        }
-
-        if (settings.CreditCardCarryInterestRate is < 0m or > 1m ||
-            settings.DeficitFinancingInterestRate is < 0m or > 1m)
-        {
-            throw new InvalidOperationException(
-                "Faiz varsayımları %0 ile %100 arasında olmalıdır.");
-        }
-
-        var plan = await GetFinancialPlanAsync(cancellationToken);
-        var history = await store.GetFinancialHistoryAsync(cancellationToken);
-        var currentSnapshot = FinancialSnapshotService.LatestCurrent(history);
-        var adjustedStrategies = settings.SalaryDay == plan.Settings.SalaryDay
-            ? plan.PaymentAssignmentStrategies
-            : plan.PaymentAssignmentStrategies.Select(strategy =>
-                strategy with
-                {
-                    EffectiveFromSalaryDate = CalendarRules.ResolveDay(
-                        strategy.EffectiveFromSalaryDate.Year,
-                        strategy.EffectiveFromSalaryDate.Month,
-                        settings.SalaryDay)
-                }).ToArray();
-        var createsRecoverySnapshot = currentSnapshot is not null &&
-                                      CanBuildProjection(plan) &&
-                                      (settings.ProjectionStartingSavings !=
-                                           plan.Settings.ProjectionStartingSavings ||
-                                       settings.ProjectionAnchorDate !=
-                                           plan.Settings.ProjectionAnchorDate);
-        if (createsRecoverySnapshot)
-        {
-            var snapshotDate = settings.ProjectionStartingSavings !=
-                               plan.Settings.ProjectionStartingSavings
-                ? clock.Today
-                : settings.ProjectionAnchorDate;
-            var normalized = settings with
-            {
-                ProjectionAnchorDate = snapshotDate
-            };
-            await snapshotService.CreateCurrentSnapshotAsync(
-                plan with
-                {
-                    Settings = normalized,
-                    PaymentAssignmentStrategies = adjustedStrategies
-                },
-                normalized.ProjectionStartingSavings,
-                snapshotDate,
-                FinancialSnapshotSource.Recovery,
-                "Güncel finansal durum yenilendi",
-                cancellationToken);
-            settings = normalized;
-        }
-        else
-        {
-            await store.SaveSettingsAsync(settings, cancellationToken);
-        }
-        if (settings.SalaryDay != plan.Settings.SalaryDay)
-        {
-            foreach (var strategy in adjustedStrategies)
-            {
-                await store.UpsertPaymentAssignmentStrategyAsync(
-                    strategy,
-                    cancellationToken);
-            }
-        }
-
-        await CapturePlanningChangeAsync(
-            "Planlama varsayımları değişti",
-            cancellationToken);
-    }
-
-    public async Task<PeriodReviewAvailability>
-        GetPeriodReviewAvailabilityAsync(
-            CancellationToken cancellationToken = default)
-    {
-        await GetFinancialPlanAsync(cancellationToken);
-        return await reviewService.GetAvailabilityAsync(cancellationToken);
-    }
-
-    public Task<PeriodReviewContext> GetPeriodReviewContextAsync(
-        Guid? planId = null,
         CancellationToken cancellationToken = default) =>
-        reviewService.GetContextAsync(planId, cancellationToken);
+        simulationService.AddRecordFromScenarioAsync(request, cancellationToken);
 
-    /// <summary>
-    /// Dönem boyunca girilen gözlem, checkpoint'te review taslağına dönüşür
-    /// (I15). Kullanıcı sıfırdan girmez; kendi girdiğini onaylar.
-    /// </summary>
-    /// <remarks>
-    /// Gözlem yoksa null döner ve review ekranı bugünkü gibi boş açılır.
-    /// </remarks>
-    public async Task<PeriodReviewDraft?> GetObservedReviewDraftAsync(
-        Guid periodPlanSnapshotId,
-        CancellationToken cancellationToken = default)
-    {
-        var observation = await store.GetPeriodObservationAsync(
-            periodPlanSnapshotId,
-            cancellationToken);
-        if (observation is null)
-        {
-            return null;
-        }
-
-        return new PeriodReviewDraft(
-            periodPlanSnapshotId,
-            observation.Payments
-                .Select(x => new ActualPaymentDraft(
-                    x.PeriodPlanPaymentLineId,
-                    x.Status,
-                    x.ActualAmount,
-                    x.ActualPaymentDate,
-                    x.Note))
-                .ToArray(),
-            observation.ObservedLivingSpend,
-            0m,
-            observation.Flows
-                .Select(x => new ActualFlowDraft(
-                    x.Type,
-                    x.Name,
-                    x.Category,
-                    x.Date,
-                    x.Amount))
-                .ToArray(),
-            [],
-            observation.ObservedBalance,
-            observation.Note);
-    }
-
-    public Task<PeriodReviewPreview> PreviewPeriodReviewAsync(
-        PeriodReviewDraft draft,
-        CancellationToken cancellationToken = default) =>
-        reviewService.PreviewAsync(draft, cancellationToken);
-
-    public async Task<FinancialReviewResult> FinalizePeriodReviewAsync(
-        PeriodReviewDraft draft,
-        CancellationToken cancellationToken = default)
-    {
-        var plan = await GetFinancialPlanAsync(cancellationToken);
-        var result = await reviewService.FinalizeAsync(
-            plan,
-            draft,
-            cancellationToken);
-        // Defter PeriodActual'a dönüştü; iki kopya kalmaz (I15).
-        await store.DeletePeriodObservationAsync(
-            draft.PeriodPlanSnapshotId,
-            cancellationToken);
-        return result;
-    }
-
-    public Task<IReadOnlyList<HistoryPeriod>> GetHistoryPeriodsAsync(
-        CancellationToken cancellationToken = default) =>
-        historyService.GetPeriodsAsync(cancellationToken);
-
-    public Task<HistoryPeriod> GetHistoryPeriodAsync(
-        Guid actualId,
-        CancellationToken cancellationToken = default) =>
-        historyService.GetPeriodAsync(actualId, cancellationToken);
-
-    public Task<HistorySummary?> GetHistorySummaryAsync(
-        int periodCount = 3,
-        CancellationToken cancellationToken = default) =>
-        historyService.GetRecentSummaryAsync(
-            periodCount,
-            cancellationToken);
-
-    /// <summary>
-    /// Ana Sayfa'nın verisi: mevcut dönemin donmuş planı + gözlem defteri.
-    /// Projeksiyon motoru çalışmaz (I16).
-    /// </summary>
-    public Task<PeriodProgress?> GetPeriodProgressAsync(
-        CancellationToken cancellationToken = default) =>
-        periodProgressService.GetAsync(cancellationToken);
-
-    public Task<PaymentReminderMode> GetPaymentReminderModeAsync(
-        CancellationToken cancellationToken = default) =>
-        store.GetPaymentReminderModeAsync(cancellationToken);
-
-    public Task SavePaymentReminderModeAsync(
-        PaymentReminderMode mode,
-        CancellationToken cancellationToken = default) =>
-        store.SavePaymentReminderModeAsync(mode, cancellationToken);
-
-    /// <summary>
-    /// Açık profilin kurulacak ödeme bildirimleri. Hatırlatıcı kapalıysa boş.
-    /// </summary>
-    public async Task<IReadOnlyList<PaymentReminder>> GetPaymentRemindersAsync(
-        DateTime now,
-        CancellationToken cancellationToken = default) =>
-        (await GetPaymentReminderBoardAsync(now, cancellationToken)).Reminders;
-
-    /// <summary>
-    /// Hatırlatıcı kartının tamamı: kurulacak bildirimler, sıradaki ödeme
-    /// günleri, ertelenenler ve bildirimden "Ödedim" denenler.
-    /// </summary>
-    /// <remarks>
-    /// Kapanmış dönemin cevapları gösterilmez: o dönemin ödemeleri
-    /// checkpoint'teki review'da netleşti. Cevap açık dönemin başlangıcından
-    /// sonraki bir vadeye aitse (sonraki dönemlere erken ödenenler dahil)
-    /// görünür.
-    /// </remarks>
-    public async Task<PaymentReminderBoard> GetPaymentReminderBoardAsync(
-        DateTime now,
-        CancellationToken cancellationToken = default)
-    {
-        var mode = await store.GetPaymentReminderModeAsync(cancellationToken);
-        var history = await store.GetFinancialHistoryAsync(cancellationToken);
-        var openPlan = PeriodProgressService.ResolveOpenPlan(history);
-        var responses = (await store.GetPaymentReminderResponsesAsync(cancellationToken))
-            .Where(x => openPlan is null || x.DueDate > openPlan.PeriodStart)
-            .ToArray();
-        var snoozed = responses
-            .Where(x => x.Kind == PaymentReminderAnswerKind.Snoozed)
-            .ToArray();
-        var paid = responses
-            .Where(x => x.Kind == PaymentReminderAnswerKind.Paid)
-            .ToArray();
-        if (mode == PaymentReminderMode.Off)
-        {
-            return new PaymentReminderBoard(mode, [], [], snoozed, paid, null);
-        }
-
-        var dues = await GetUpcomingPaymentDuesAsync(now, cancellationToken);
-        var scheduled = PaymentReminderPlanner.Plan(mode, dues, now);
-        var reminders = scheduled
-            .Concat(PaymentReminderPlanner.FollowUps(snoozed, now))
-            .OrderBy(x => x.NotifyAt)
-            .ThenBy(x => x.Key, StringComparer.Ordinal)
-            .ToArray();
-        var snoozedKeys = snoozed.Select(x => x.DueKey).ToHashSet();
-        var upcoming = PaymentReminderPlanner.Preview(
-            PaymentReminderPlanner.Plan(
-                mode,
-                dues.Where(x => !snoozedKeys.Contains(x.Key)),
-                now),
-            now);
-        return new PaymentReminderBoard(
-            mode,
-            reminders,
-            upcoming,
-            snoozed,
-            paid,
-            PaymentReminderPlanner.Sample(dues, now));
-    }
-
-    /// <summary>
-    /// Bildirimden ya da karttan gelen cevabı deftere yazar. "Ödedim" denen
-    /// ödeme artık hatırlatılmaz ve Ana Sayfa'da ödenmiş sayılır; "Ertele"
-    /// denen ödeme vadesi geçse de ödenmemiş sayılır.
-    /// </summary>
-    /// <remarks>
-    /// Ödendi kaydı geç gelen bir "Ertele" ile geri alınmaz: aynı bildirimin
-    /// eski bir kopyasına basılmış olabilir. Geri almak için
-    /// <see cref="UndoPaymentReminderAnswerAsync"/>.
-    /// </remarks>
-    public async Task RecordPaymentReminderAnswerAsync(
-        PaymentReminderAnswer answer,
-        CancellationToken cancellationToken = default)
-    {
-        if (answer.Payments.Count == 0)
-        {
-            return;
-        }
-
-        var existing = (await store.GetPaymentReminderResponsesAsync(cancellationToken))
-            .ToDictionary(x => x.DueKey, StringComparer.Ordinal);
-        var responses = answer.Payments
-            .GroupBy(x => x.Key, StringComparer.Ordinal)
-            .Select(x => x.First())
-            .Where(x => answer.Kind == PaymentReminderAnswerKind.Paid ||
-                        !existing.TryGetValue(x.Key, out var previous) ||
-                        previous.Kind != PaymentReminderAnswerKind.Paid)
-            .Select(x => new PaymentReminderResponse(
-                x.Key,
-                x.Name,
-                x.DueDate,
-                x.Amount,
-                answer.Kind,
-                answer.AnsweredAt,
-                answer.Kind == PaymentReminderAnswerKind.Snoozed
-                    ? answer.SnoozedUntil
-                    : null))
-            .ToArray();
-        if (responses.Length > 0)
-        {
-            await store.UpsertPaymentReminderResponsesAsync(
-                responses,
-                cancellationToken);
-        }
-    }
-
-    /// <summary>Cevabı siler; ödeme yeniden planın kendi varsayımına döner.</summary>
-    public Task UndoPaymentReminderAnswerAsync(
-        string dueKey,
-        CancellationToken cancellationToken = default) =>
-        store.DeletePaymentReminderResponseAsync(dueKey, cancellationToken);
-
-    /// <summary>Defterin tamamı; dönem sihirbazı ertelenenleri "ödenmedi" açar.</summary>
-    public Task<IReadOnlyList<PaymentReminderResponse>> GetPaymentReminderResponsesAsync(
-        CancellationToken cancellationToken = default) =>
-        store.GetPaymentReminderResponsesAsync(cancellationToken);
-
-    /// <summary>
-    /// Hatırlatma ufkundaki ödemeler. Açık dönemde kaynak Ana Sayfa'nın
-    /// donmuş planıdır; ödendi işaretlenen satır hatırlatılmaz, bugün vadesi
-    /// gelen satır hatırlatılır. Dönem sonrasındaki ödemeler projeksiyondan
-    /// gelir: dönem kapatılmadan da ödeme günü hatırlatılmalı. Bildirimden
-    /// "Ödedim" denen ödeme hangi kaynaktan gelirse gelsin hatırlatılmaz.
-    /// </summary>
-    public async Task<IReadOnlyList<PaymentDue>> GetUpcomingPaymentDuesAsync(
-        DateTime now,
-        CancellationToken cancellationToken = default)
-    {
-        var today = DateOnly.FromDateTime(now);
-        var last = today.AddDays(PaymentReminderPlanner.HorizonDays);
-        var history = await store.GetFinancialHistoryAsync(cancellationToken);
-        var openPlan = PeriodProgressService.ResolveOpenPlan(history);
-        if (openPlan is null)
-        {
-            return [];
-        }
-
-        var revision = history.Revisions
-            .Where(x => x.PeriodPlanSnapshotId == openPlan.Id)
-            .OrderBy(x => x.CreatedAtUtc)
-            .ThenBy(x => x.RevisionNumber)
-            .LastOrDefault();
-        var observation = await store.GetPeriodObservationAsync(
-            openPlan.Id,
-            cancellationToken);
-        var settled = observation?.Payments
-            .Where(x => x.Status != ActualPaymentStatus.Unpaid)
-            .Select(x => x.PeriodPlanPaymentLineId)
-            .ToHashSet() ?? [];
-        var dues = (revision?.PaymentLines ?? openPlan.PaymentLines)
-            .Where(x => !settled.Contains(x.Id) &&
-                        x.PlannedDate >= today &&
-                        x.PlannedDate <= last)
-            .Select(x => new PaymentDue(
-                DueKey(x.SourceEntityId, x.Name, x.PlannedDate),
-                x.Name,
-                x.PlannedDate,
-                x.PlannedAmount))
-            .ToList();
-
-        if (last > openPlan.PeriodEnd)
-        {
-            var periods = await GetFuturePeriodsAsync(
-                periodCount: 3,
-                cancellationToken: cancellationToken);
-            dues.AddRange(periods
-                .SelectMany(x => x.MandatoryItems)
-                .Where(x => x.DueDate > openPlan.PeriodEnd &&
-                            x.DueDate >= today &&
-                            x.DueDate <= last)
-                .Select(x => new PaymentDue(
-                    DueKey(x.PaymentId, x.Name, x.DueDate),
-                    x.Name,
-                    x.DueDate,
-                    x.Amount)));
-            var plan = await GetFinancialPlanAsync(cancellationToken);
-            dues.AddRange(plan.PlannedLargeExpenses
-                .Where(x => x.Status == PlannedExpenseStatus.Planned &&
-                            x.ExactDate > openPlan.PeriodEnd &&
-                            x.ExactDate >= today &&
-                            x.ExactDate <= last)
-                .Select(x => new PaymentDue(
-                    DueKey(x.Id, x.Name, x.ExactDate),
-                    x.Name,
-                    x.ExactDate,
-                    x.Amount)));
-        }
-
-        var answeredPaid = (await store.GetPaymentReminderResponsesAsync(cancellationToken))
-            .Where(x => x.Kind == PaymentReminderAnswerKind.Paid)
-            .Select(x => x.DueKey)
-            .ToHashSet(StringComparer.Ordinal);
-        return dues
-            .Where(x => !answeredPaid.Contains(x.Key))
-            .GroupBy(x => x.Key)
-            .Select(x => x.First())
-            .OrderBy(x => x.DueDate)
-            .ThenBy(x => x.Name, StringComparer.Ordinal)
-            .ToArray();
-    }
-
-    private static string DueKey(Guid sourceId, string name, DateOnly date) =>
-        PaymentReminderPlanner.DueKey(sourceId, name, date);
-
-    /// <summary>
-    /// "Bugün şu kadar param var." Dönem içi gözlem — snapshot zincirine
-    /// dokunmaz (I14), donmuş planı ve review checkpoint'ini değiştirmez.
-    /// </summary>
-    /// <remarks>
-    /// Bu metot bilinçli olarak <see cref="RefreshCurrentFinancialStateAsync"/>
-    /// çağırmaz. O bir checkpoint işlemidir; dönem içinde çağrılırsa açık
-    /// planın penceresi kısalır, orijinal plan yetim kalır ve plan/gerçek
-    /// karşılaştırması anlamsızlaşır. Ölçüldü, `PLAN-IZOLASYON.md`.
-    /// </remarks>
-    public async Task<PeriodObservation> ObserveCurrentBalanceAsync(
-        decimal balance,
-        CancellationToken cancellationToken = default)
-    {
-        var openPlan = await ResolveOpenPlanAsync(cancellationToken);
-        var existing = await store.GetPeriodObservationAsync(
-            openPlan.Id,
-            cancellationToken);
-        var now = clock.UtcNow;
-        var observation = (existing ?? new PeriodObservation
-            {
-                PeriodPlanSnapshotId = openPlan.Id,
-                CreatedAtUtc = now
-            }) with
-            {
-                ObservedOn = clock.Today,
-                ObservedBalance = balance,
-                UpdatedAtUtc = now
-            };
-        await store.UpsertPeriodObservationAsync(
-            observation,
-            cancellationToken);
-        return observation;
-    }
-
-    /// <summary>
-    /// Bir plan satırının gözlenen durumu: ödendi / farklı tutar / ödenmedi.
-    /// Checkpoint'te review'a olduğu gibi taşınır (I15).
-    /// </summary>
-    public async Task<PeriodObservation> ObservePaymentAsync(
-        Guid periodPlanPaymentLineId,
-        ActualPaymentStatus status,
-        decimal actualAmount,
-        DateOnly? actualPaymentDate = null,
-        string note = "",
-        CancellationToken cancellationToken = default)
-    {
-        var openPlan = await ResolveOpenPlanAsync(cancellationToken);
-        if (openPlan.PaymentLines.All(x => x.Id != periodPlanPaymentLineId))
-        {
-            throw new InvalidOperationException(
-                "Gözlenen ödeme satırı açık dönem planında bulunamadı.");
-        }
-
-        var now = clock.UtcNow;
-        var existing = await store.GetPeriodObservationAsync(
-            openPlan.Id,
-            cancellationToken);
-        var observation = existing ?? new PeriodObservation
-        {
-            PeriodPlanSnapshotId = openPlan.Id,
-            ObservedOn = clock.Today,
-            CreatedAtUtc = now
-        };
-        var payments = observation.Payments
-            .Where(x => x.PeriodPlanPaymentLineId != periodPlanPaymentLineId)
-            .Append(new PeriodObservationPayment
-            {
-                PeriodObservationId = observation.Id,
-                PeriodPlanPaymentLineId = periodPlanPaymentLineId,
-                Status = status,
-                ActualAmount = actualAmount,
-                ActualPaymentDate = actualPaymentDate ?? clock.Today,
-                Note = note.Trim()
-            })
-            .ToArray();
-        observation = observation with
-        {
-            Payments = payments,
-            ObservedOn = clock.Today,
-            UpdatedAtUtc = now
-        };
-        await store.UpsertPeriodObservationAsync(
-            observation,
-            cancellationToken);
-        return observation;
-    }
-
-    private async Task<PeriodPlanSnapshot> ResolveOpenPlanAsync(
-        CancellationToken cancellationToken)
-    {
-        var history = await store.GetFinancialHistoryAsync(cancellationToken);
-        return PeriodProgressService.ResolveOpenPlan(history) ??
-               throw new InvalidOperationException(
-                   "Gözlem kaydedebilmek için önce güncel bir dönem planı gerekir.");
-    }
-
-    public async Task<FinancialSnapshot> RefreshCurrentFinancialStateAsync(
-        decimal startingSavings,
-        string note = "",
-        CancellationToken cancellationToken = default)
-    {
-        var plan = await GetFinancialPlanAsync(cancellationToken);
-        var bundle = await snapshotService.CreateCurrentSnapshotAsync(
-            plan,
-            startingSavings,
-            clock.Today,
-            FinancialSnapshotSource.Recovery,
-            string.IsNullOrWhiteSpace(note)
-                ? "Güncel finansal durum yenilendi"
-                : note,
-            cancellationToken);
-        return bundle.Snapshot;
-    }
-
-    public async Task<PaymentAssignmentStrategyOverview>
+    public Task<PaymentAssignmentStrategyOverview>
         GetPaymentAssignmentStrategyOverviewAsync(
-            CancellationToken cancellationToken = default)
-    {
-        var query = await GetProjectionPlanAsync(clock.Today, cancellationToken);
-        var plan = query.Plan;
-        var history = plan.PaymentAssignmentStrategies
-            .OrderBy(x => x.EffectiveFromSalaryDate)
-            .ThenBy(x => x.CreatedAt)
-            .ToArray();
-        var anchor = plan.Settings.ProjectionAnchorDate == default
-            ? clock.Today
-            : plan.Settings.ProjectionAnchorDate;
-        var firstProjectionSalary =
-            query.Boundary?.FirstUnrealizedSalaryDate ??
-            salaryPeriodCalculator.GetFirstSalaryOnOrAfter(
-                anchor,
-                plan.Settings.SalaryDay);
-        var referenceSalary = salaryPeriodCalculator
-            .GetPeriod(clock.Today, plan.Settings.SalaryDay)
-            .Start;
-        var current = history
-            .Where(x => x.EffectiveFromSalaryDate <= referenceSalary)
-            .LastOrDefault() ?? history.FirstOrDefault();
-        var currentThreshold = current is null
-            ? referenceSalary
-            : DateOnly.FromDayNumber(Math.Max(
-                referenceSalary.DayNumber,
-                current.EffectiveFromSalaryDate.DayNumber));
-        var pending = history.FirstOrDefault(x =>
-            x.EffectiveFromSalaryDate > currentThreshold);
-        var firstChoice = salaryPeriodCalculator.GetFirstSalaryOnOrAfter(
-            clock.Today,
-            plan.Settings.SalaryDay);
-        if (firstChoice <= clock.Today)
-        {
-            firstChoice = CalendarRules.AddMonthsKeepingDay(
-                firstChoice,
-                1,
-                plan.Settings.SalaryDay);
-        }
-        if (firstChoice < firstProjectionSalary)
-        {
-            firstChoice = firstProjectionSalary;
-        }
+            CancellationToken cancellationToken = default) =>
+        queryService.GetPaymentAssignmentStrategyOverviewAsync(cancellationToken);
 
-        var choices = Enumerable.Range(0, 12)
-            .Select(index => CalendarRules.AddMonthsKeepingDay(
-                firstChoice,
-                index,
-                plan.Settings.SalaryDay))
-            .ToArray();
-        return new PaymentAssignmentStrategyOverview(
-            current,
-            pending,
-            history,
-            choices);
-    }
-
-    public async Task<PaymentStrategyChangePreview>
+    public Task<PaymentStrategyChangePreview>
         PreviewPaymentAssignmentStrategyAsync(
             PaymentAssignmentMode newMode,
             DateOnly effectiveSalaryDate,
-            CancellationToken cancellationToken = default)
-    {
-        var query = await GetProjectionPlanAsync(clock.Today, cancellationToken);
-        var plan = query.Plan;
-        ValidateStrategyDate(plan, effectiveSalaryDate);
-        var currentMode = ResolveModeBeforeChange(plan, effectiveSalaryDate);
-        var request = CreateStrategySimulationRequest(
+            CancellationToken cancellationToken = default) =>
+        queryService.PreviewPaymentAssignmentStrategyAsync(
             newMode,
             effectiveSalaryDate,
-            "Gelir kullanım düzeni önizlemesi");
-        var firstSalary =
-            query.Boundary?.FirstUnrealizedSalaryDate ??
-            salaryPeriodCalculator.GetFirstSalaryOnOrAfter(
-                plan.Settings.ProjectionAnchorDate,
-                plan.Settings.SalaryDay);
-        var effectiveIndex = Math.Max(
-            0,
-            ((effectiveSalaryDate.Year - firstSalary.Year) * 12) +
-            effectiveSalaryDate.Month - firstSalary.Month);
-        var result = simulationCalculator.Calculate(
-            plan,
-            clock.Today,
-            request,
-            Math.Min(60, Math.Max(12, effectiveIndex + 1)),
-            firstSalary);
-        var row = result.Rows.Single(x =>
-            x.Scenario.PeriodStart == effectiveSalaryDate);
-        return new PaymentStrategyChangePreview(
-            effectiveSalaryDate,
-            currentMode,
-            newMode,
-            row.Baseline,
-            row.Scenario);
-    }
-
-    public async Task SavePaymentAssignmentStrategyAsync(
-        PaymentAssignmentStrategy strategy,
-        bool confirmedHistoricalCorrection = false,
-        CancellationToken cancellationToken = default)
-    {
-        var plan = await GetFinancialPlanAsync(cancellationToken);
-        ValidateStrategyDate(plan, strategy.EffectiveFromSalaryDate);
-        if (!Enum.IsDefined(strategy.Mode))
-        {
-            throw new InvalidOperationException(
-                "Gelir kullanım düzeni geçersiz.");
-        }
-
-        var existing = plan.PaymentAssignmentStrategies
-            .FirstOrDefault(x => x.Id == strategy.Id);
-        var isHistoricalCorrection = existing is not null &&
-                                     existing.EffectiveFromSalaryDate <=
-                                     clock.Today;
-        if (isHistoricalCorrection && !confirmedHistoricalCorrection)
-        {
-            throw new InvalidOperationException(
-                "Geçmiş bir kararı düzeltmek önceki plan sonuçlarını değiştirir ve ayrı onay gerektirir.");
-        }
-
-        var conflicting = plan.PaymentAssignmentStrategies.FirstOrDefault(x =>
-            x.EffectiveFromSalaryDate == strategy.EffectiveFromSalaryDate &&
-            x.Id != strategy.Id);
-        if (conflicting is not null)
-        {
-            if (conflicting.EffectiveFromSalaryDate <= clock.Today &&
-                !confirmedHistoricalCorrection)
-            {
-                throw new InvalidOperationException(
-                    "Bu dönem tarihindeki geçmiş kayıt yalnızca onaylı düzeltme ile değiştirilebilir.");
-            }
-
-            await store.DeletePaymentAssignmentStrategyAsync(
-                conflicting.Id,
-                cancellationToken);
-        }
-
-        await store.UpsertPaymentAssignmentStrategyAsync(
-            strategy with
-            {
-                CreatedAt = existing?.CreatedAt ?? clock.UtcNow
-            },
             cancellationToken);
-        await CapturePlanningChangeAsync(
-            "Gelir kullanım düzeni değişti",
-            cancellationToken);
-    }
-
-    public async Task DeletePaymentAssignmentStrategyAsync(
-        Guid id,
-        bool confirmedHistoricalCorrection = false,
-        CancellationToken cancellationToken = default)
-    {
-        var plan = await GetFinancialPlanAsync(cancellationToken);
-        var strategy = plan.PaymentAssignmentStrategies
-            .SingleOrDefault(x => x.Id == id)
-            ?? throw new InvalidOperationException("Düzen kaydı bulunamadı.");
-        if (plan.PaymentAssignmentStrategies.Count == 1)
-        {
-            throw new InvalidOperationException("İlk düzen kaydı silinemez.");
-        }
-
-        if (strategy.EffectiveFromSalaryDate <= clock.Today &&
-            !confirmedHistoricalCorrection)
-        {
-            throw new InvalidOperationException(
-                "Geçmiş düzen kaydını silmek ayrı onay gerektirir.");
-        }
-
-        var remaining = plan.PaymentAssignmentStrategies
-            .Where(x => x.Id != id)
-            .ToArray();
-        var firstSalary = salaryPeriodCalculator.GetFirstSalaryOnOrAfter(
-            plan.Settings.ProjectionAnchorDate,
-            plan.Settings.SalaryDay);
-        strategyResolver.ValidateHistory(
-            remaining,
-            plan.Settings.SalaryDay,
-            firstSalary);
-        await store.DeletePaymentAssignmentStrategyAsync(id, cancellationToken);
-        await CapturePlanningChangeAsync(
-            "Gelir kullanım düzeni değişti",
-            cancellationToken);
-    }
-
-    private static SimulationRequest CreateStrategySimulationRequest(
-        PaymentAssignmentMode mode,
-        DateOnly effectiveSalaryDate,
-        string note) => new(
-            SimulationScenarioType.PaymentStrategyChange,
-            note,
-            0m,
-            effectiveSalaryDate,
-            NewPaymentAssignmentMode: mode,
-            EffectiveSalaryDate: effectiveSalaryDate);
-
-    private void ValidateStrategyDate(
-        FinancialPlan plan,
-        DateOnly effectiveSalaryDate)
-    {
-        if (!strategyResolver.IsSalaryDate(
-                effectiveSalaryDate,
-                plan.Settings.SalaryDay))
-        {
-            throw new InvalidOperationException(
-                "Düzen değişikliği yalnızca bir dönem tarihinde başlayabilir.");
-        }
-    }
-
-    private PaymentAssignmentMode ResolveModeBeforeChange(
-        FinancialPlan plan,
-        DateOnly effectiveSalaryDate)
-    {
-        var previousSalary = CalendarRules.AddMonthsKeepingDay(
-            effectiveSalaryDate,
-            -1,
-            plan.Settings.SalaryDay);
-        return plan.PaymentAssignmentStrategies
-            .Where(x => x.EffectiveFromSalaryDate <= previousSalary)
-            .OrderBy(x => x.EffectiveFromSalaryDate)
-            .LastOrDefault()?.Mode ??
-               plan.PaymentAssignmentStrategies
-                   .OrderBy(x => x.EffectiveFromSalaryDate)
-                   .First().Mode;
-    }
-
-    private static bool CanBuildProjection(FinancialPlan plan) =>
-        plan.Salaries.Count > 0 &&
-        plan.PaymentAssignmentStrategies.Count > 0 &&
-        plan.Settings.ProjectionAnchorDate != default;
-
-    private async Task<ProjectionQueryPlan> GetProjectionPlanAsync(
-        DateOnly asOf,
-        CancellationToken cancellationToken)
-    {
-        var plan = await GetFinancialPlanAsync(cancellationToken);
-        if (!CanBuildProjection(plan))
-        {
-            return new ProjectionQueryPlan(plan, null);
-        }
-
-        var history = await store.GetFinancialHistoryAsync(cancellationToken);
-        var currentSnapshot = FinancialSnapshotService.LatestCurrent(history);
-        if (currentSnapshot is null)
-        {
-            return new ProjectionQueryPlan(plan, null);
-        }
-
-        var boundary = projectionBoundaryResolver.Resolve(
-            history,
-            currentSnapshot,
-            plan.Settings,
-            asOf);
-        return new ProjectionQueryPlan(
-            ApplyProjectionBoundary(plan, boundary),
-            boundary);
-    }
-
-    private static FinancialPlan ApplyProjectionBoundary(
-        FinancialPlan plan,
-        ProjectionBoundary boundary) => plan with
-    {
-        Settings = plan.Settings with
-        {
-            ProjectionStartingSavings = boundary.StartingSavings,
-            ProjectionAnchorDate = boundary.ProjectionAnchorDate
-        }
-    };
-
-    private sealed record ProjectionQueryPlan(
-        FinancialPlan Plan,
-        ProjectionBoundary? Boundary);
-
-    private static void ValidateOnboardingDraft(OnboardingDraft draft)
-    {
-        CalendarRules.ValidateDay(draft.Settings.SalaryDay);
-        if (draft.Settings.MonthlyLivingBudget < 0m)
-        {
-            throw new InvalidOperationException(
-                "Yaşam gideri negatif olamaz.");
-        }
-
-        if (draft.Settings.CreditCardCarryInterestRate is < 0m or > 1m ||
-            draft.Settings.DeficitFinancingInterestRate is < 0m or > 1m)
-        {
-            throw new InvalidOperationException(
-                "Faiz varsayımları %0 ile %100 arasında olmalıdır.");
-        }
-
-        if (draft.Salaries.Count == 0)
-        {
-            throw new InvalidOperationException(
-                "Başlamak için en az bir gelir eklemelisin.");
-        }
-
-        if (draft.Salaries.Any(x => x.Amount <= 0m))
-        {
-            throw new InvalidOperationException(
-                "Gelir tutarı sıfırdan büyük olmalıdır.");
-        }
-
-        if (draft.OtherIncomes.Any(x => x.Amount <= 0m))
-        {
-            throw new InvalidOperationException(
-                "Tek seferlik gelir tutarı sıfırdan büyük olmalıdır.");
-        }
-
-        foreach (var loan in draft.Loans)
-        {
-            if (loan.MonthlyPayment <= 0m ||
-                loan.RemainingInstallmentCount < 1)
-            {
-                throw new InvalidOperationException(
-                    "Kredi taksiti ve kalan taksit sayısı pozitif olmalıdır.");
-            }
-
-            CalendarRules.ValidateDay(loan.PaymentDay);
-        }
-
-        foreach (var plan in draft.PaymentPlans)
-        {
-            if (plan.Installments.Count == 0 ||
-                plan.Installments.Any(x => x.Amount <= 0m))
-            {
-                throw new InvalidOperationException(
-                    "Ödeme planında en az bir pozitif ödeme olmalıdır.");
-            }
-        }
-
-        foreach (var card in draft.CreditCards)
-        {
-            if (card.Limit <= 0m)
-            {
-                throw new InvalidOperationException(
-                    "Kart limiti sıfırdan büyük olmalıdır.");
-            }
-
-            if (card.CarriedBalance < 0m ||
-                card.UnbilledSpending < 0m ||
-                card.MinimumPaymentRate is <= 0m or > 1m ||
-                card.Charges.Any(x => x.Amount <= 0m))
-            {
-                throw new InvalidOperationException(
-                    "Kart tutarları ve asgari oran geçersiz.");
-            }
-
-            ValidateCreditCardPaymentSettings(card);
-        }
-
-        if (draft.PlannedLargeExpenses.Any(x => x.Amount <= 0m))
-        {
-            throw new InvalidOperationException(
-                "Planlı ödeme tutarı sıfırdan büyük olmalıdır.");
-        }
-
-        if (!Enum.IsDefined(draft.InitialPaymentAssignmentMode))
-        {
-            throw new InvalidOperationException(
-                "Gelir kullanım düzeni geçersiz.");
-        }
-    }
-
-    private static TemporaryPaymentPlan NormalizePaymentPlan(
-        TemporaryPaymentPlan plan) => plan with
-        {
-            Installments = plan.Installments
-                .OrderBy(x => x.DueDate)
-                .Select(x => x with { PlanId = plan.Id })
-                .ToArray()
-        };
-
-    private CreditCard NormalizeCreditCard(CreditCard card) => card with
-    {
-        BalanceAsOfDate = card.BalanceAsOfDate == default
-            ? clock.Today
-            : card.BalanceAsOfDate,
-        CurrentStatement = card.CurrentStatement is null
-            ? null
-            : card.CurrentStatement with
-            {
-                CreditCardId = card.Id,
-                UpdatedAt = card.CurrentStatement.UpdatedAt == default
-                    ? clock.UtcNow
-                    : card.CurrentStatement.UpdatedAt
-            },
-        CurrentStatementPaymentPlan =
-            card.CurrentStatementPaymentPlan is null ||
-            card.CurrentStatementPaymentPlan.Mode ==
-            CurrentStatementPaymentMode.Custom
-                ? card.CurrentStatementPaymentPlan
-                : card.CurrentStatementPaymentPlan with
-                {
-                    CustomAmount = null
-                },
-        Charges = card.Charges
-            .OrderBy(x => x.PostingDate)
-            .Select(x => x with { CreditCardId = card.Id })
-            .ToArray(),
-        PaymentPlans = card.PaymentPlans
-            .OrderBy(x => x.DueDate)
-            .Select(x => x with { CreditCardId = card.Id })
-            .ToArray()
-    };
-
-    private static void ValidateCreditCardPaymentSettings(CreditCard card)
-    {
-        CalendarRules.ValidateDay(card.StatementClosingDay);
-        CalendarRules.ValidateDay(card.PaymentDueDay);
-        if (card.PaymentStrategy == CreditCardPaymentStrategy.FixedAmount &&
-            card.FixedPaymentAmount is null or <= 0m)
-        {
-            throw new InvalidOperationException(
-                "Sabit ödeme stratejisi için pozitif tutar gereklidir.");
-        }
-
-        if (card.ProjectionFallbackStrategy ==
-                ProjectionFallbackStrategy.FixedAmount &&
-            card.ProjectionFallbackFixedAmount is null or <= 0m)
-        {
-            throw new InvalidOperationException(
-                "Gelecek hesaplamalarda sabit tutar kullanmak için 0'dan büyük bir tutar gereklidir.");
-        }
-
-        if (card.PaymentPlans.Any(x =>
-                x.PaymentType == CreditCardPaymentType.FixedAmount &&
-                x.Amount is null or <= 0m))
-        {
-            throw new InvalidOperationException(
-                "Özel kart ödeme tutarı sıfırdan büyük olmalıdır.");
-        }
-
-        if (card.CurrentStatement is { } statement)
-        {
-            if (statement.CreditCardId != card.Id)
-            {
-                throw new InvalidOperationException(
-                    "Ekstre kartla eşleşmiyor.");
-            }
-
-            if (statement.StatementDate == default ||
-                statement.DueDate == default ||
-                statement.StatementAmount < 0m ||
-                statement.MinimumPaymentAmount < 0m ||
-                statement.MinimumPaymentAmount > statement.StatementAmount)
-            {
-                throw new InvalidOperationException(
-                    "Kesilmiş ekstre bilgileri geçersiz.");
-            }
-
-            if (statement.NextStatementDate is { } nextStatementDate &&
-                nextStatementDate <= statement.StatementDate)
-            {
-                throw new InvalidOperationException(
-                    "Bir sonraki kesim tarihi mevcut ekstre tarihinden sonra olmalıdır.");
-            }
-
-            if (statement.NextDueDate is { } nextDueDate &&
-                nextDueDate <= statement.DueDate)
-            {
-                throw new InvalidOperationException(
-                    "Bir sonraki son ödeme tarihi mevcut son ödeme tarihinden sonra olmalıdır.");
-            }
-        }
-
-        if (card.CurrentStatement is null &&
-            card.CurrentStatementPaymentPlan is not null)
-        {
-            throw new InvalidOperationException(
-                "Kesilmiş ekstre planı için önce ekstre bilgisi gereklidir.");
-        }
-
-        if (card is
-            {
-                CurrentStatement: { } currentStatement,
-                CurrentStatementPaymentPlan:
-                {
-                    Mode: CurrentStatementPaymentMode.Custom
-                } currentPlan
-            } &&
-            (currentPlan.CustomAmount is null or < 0m ||
-             currentPlan.CustomAmount > currentStatement.StatementAmount))
-        {
-            throw new InvalidOperationException(
-                "Bu ekstre için özel ödeme tutarı 0 ile ekstre tutarı arasında olmalıdır.");
-        }
-    }
 }

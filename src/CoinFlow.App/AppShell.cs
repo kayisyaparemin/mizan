@@ -7,9 +7,9 @@ namespace CoinFlow.App;
 
 public sealed class AppShell : Shell
 {
-    public const string PeriodDetailRoute = "salary-period-detail";
-    public const string OnboardingRoute = "onboarding";
-    public const string CardControlRoute = "card-control";
+    public const string PeriodDetailRoute = NavigationRoutes.SalaryPeriodDetail;
+    public const string OnboardingRoute = NavigationRoutes.Onboarding;
+    public const string CardControlRoute = NavigationRoutes.CardControl;
 
     public AppShell(IServiceProvider services)
     {

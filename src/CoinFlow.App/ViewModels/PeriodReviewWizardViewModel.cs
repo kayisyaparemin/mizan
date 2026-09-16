@@ -1,5 +1,4 @@
 using System.Collections.ObjectModel;
-using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CoinFlow.App.Models;
@@ -17,7 +16,6 @@ public partial class PeriodReviewWizardViewModel(
     private PeriodReviewContext? _context;
     private decimal _lastSuggestedSavings;
     private bool _loaded;
-    // "Her şey planlandığı gibi" kısayolunun geri döneceği planlanan değerler.
     private decimal _plannedLiving;
     private decimal _plannedInterest;
 
@@ -73,59 +71,38 @@ public partial class PeriodReviewWizardViewModel(
     public bool HasPayments => Payments.Count > 0;
     public bool HasFlows => Flows.Count > 0;
     public string PlanIndicator => CurrentStep == 1 ? "●  Plan" : "✓  Plan";
-    public string ActualIndicator => CurrentStep < 2
-        ? "○  Gerçek"
-        : CurrentStep == 2 ? "●  Gerçek" : "✓  Gerçek";
-    public string ResultIndicator => CurrentStep < 3
-        ? "○  Sonuç"
-        : "●  Sonuç";
+    public string ActualIndicator => CurrentStep < 2 ? "○  Gerçek" : CurrentStep == 2 ? "●  Gerçek" : "✓  Gerçek";
+    public string ResultIndicator => CurrentStep < 3 ? "○  Sonuç" : "●  Sonuç";
 
     public async Task LoadAsync()
     {
-        if (_loaded)
-        {
-            return;
-        }
-
+        if (_loaded) return;
         try
         {
             IsBusy = true;
             _context = await service.GetPeriodReviewContextAsync();
-            if (_context.Actual is not null)
-            {
-                throw new InvalidOperationException(
-                    "Bu dönem daha önce kaydedildi.");
-            }
+            if (_context.Actual is not null) throw new InvalidOperationException("Bu dönem daha önce kaydedildi.");
 
             var plan = _context.OriginalPlan;
             var finalPlan = FinalPlanValues.From(plan, _context.Revision);
-            PeriodText =
-                $"{plan.PeriodStart.ToString("dd MMMM yyyy", TurkishCulture)} → {plan.PeriodEnd.ToString("dd MMMM yyyy", TurkishCulture)}";
+            PeriodText = $"{plan.PeriodStart.ToString("dd MMMM yyyy", TurkishCulture)} → {plan.PeriodEnd.ToString("dd MMMM yyyy", TurkishCulture)}";
             PlannedIncome = Money(finalPlan.PlannedIncome, 2);
             PlannedLoans = Money(finalPlan.PlannedLoanPayments, 2);
             PlannedCards = Money(finalPlan.PlannedCardPayments, 2);
             PlannedTemporary = Money(finalPlan.PlannedTemporaryPayments, 2);
-            PlannedInstallments = Money(
-                finalPlan.PlannedInstallmentPayments,
-                2);
+            PlannedInstallments = Money(finalPlan.PlannedInstallmentPayments, 2);
             PlannedOther = Money(finalPlan.PlannedOtherScheduledPayments, 2);
             PlannedLarge = Money(finalPlan.PlannedLargeExpenses, 2);
             PlannedLiving = Money(finalPlan.PlannedLivingBudget, 2);
             PlannedInterest = Money(finalPlan.PlannedInterest, 2);
             PlannedEnding = Money(finalPlan.PlannedEndingSavings, 2);
             HasPlanRevision = _context.RevisionCount > 0;
-            PlanRevisionNotice = HasPlanRevision
-                ? $"Bu plan dönem içinde {_context.RevisionCount} kez güncellendi."
-                : string.Empty;
-            // Alanlar planlanan değerlerle doldurulmaz: boş alan planlananı
-            // kabul eder ve bunu placeholder'da söyler. Kullanıcı yalnız
-            // farklı olanı yazar.
+            PlanRevisionNotice = HasPlanRevision ? $"Bu plan dönem içinde {_context.RevisionCount} kez güncellendi." : string.Empty;
+
             _plannedLiving = finalPlan.PlannedLivingBudget;
             _plannedInterest = finalPlan.PlannedDeficitInterest;
-            LivingPlaceholder =
-                $"Boş bırakırsan planlanan: {Money(_plannedLiving, 2)}";
-            InterestPlaceholder =
-                $"Boş bırakırsan planlanan: {Money(_plannedInterest, 2)}";
+            LivingPlaceholder = $"Boş bırakırsan planlanan: {Money(_plannedLiving, 2)}";
+            InterestPlaceholder = $"Boş bırakırsan planlanan: {Money(_plannedInterest, 2)}";
             ActualLivingSpend = string.Empty;
             ActualInterest = string.Empty;
             _lastSuggestedSavings = _context.SuggestedStartingSavings;
@@ -133,32 +110,24 @@ public partial class PeriodReviewWizardViewModel(
             CurrentStartingSavings = string.Empty;
 
             Payments.Clear();
-            // Hatırlatıcıda ertelenip ödendiği söylenmeyen ödeme "Ödenmedi"
-            // açılır; kullanıcı ödediyse burada değiştirir.
             var snoozedKeys = (await service.GetPaymentReminderResponsesAsync())
                 .Where(x => x.Kind == PaymentReminderAnswerKind.Snoozed)
                 .Select(x => x.DueKey)
                 .ToHashSet(StringComparer.Ordinal);
             foreach (var line in FinalPaymentLines(plan, _context.Revision))
             {
-                var snoozed = snoozedKeys.Contains(PaymentReminderPlanner.DueKey(
-                    line.SourceEntityId,
-                    line.Name,
-                    line.PlannedDate));
+                var snoozed = snoozedKeys.Contains(PaymentReminderPlanner.DueKey(line.SourceEntityId, line.Name, line.PlannedDate));
                 var item = new ActualPaymentInputItem
                 {
                     PlanLineId = line.Id,
                     Name = line.Name,
                     PlannedDate = line.PlannedDate,
                     PlannedAmountValue = line.PlannedAmount,
-                    ActualDate = line.PlannedDate.ToDateTime(
-                        TimeOnly.MinValue),
+                    ActualDate = line.PlannedDate.ToDateTime(TimeOnly.MinValue),
                     Note = snoozed ? "Hatırlatıcıda ertelendi" : string.Empty
                 };
                 item.SelectedStatus = item.StatusOptions.First(x =>
-                    x.Value == (line.PlannedAmount is null || snoozed
-                        ? ActualPaymentStatus.Unpaid
-                        : ActualPaymentStatus.Paid));
+                    x.Value == (line.PlannedAmount is null || snoozed ? ActualPaymentStatus.Unpaid : ActualPaymentStatus.Paid));
                 Payments.Add(item);
             }
 
@@ -175,11 +144,6 @@ public partial class PeriodReviewWizardViewModel(
         }
     }
 
-    /// <summary>
-    /// §7 — "Her şey planlandığı gibi" hızlı yolu. Boş alan planlananı kabul
-    /// ettiği için alanları boşaltıp kullanıcıyı tek tek doğrulatmadan doğrudan
-    /// sonuç adımına götürür. Kullanıcı sonucu görüp geri dönebilir.
-    /// </summary>
     [RelayCommand]
     private async Task EverythingAsPlannedAsync()
     {
@@ -201,13 +165,10 @@ public partial class PeriodReviewWizardViewModel(
         foreach (var payment in Payments)
         {
             payment.ActualAmount = string.Empty;
-            payment.ActualDate = payment.PlannedDate.ToDateTime(
-                TimeOnly.MinValue);
+            payment.ActualDate = payment.PlannedDate.ToDateTime(TimeOnly.MinValue);
             payment.Note = string.Empty;
             payment.SelectedStatus = payment.StatusOptions.First(x =>
-                x.Value == (payment.PlannedAmountValue is null
-                    ? ActualPaymentStatus.Unpaid
-                    : ActualPaymentStatus.Paid));
+                x.Value == (payment.PlannedAmountValue is null ? ActualPaymentStatus.Unpaid : ActualPaymentStatus.Paid));
         }
 
         ActualLivingSpend = string.Empty;
@@ -227,17 +188,8 @@ public partial class PeriodReviewWizardViewModel(
         try
         {
             SetStatus(string.Empty);
-            if (CurrentStep == 1)
-            {
-                CurrentStep = 2;
-                return;
-            }
-
-            if (CurrentStep == 2)
-            {
-                await RefreshPreviewAsync();
-                CurrentStep = 3;
-            }
+            if (CurrentStep == 1) { CurrentStep = 2; return; }
+            if (CurrentStep == 2) { await RefreshPreviewAsync(); CurrentStep = 3; }
         }
         catch (Exception exception)
         {
@@ -248,10 +200,7 @@ public partial class PeriodReviewWizardViewModel(
     [RelayCommand]
     private void Back()
     {
-        if (CurrentStep > 1 && !IsBusy)
-        {
-            CurrentStep--;
-        }
+        if (CurrentStep > 1 && !IsBusy) CurrentStep--;
     }
 
     [RelayCommand]
@@ -269,45 +218,9 @@ public partial class PeriodReviewWizardViewModel(
     }
 
     [RelayCommand]
-    private void AddUnplannedPayment()
-    {
-        AddFlow(
-            ActualFlowType.UnplannedPayment,
-            NewPaymentName,
-            NewPaymentCategory,
-            NewPaymentDate,
-            NewPaymentAmount);
-        NewPaymentName = string.Empty;
-        NewPaymentAmount = string.Empty;
-    }
-
-    [RelayCommand]
-    private void AddUnplannedIncome()
-    {
-        AddFlow(
-            ActualFlowType.UnplannedIncome,
-            NewIncomeName,
-            NewIncomeCategory,
-            NewIncomeDate,
-            NewIncomeAmount);
-        NewIncomeName = string.Empty;
-        NewIncomeAmount = string.Empty;
-    }
-
-    [RelayCommand]
-    private void RemoveFlow(ActualFlowInputItem item)
-    {
-        Flows.Remove(item);
-        OnPropertyChanged(nameof(HasFlows));
-    }
-
-    [RelayCommand]
     private async Task SaveAsync()
     {
-        if (IsBusy)
-        {
-            return;
-        }
+        if (IsBusy) return;
 
         PeriodReviewDraft draft;
         try
@@ -326,8 +239,7 @@ public partial class PeriodReviewWizardViewModel(
             IsBusy = true;
             var result = await service.FinalizePeriodReviewAsync(draft);
             ComparisonSummary = result.Comparison.Summary;
-            SuccessText =
-                $"{result.NewSnapshot.SnapshotDate.ToString("dd MMMM yyyy", TurkishCulture)} itibarıyla yeni 12 dönemlik planın güncellendi.";
+            SuccessText = $"{result.NewSnapshot.SnapshotDate.ToString("dd MMMM yyyy", TurkishCulture)} itibarıyla yeni 12 dönemlik planın güncellendi.";
             await feedback.ShowSuccessAsync("Dönem bilgileri kaydedildi.");
             IsSuccess = true;
         }
@@ -343,27 +255,16 @@ public partial class PeriodReviewWizardViewModel(
         }
     }
 
-    /// <summary>
-    /// Öneriyi yeniden hesaplar. Başlangıç durumu alanı boşsa öneriyi izler;
-    /// kullanıcının yazdığı tutar olduğu gibi kalır.
-    /// </summary>
     private async Task RefreshPreviewAsync()
     {
-        var suggested = await service.PreviewPeriodReviewAsync(
-            BuildDraft(false));
+        var suggested = await service.PreviewPeriodReviewAsync(BuildDraft(false));
         _lastSuggestedSavings = suggested.SuggestedStartingSavings;
         SuggestedStartingSavings = Money(_lastSuggestedSavings, 2);
-        var preview = await service.PreviewPeriodReviewAsync(
-            BuildDraft(true));
+        var preview = await service.PreviewPeriodReviewAsync(BuildDraft(true));
         ComparisonSummary = preview.Comparison.Summary;
-        ComparisonPlannedEnding = Money(
-            preview.Comparison.PlannedEndingSavings,
-            2);
-        ComparisonActualEnding = Money(
-            preview.Comparison.ActualEndingSavings,
-            2);
-        ComparisonDifference = SignedMoney(
-            preview.Comparison.Difference);
+        ComparisonPlannedEnding = Money(preview.Comparison.PlannedEndingSavings, 2);
+        ComparisonActualEnding = Money(preview.Comparison.ActualEndingSavings, 2);
+        ComparisonDifference = SignedMoney(preview.Comparison.Difference);
         ComparisonLines.Clear();
         foreach (var line in preview.Comparison.Lines)
         {
@@ -377,27 +278,22 @@ public partial class PeriodReviewWizardViewModel(
 
     private PeriodReviewDraft BuildDraft(bool includeConfirmedSavings)
     {
-        var context = _context ?? throw new InvalidOperationException(
-            "Dönem bilgisi henüz yüklenmedi.");
+        var context = _context ?? throw new InvalidOperationException("Dönem bilgisi henüz yüklenmedi.");
         var paymentDrafts = Payments.Select(item =>
         {
             var status = item.SelectedStatus?.Value
-                ?? throw new InvalidOperationException(
-                    $"{item.Name} için ödeme durumu seçilmelidir.");
+                ?? throw new InvalidOperationException($"{item.Name} için ödeme durumu seçilmelidir.");
             var amount = status == ActualPaymentStatus.Unpaid
                 ? 0m
                 : string.IsNullOrWhiteSpace(item.ActualAmount)
                     ? item.PlannedAmountValue ??
-                      throw new InvalidOperationException(
-                          $"{item.Name} için ödediğin tutarı yazmalısın.")
+                      throw new InvalidOperationException($"{item.Name} için ödediğin tutarı yazmalısın.")
                     : ParseMoney(item.ActualAmount, $"{item.Name} gerçek ödeme");
             return new ActualPaymentDraft(
                 item.PlanLineId,
                 status,
                 amount,
-                status == ActualPaymentStatus.Unpaid
-                    ? null
-                    : DateOnly.FromDateTime(item.ActualDate),
+                status == ActualPaymentStatus.Unpaid ? null : DateOnly.FromDateTime(item.ActualDate),
                 item.Note);
         }).ToArray();
         var living = string.IsNullOrWhiteSpace(ActualLivingSpend)
@@ -414,137 +310,17 @@ public partial class PeriodReviewWizardViewModel(
             Breakdown("Eğlence", EntertainmentAmount),
             Breakdown("Diğer", OtherLivingAmount)
         }.Where(x => x.Amount > 0m).ToArray();
-        // Boş başlangıç durumu hesaplanan öneriyi kabul eder.
-        decimal? confirmed = includeConfirmedSavings &&
-                             !string.IsNullOrWhiteSpace(CurrentStartingSavings)
-            ? ParseMoney(
-                CurrentStartingSavings,
-                "Yeni planlama başlangıç durumu")
+        decimal? confirmed = includeConfirmedSavings && !string.IsNullOrWhiteSpace(CurrentStartingSavings)
+            ? ParseMoney(CurrentStartingSavings, "Yeni planlama başlangıç durumu")
             : null;
         return new PeriodReviewDraft(
             context.OriginalPlan.Id,
             paymentDrafts,
             living,
             interest,
-            Flows.Select(x => new ActualFlowDraft(
-                x.Type,
-                x.Name,
-                x.Category,
-                x.Date,
-                x.Amount)).ToArray(),
+            Flows.Select(x => new ActualFlowDraft(x.Type, x.Name, x.Category, x.Date, x.Amount)).ToArray(),
             breakdown,
             confirmed,
             string.Empty);
-    }
-
-    private LivingBreakdownDraft Breakdown(string category, string amount) =>
-        new(
-            category,
-            string.IsNullOrWhiteSpace(amount)
-                ? 0m
-                : ParseMoney(amount, category));
-
-    private void AddFlow(
-        ActualFlowType type,
-        string name,
-        string category,
-        DateTime date,
-        string amountText)
-    {
-        try
-        {
-            var amount = ParseMoney(
-                amountText,
-                type == ActualFlowType.UnplannedIncome
-                    ? "Gelir tutarı"
-                    : "Ödeme tutarı");
-            if (string.IsNullOrWhiteSpace(name) || amount <= 0m)
-            {
-                throw new InvalidOperationException(
-                    "Ad ve sıfırdan büyük tutar gereklidir.");
-            }
-
-            Flows.Add(new ActualFlowInputItem(
-                Guid.NewGuid(),
-                type,
-                name.Trim(),
-                string.IsNullOrWhiteSpace(category)
-                    ? type == ActualFlowType.UnplannedIncome ? "Ek gelir" : "Diğer"
-                    : category.Trim(),
-                DateOnly.FromDateTime(date),
-                amount));
-            OnPropertyChanged(nameof(HasFlows));
-            SetStatus(string.Empty);
-        }
-        catch (Exception exception)
-        {
-            SetStatus(UserFacingMessages.FromException(exception));
-        }
-    }
-
-    partial void OnCurrentStepChanged(int value) => NotifyStepProperties();
-    partial void OnIsSuccessChanged(bool value) => NotifyStepProperties();
-    private void NotifyStepProperties()
-    {
-        OnPropertyChanged(nameof(IsStep1));
-        OnPropertyChanged(nameof(IsStep2));
-        OnPropertyChanged(nameof(IsStep3));
-        OnPropertyChanged(nameof(IsReviewVisible));
-        OnPropertyChanged(nameof(PlanIndicator));
-        OnPropertyChanged(nameof(ActualIndicator));
-        OnPropertyChanged(nameof(ResultIndicator));
-    }
-
-    private static string SignedMoney(decimal value) =>
-        $"{(value > 0m ? "+" : string.Empty)}{value.ToString("N2", CultureInfo.GetCultureInfo("tr-TR"))} TL";
-
-    private static IReadOnlyList<PeriodPlanPaymentLine> FinalPaymentLines(
-        PeriodPlanSnapshot plan,
-        PeriodPlanRevision? revision) =>
-        revision?.PaymentLines.Count > 0
-            ? revision.PaymentLines
-            : plan.PaymentLines;
-
-    private sealed record FinalPlanValues(
-        decimal PlannedIncome,
-        decimal PlannedLoanPayments,
-        decimal PlannedCardPayments,
-        decimal PlannedTemporaryPayments,
-        decimal PlannedInstallmentPayments,
-        decimal PlannedOtherScheduledPayments,
-        decimal PlannedLargeExpenses,
-        decimal PlannedLivingBudget,
-        decimal PlannedInterest,
-        decimal PlannedDeficitInterest,
-        decimal PlannedEndingSavings)
-    {
-        public static FinalPlanValues From(
-            PeriodPlanSnapshot plan,
-            PeriodPlanRevision? revision) => revision is null
-            ? new FinalPlanValues(
-                plan.PlannedIncome,
-                plan.PlannedLoanPayments,
-                plan.PlannedCardPayments,
-                plan.PlannedTemporaryPayments,
-                plan.PlannedInstallmentPayments,
-                plan.PlannedOtherScheduledPayments,
-                plan.PlannedLargeExpenses,
-                plan.PlannedLivingBudget,
-                plan.PlannedCardInterest + plan.PlannedDeficitInterest,
-                plan.PlannedDeficitInterest,
-                plan.PlannedEndingSavings)
-            : new FinalPlanValues(
-                revision.PlannedIncome,
-                revision.PlannedLoanPayments,
-                revision.PlannedCardPayments,
-                revision.PlannedTemporaryPayments,
-                revision.PlannedInstallmentPayments,
-                revision.PlannedOtherScheduledPayments,
-                revision.PlannedLargeExpenses,
-                revision.PlannedLivingBudget,
-                revision.PlannedCardInterest +
-                revision.PlannedDeficitInterest,
-                revision.PlannedDeficitInterest,
-                revision.PlannedEndingSavings);
     }
 }

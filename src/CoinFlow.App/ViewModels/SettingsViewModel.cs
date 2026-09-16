@@ -12,17 +12,15 @@ namespace CoinFlow.App.ViewModels;
 public partial class SettingsViewModel(
     CoinFlowService service,
     BackupService backup,
-    IUserFeedbackService feedback) : ViewModelBase
+    IUserFeedbackService feedback,
+    INavigationService navigation) : ViewModelBase
 {
-    // Mevcut tutar ve çapa artık Ana Sayfa'dan güncelleniyor; burada yalnız
-    // olduğu gibi geri yazılabilsin diye tutuluyorlar.
     private DateOnly _projectionAnchorDate;
     private decimal _projectionStartingSavings;
     private PaymentAssignmentStrategy? _pendingStrategy;
     private bool _settingsLoaded;
     private bool _isUpdatingSettingsForm;
-    private SettingsFormSnapshot _savedSettingsSnapshot =
-        SettingsFormSnapshot.Empty;
+    private SettingsFormSnapshot _savedSettingsSnapshot = SettingsFormSnapshot.Empty;
 
     public ObservableCollection<StrategyHistoryLine> StrategyHistory { get; } = [];
     public IReadOnlyList<SelectionOption<PaymentAssignmentMode>> StrategyModes { get; } =
@@ -58,14 +56,12 @@ public partial class SettingsViewModel(
 
     public bool NeedsBackupAccess => !HasBackupAccess;
 
-    partial void OnHasBackupAccessChanged(bool value) =>
-        OnPropertyChanged(nameof(NeedsBackupAccess));
-
-    public async Task RequestBackupAccessAsync()
-    {
-        await backup.RequestAccessAsync();
-        await LoadBackupStateAsync();
-    }
+    partial void OnHasBackupAccessChanged(bool value) => OnPropertyChanged(nameof(NeedsBackupAccess));
+    partial void OnSalaryDayChanged(string value) => RefreshSettingsDirtyState();
+    partial void OnMonthlyLivingBudgetChanged(string value) => RefreshSettingsDirtyState();
+    partial void OnCreditCardCarryInterestRateChanged(string value) => RefreshSettingsDirtyState();
+    partial void OnDeficitFinancingInterestRateChanged(string value) => RefreshSettingsDirtyState();
+    partial void OnIsSettingsDirtyChanged(bool value) => SaveCommand.NotifyCanExecuteChanged();
 
     public bool IsDevelopment => BuildInfo.IsDevelopment;
     public string BuildChannel => BuildInfo.Channel;
@@ -73,67 +69,6 @@ public partial class SettingsViewModel(
     public string CommitText => $"Commit {BuildInfo.Commit}";
     public string BuildText => $"Build #{BuildInfo.BuildNumber}";
     public bool CanSaveSettings => IsSettingsDirty && !IsBusy;
-
-    partial void OnSalaryDayChanged(string value) =>
-        RefreshSettingsDirtyState();
-
-    partial void OnMonthlyLivingBudgetChanged(string value) =>
-        RefreshSettingsDirtyState();
-
-    partial void OnCreditCardCarryInterestRateChanged(string value) =>
-        RefreshSettingsDirtyState();
-
-    partial void OnDeficitFinancingInterestRateChanged(string value) =>
-        RefreshSettingsDirtyState();
-
-    partial void OnIsSettingsDirtyChanged(bool value) =>
-        SaveCommand.NotifyCanExecuteChanged();
-
-    public async Task BackUpNowAsync()
-    {
-        if (IsBusy)
-        {
-            return;
-        }
-
-        try
-        {
-            IsBusy = true;
-            var result = await backup.BackUpNowAsync();
-            await LoadBackupStateAsync();
-            if (result.Outcome == BackupOutcome.Created)
-            {
-                await feedback.ShowSuccessAsync(
-                    $"Bütün profiller {backup.LocationDescription} klasörüne yedeklendi: {result.State!.FileName}",
-                    title: "Yedeklendi");
-            }
-            else if (result.Outcome == BackupOutcome.NoAccess)
-            {
-                await feedback.ShowErrorAsync(
-                    "Yedek klasörüne erişim izni yok. \"İzin Ver\" ile açabilirsin.",
-                    title: "Yedeklenemedi");
-            }
-        }
-        catch (Exception exception)
-        {
-            await feedback.ShowErrorAsync(
-                UserFacingMessages.FromException(exception),
-                title: "Yedeklenemedi");
-        }
-        finally
-        {
-            IsBusy = false;
-        }
-    }
-
-    private async Task LoadBackupStateAsync()
-    {
-        HasBackupAccess = backup.HasAccess;
-        var state = await backup.GetLastBackupAsync();
-        LastBackupText = state is null
-            ? "Henüz yedek alınmadı."
-            : $"Son yedek: {state.BackedUpAt.ToLocalTime().ToString("d MMMM yyyy HH:mm", TurkishCulture)} · {state.FileName}";
-    }
 
     public async Task LoadAsync()
     {
@@ -145,15 +80,12 @@ public partial class SettingsViewModel(
 
         CanManageStrategy = overview.Current is not null;
         HasNoStrategy = !CanManageStrategy;
-        CurrentStrategyText = overview.Current is null
-            ? "Henüz seçilmedi"
-            : ModeText(overview.Current.Mode);
+        CurrentStrategyText = overview.Current is null ? "Henüz seçilmedi" : ModeText(overview.Current.Mode);
         CurrentStrategySinceText = overview.Current is null
             ? plan.Salaries.Count == 0
                 ? "İlk gelirini eklediğinde kullanım düzenini seçersin."
                 : "Gelir kullanım düzenini seçerek 12 dönemlik planı tamamla."
-            : overview.Current.EffectiveFromSalaryDate >
-              DateOnly.FromDateTime(DateTime.Today)
+            : overview.Current.EffectiveFromSalaryDate > DateOnly.FromDateTime(DateTime.Today)
                 ? $"{overview.Current.EffectiveFromSalaryDate.ToString("dd MMMM yyyy", TurkishCulture)} döneminden itibaren"
                 : $"{overview.Current.EffectiveFromSalaryDate.ToString("dd MMMM yyyy", TurkishCulture)} döneminden beri";
         _pendingStrategy = overview.Pending;
@@ -163,17 +95,14 @@ public partial class SettingsViewModel(
             : $"{overview.Pending.EffectiveFromSalaryDate.ToString("dd MMMM yyyy", TurkishCulture)} döneminden itibaren {ModeText(overview.Pending.Mode)}";
 
         StrategyHistory.Clear();
-        foreach (var strategy in overview.History.OrderByDescending(x =>
-                     x.EffectiveFromSalaryDate))
+        foreach (var strategy in overview.History.OrderByDescending(x => x.EffectiveFromSalaryDate))
         {
             StrategyHistory.Add(new StrategyHistoryLine(
                 strategy.Id,
-                strategy.EffectiveFromSalaryDate.ToString(
-                    "dd MMMM yyyy", TurkishCulture),
+                strategy.EffectiveFromSalaryDate.ToString("dd MMMM yyyy", TurkishCulture),
                 ModeText(strategy.Mode),
                 strategy.Note,
-                strategy.EffectiveFromSalaryDate > DateOnly.FromDateTime(
-                    DateTime.Today)));
+                strategy.EffectiveFromSalaryDate > DateOnly.FromDateTime(DateTime.Today)));
         }
 
         EffectiveSalaryDates.Clear();
@@ -188,122 +117,13 @@ public partial class SettingsViewModel(
                           (overview.Current is null
                               ? PaymentAssignmentMode.UpcomingPeriod
                               : Opposite(overview.Current.Mode));
-        SelectedStrategyMode = StrategyModes.First(x =>
-            x.Value == defaultMode);
+        SelectedStrategyMode = StrategyModes.First(x => x.Value == defaultMode);
         SelectedEffectiveSalary = overview.Pending is null
             ? EffectiveSalaryDates.FirstOrDefault()
-            : EffectiveSalaryDates.FirstOrDefault(x =>
-                  x.Value == overview.Pending.EffectiveFromSalaryDate) ??
+            : EffectiveSalaryDates.FirstOrDefault(x => x.Value == overview.Pending.EffectiveFromSalaryDate) ??
               EffectiveSalaryDates.FirstOrDefault();
         StrategyNote = overview.Pending?.Note ?? "Planlanan düzen değişikliği";
         HasPreview = false;
-    }
-
-    public void PrepareStrategyEditor()
-    {
-        if (!CanManageStrategy)
-        {
-            SetStatus(
-                "Önce gelirini ekleyip ilk gelir kullanım düzenini seçmelisin.");
-            return;
-        }
-
-        HasPreview = false;
-        SetStatus(string.Empty);
-    }
-
-    [RelayCommand]
-    private Task OpenCommitmentsAsync() =>
-        Shell.Current.GoToAsync("//commitments/commitments-content");
-
-    [RelayCommand]
-    private async Task PreviewStrategyAsync()
-    {
-        try
-        {
-            var preview = await service.PreviewPaymentAssignmentStrategyAsync(
-                SelectedStrategyMode?.Value ?? throw new InvalidOperationException(
-                    "Yeni düzen seçilmelidir."),
-                SelectedEffectiveSalary?.Value ?? throw new InvalidOperationException(
-                    "Geçerli dönem tarihi seçilmelidir."));
-            PreviewText = string.Join(Environment.NewLine,
-                $"Başlangıç dönemi: {preview.EffectiveSalaryDate:dd.MM.yyyy}",
-                $"Mevcut düzen: {ModeText(preview.CurrentMode)}",
-                $"Yeni düzen: {ModeText(preview.NewMode)}",
-                $"Normal zorunlu ödemeler: {Money(preview.Baseline.MandatoryOutflow)}",
-                $"Geçmiş düzenden kapanacak: {Money(preview.Scenario.TransitionCatchUpAmount)}",
-                $"Yeni dönem için ayrılacak: {Money(preview.Scenario.ForwardFundedAmount)}",
-                $"Toplam geçiş yükü: {Money(preview.TotalTransitionBurden)}",
-                $"Dönem neti: {Money(preview.Scenario.EstimatedSavingsCapacity)}",
-                $"Dönem sonu durumu: {Money(preview.Scenario.EndingProjectedSavings)}",
-                preview.FinancingGap < 0m
-                    ? $"Finansman açığı: {Money(preview.FinancingGap)}"
-                    : "Finansman açığı oluşmuyor.");
-            HasPreview = true;
-            SetStatus(string.Empty);
-        }
-        catch (Exception exception)
-        {
-            HasPreview = false;
-            SetStatus(UserFacingMessages.FromException(exception));
-        }
-    }
-
-    public async Task<bool> ApplyStrategyAsync()
-    {
-        try
-        {
-            var date = SelectedEffectiveSalary?.Value ??
-                       throw new InvalidOperationException(
-                           "Geçerli dönem tarihi seçilmelidir.");
-            var mode = SelectedStrategyMode?.Value ??
-                       throw new InvalidOperationException(
-                           "Yeni düzen seçilmelidir.");
-            await service.SavePaymentAssignmentStrategyAsync(
-                new PaymentAssignmentStrategy
-                {
-                    Id = _pendingStrategy?.Id ?? Guid.NewGuid(),
-                    Mode = mode,
-                    EffectiveFromSalaryDate = date,
-                    Note = StrategyNote.Trim()
-            });
-            await LoadAsync();
-            SetStatus(string.Empty);
-            await feedback.ShowSuccessAsync(
-                "Gelir kullanım düzeni planlandı.");
-            return true;
-        }
-        catch (Exception exception)
-        {
-            var message = UserFacingMessages.FromException(exception);
-            SetStatus(message);
-            await feedback.ShowErrorAsync(message);
-            return false;
-        }
-    }
-
-    public async Task<bool> DeletePendingStrategyAsync()
-    {
-        if (_pendingStrategy is null)
-        {
-            return false;
-        }
-
-        try
-        {
-            await service.DeletePaymentAssignmentStrategyAsync(
-                _pendingStrategy.Id);
-            await LoadAsync();
-            SetStatus(string.Empty);
-            return true;
-        }
-        catch (Exception exception)
-        {
-            var message = UserFacingMessages.FromException(exception);
-            SetStatus(message);
-            await feedback.ShowErrorAsync(message);
-            return false;
-        }
     }
 
     [RelayCommand(CanExecute = nameof(CanSaveSettings))]
@@ -342,82 +162,21 @@ public partial class SettingsViewModel(
         }
     }
 
-    public async Task<bool> ClearDevelopmentDataAsync()
-    {
-        if (!IsDevelopment)
-        {
-            SetStatus("Bu işlem yalnızca geliştirme sürümünde kullanılabilir.");
-            return false;
-        }
-
-        try
-        {
-            await service.ClearDevelopmentDataAsync();
-            await LoadAsync();
-            SetStatus(string.Empty);
-            await feedback.ShowSuccessAsync(
-                "Tüm veriler silindi.",
-                title: "Tamamlandı");
-            return true;
-        }
-        catch (Exception exception)
-        {
-            var message = UserFacingMessages.FromException(exception);
-            SetStatus(message);
-            await feedback.ShowErrorAsync(message);
-            return false;
-        }
-    }
-
-    public async Task<bool> LoadCanonicalSeedAsync()
-    {
-        if (!IsDevelopment)
-        {
-            SetStatus("Bu işlem yalnızca geliştirme sürümünde kullanılabilir.");
-            return false;
-        }
-
-        try
-        {
-            await service.LoadCanonicalDevelopmentDataAsync();
-            await LoadAsync();
-            SetStatus(string.Empty);
-            await feedback.ShowSuccessAsync(
-                "Test verisi yüklendi.",
-                title: "Tamamlandı");
-            return true;
-        }
-        catch (Exception exception)
-        {
-            var message = UserFacingMessages.FromException(exception);
-            SetStatus(message);
-            await feedback.ShowErrorAsync(message);
-            return false;
-        }
-    }
-
     private UserSettings BuildSettingsFromForm()
     {
         if (!int.TryParse(SalaryDay, out var day) || day is < 1 or > 31)
         {
-            throw new InvalidOperationException(
-                "Dönem günü 1 ile 31 arasında olmalıdır.");
+            throw new InvalidOperationException("Dönem günü 1 ile 31 arasında olmalıdır.");
         }
 
         return new UserSettings
         {
             SalaryDay = day,
-            MonthlyLivingBudget = ParseMoney(
-                MonthlyLivingBudget,
-                "Aylık tahmini yaşam bütçesi"),
+            MonthlyLivingBudget = ParseMoney(MonthlyLivingBudget, "Aylık tahmini yaşam bütçesi"),
             ProjectionStartingSavings = _projectionStartingSavings,
             ProjectionAnchorDate = _projectionAnchorDate,
-            CreditCardCarryInterestRate = ParseRate(
-                CreditCardCarryInterestRate,
-                "Kredi kartı devreden borç faizi"),
-            DeficitFinancingInterestRate = ParseRate(
-                DeficitFinancingInterestRate,
-                "Finansman açığı faizi")
+            CreditCardCarryInterestRate = ParseRate(CreditCardCarryInterestRate, "Kredi kartı devreden borç faizi"),
+            DeficitFinancingInterestRate = ParseRate(DeficitFinancingInterestRate, "Finansman açığı faizi")
         };
     }
 
@@ -426,15 +185,10 @@ public partial class SettingsViewModel(
         _isUpdatingSettingsForm = true;
         _projectionAnchorDate = settings.ProjectionAnchorDate;
         SalaryDay = settings.SalaryDay.ToString(TurkishCulture);
-        MonthlyLivingBudget = settings.MonthlyLivingBudget
-            .ToString("N2", TurkishCulture);
+        MonthlyLivingBudget = settings.MonthlyLivingBudget.ToString("N2", TurkishCulture);
         _projectionStartingSavings = settings.ProjectionStartingSavings;
-        CreditCardCarryInterestRate =
-            (settings.CreditCardCarryInterestRate * 100m)
-            .ToString("N2", TurkishCulture);
-        DeficitFinancingInterestRate =
-            (settings.DeficitFinancingInterestRate * 100m)
-            .ToString("N2", TurkishCulture);
+        CreditCardCarryInterestRate = (settings.CreditCardCarryInterestRate * 100m).ToString("N2", TurkishCulture);
+        DeficitFinancingInterestRate = (settings.DeficitFinancingInterestRate * 100m).ToString("N2", TurkishCulture);
         _isUpdatingSettingsForm = false;
 
         _savedSettingsSnapshot = CaptureSettingsSnapshot();
@@ -445,33 +199,17 @@ public partial class SettingsViewModel(
 
     private void RefreshSettingsDirtyState()
     {
-        if (_isUpdatingSettingsForm || !_settingsLoaded)
-        {
-            return;
-        }
-
-        IsSettingsDirty =
-            CaptureSettingsSnapshot() != _savedSettingsSnapshot;
+        if (_isUpdatingSettingsForm || !_settingsLoaded) return;
+        IsSettingsDirty = CaptureSettingsSnapshot() != _savedSettingsSnapshot;
         SaveCommand.NotifyCanExecuteChanged();
     }
-
-    private static PaymentAssignmentMode Opposite(PaymentAssignmentMode mode) =>
-        mode == PaymentAssignmentMode.PreviousPeriod
-            ? PaymentAssignmentMode.UpcomingPeriod
-            : PaymentAssignmentMode.PreviousPeriod;
-
-    private static string ModeText(PaymentAssignmentMode mode) =>
-        mode == PaymentAssignmentMode.PreviousPeriod
-            ? "Geçmiş dönemi kapatırım"
-            : "Gelecek dönemi karşılarım";
 
     private static decimal ParseRate(string value, string field)
     {
         var percentage = ParseMoney(value, field);
         if (percentage is < 0m or > 100m)
         {
-            throw new InvalidOperationException(
-                $"{field} %0 ile %100 arasında olmalıdır.");
+            throw new InvalidOperationException($"{field} %0 ile %100 arasında olmalıdır.");
         }
 
         return percentage / 100m;

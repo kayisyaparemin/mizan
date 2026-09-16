@@ -7,12 +7,16 @@ public partial class OnboardingPage : ContentPage
 {
     private readonly TaskCompletionSource<bool> _completion = new();
     private readonly OnboardingViewModel _viewModel;
+    private readonly INavigationService _navigation;
     private bool _isClosing;
 
-    public OnboardingPage(OnboardingViewModel viewModel)
+    public OnboardingPage(
+        OnboardingViewModel viewModel,
+        INavigationService navigation)
     {
         InitializeComponent();
         BindingContext = _viewModel = viewModel;
+        _navigation = navigation;
         _viewModel.Completed += OnCompleted;
     }
 
@@ -30,11 +34,11 @@ public partial class OnboardingPage : ContentPage
         _viewModel.Completed -= OnCompleted;
         if (Navigation.ModalStack.Count > 0)
         {
-            await Navigation.PopModalAsync();
+            await _navigation.PopModalAsync();
         }
         else
         {
-            await Shell.Current.GoToAsync("//dashboard/dashboard-content");
+            await _navigation.NavigateToAsync(NavigationRoutes.Dashboard);
         }
     }
 

@@ -6,15 +6,15 @@ namespace CoinFlow.App.Pages;
 public partial class HistoryPage : ContentPage
 {
     private readonly HistoryViewModel _viewModel;
-    private readonly IServiceProvider _services;
+    private readonly INavigationService _navigation;
 
     public HistoryPage(
         HistoryViewModel viewModel,
-        IServiceProvider services)
+        INavigationService navigation)
     {
         InitializeComponent();
         BindingContext = _viewModel = viewModel;
-        _services = services;
+        _navigation = navigation;
     }
 
     protected override async void OnAppearing()
@@ -34,8 +34,6 @@ public partial class HistoryPage : ContentPage
         }
 
         ((CollectionView)sender!).SelectedItem = null;
-        var page = _services.GetRequiredService<HistoryDetailPage>();
-        await page.LoadAsync(selected.ActualId);
-        await Navigation.PushModalAsync(new NavigationPage(page));
+        await _navigation.OpenHistoryDetailModalAsync(selected.ActualId);
     }
 }

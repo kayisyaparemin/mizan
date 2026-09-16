@@ -21,7 +21,7 @@ public sealed class PaymentReminderAppSourceTests
     [Fact]
     public void Receivers_HaveStableJavaNames_AndTheBootReceiverListensForRebootAndUpdate()
     {
-        var source = Read("Platforms", "Android", "PaymentReminders.cs");
+        var source = ReadAndroidReminderSources();
 
         Assert.Contains("Name = \"com.coinflow.mobile.PaymentReminderReceiver\"", source);
         Assert.Contains("Name = \"com.coinflow.mobile.PaymentReminderBootReceiver\"", source);
@@ -138,7 +138,7 @@ public sealed class PaymentReminderAppSourceTests
     [Fact]
     public void Notification_HasPaidAndSnoozeButtons_ThatQueueTheAnswerWithoutOpeningTheDatabase()
     {
-        var source = Read("Platforms", "Android", "PaymentReminders.cs");
+        var source = ReadAndroidReminderSources();
 
         Assert.Contains("Name = \"com.coinflow.mobile.PaymentReminderActionReceiver\"", source);
         Assert.Contains("\"Ödedim\"", source);
@@ -187,6 +187,11 @@ public sealed class PaymentReminderAppSourceTests
     private static string Read(params string[] parts) =>
         File.ReadAllText(Path.Combine(
             [RepositoryRoot(), "src", "CoinFlow.App", .. parts]));
+
+    private static string ReadAndroidReminderSources() =>
+        string.Join("\n", Directory.GetFiles(
+            Path.Combine([RepositoryRoot(), "src", "CoinFlow.App", "Platforms", "Android"]),
+            "PaymentReminder*.cs").Select(File.ReadAllText));
 
     private static string RepositoryRoot()
     {

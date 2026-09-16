@@ -10,7 +10,8 @@ using CoinFlow.Domain.Calculations;
 namespace CoinFlow.App.ViewModels;
 
 public partial class FutureMonthsViewModel(
-    CoinFlowService service) : ViewModelBase
+    CoinFlowService service,
+    INavigationService navigation) : ViewModelBase
 {
     public ObservableCollection<ProjectionLine> Periods { get; } = [];
     public ObservableCollection<LoanAdviceLine> LoanAdvice { get; } = [];
@@ -112,7 +113,7 @@ public partial class FutureMonthsViewModel(
 
     [RelayCommand]
     private Task OpenCommitmentsAsync() =>
-        Shell.Current.GoToAsync("//commitments/commitments-content");
+        navigation.NavigateToAsync(NavigationRoutes.Commitments);
 
     [RelayCommand]
     private async Task OpenPeriodDetailAsync(ProjectionLine? line)
@@ -122,9 +123,9 @@ public partial class FutureMonthsViewModel(
             return;
         }
 
-        await Shell.Current.GoToAsync(
-            AppShell.PeriodDetailRoute,
-            new ShellNavigationQueryParameters
+        await navigation.NavigateToAsync(
+            NavigationRoutes.SalaryPeriodDetail,
+            new Dictionary<string, object>
             {
                 [SalaryPeriodDetailViewModel.DetailQueryKey] =
                     new SalaryPeriodDetailRequest(line.Projection)
@@ -174,7 +175,7 @@ public partial class FutureMonthsViewModel(
 
     [RelayCommand]
     private Task OpenCurrentPeriodAsync() =>
-        Shell.Current.GoToAsync("//dashboard/dashboard-content");
+        navigation.NavigateToAsync(NavigationRoutes.Dashboard);
 
     private async Task RefreshDeviationNoticeAsync()
     {
@@ -282,13 +283,13 @@ public partial class FutureMonthsViewModel(
     [RelayCommand]
     private Task TryLoanClosureAsync(LoanAdviceLine? line) =>
         line is { IsRecommended: true, Date: { } date }
-            ? Shell.Current.GoToAsync(
-                $"//simulation/simulation-content?closeLoan={line.LoanId:D}&date={date:yyyy-MM-dd}")
+            ? navigation.NavigateToAsync(
+                $"{NavigationRoutes.Simulation}?closeLoan={line.LoanId:D}&date={date:yyyy-MM-dd}")
             : Task.CompletedTask;
 
     [RelayCommand]
     private Task EditLoansAsync() =>
-        Shell.Current.GoToAsync("//commitments/commitments-content?section=payment");
+        navigation.NavigateToAsync($"{NavigationRoutes.Commitments}?section=payment");
 
     private static string PeriodTitle(SalaryPeriodProjection row) =>
         $"{row.PeriodStart.ToString("dd MMMM yyyy", TurkishCulture)} Dönemi";

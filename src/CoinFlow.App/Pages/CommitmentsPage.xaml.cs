@@ -12,14 +12,17 @@ public partial class CommitmentsPage : ContentPage, IQueryAttributable
     private Guid? _requestedCardId;
     private bool _requestedCardDetailsEdit;
     private readonly IUserFeedbackService _feedback;
+    private readonly INavigationService _navigation;
 
     public CommitmentsPage(
         CommitmentsViewModel viewModel,
-        IUserFeedbackService feedback)
+        IUserFeedbackService feedback,
+        INavigationService navigation)
     {
         InitializeComponent();
         BindingContext = _viewModel = viewModel;
         _feedback = feedback;
+        _navigation = navigation;
         _viewModel.InitialStrategySetupRequested +=
             OnInitialStrategySetupRequested;
     }
@@ -35,9 +38,7 @@ public partial class CommitmentsPage : ContentPage, IQueryAttributable
         _isShowingInitialStrategySetup = true;
         try
         {
-            var page = new InitialStrategyPage(setup, _viewModel);
-            await Navigation.PushModalAsync(page);
-            await page.Completion;
+            await _navigation.OpenInitialStrategyModalAsync(setup, _viewModel);
         }
         finally
         {
@@ -151,9 +152,9 @@ public partial class CommitmentsPage : ContentPage, IQueryAttributable
     }
 
     private Task OpenCardControlAsync(Guid cardId) =>
-        Shell.Current.GoToAsync(
-            AppShell.CardControlRoute,
-            new ShellNavigationQueryParameters
+        _navigation.NavigateToAsync(
+            NavigationRoutes.CardControl,
+            new Dictionary<string, object>
             {
                 [CardControlViewModel.CardIdQueryKey] = cardId.ToString("D")
             });

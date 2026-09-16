@@ -7,14 +7,17 @@ public partial class PeriodReviewPage : ContentPage
 {
     private readonly PeriodReviewWizardViewModel _viewModel;
     private readonly IUserFeedbackService _feedback;
+    private readonly INavigationService _navigation;
 
     public PeriodReviewPage(
         PeriodReviewWizardViewModel viewModel,
-        IUserFeedbackService feedback)
+        IUserFeedbackService feedback,
+        INavigationService navigation)
     {
         InitializeComponent();
         BindingContext = _viewModel = viewModel;
         _feedback = feedback;
+        _navigation = navigation;
     }
 
     protected override async void OnAppearing()
@@ -47,18 +50,18 @@ public partial class PeriodReviewPage : ContentPage
             }
         }
 
-        await Navigation.PopModalAsync();
+        await _navigation.PopModalAsync();
     }
 
     private async void OnViewPlanClicked(object? sender, EventArgs e)
     {
-        await Navigation.PopModalAsync();
-        await Shell.Current.GoToAsync("//projection/future-months-content");
+        await _navigation.PopModalAsync();
+        await _navigation.NavigateToAsync(NavigationRoutes.FutureMonths);
     }
 
     private async void OnReturnHomeClicked(object? sender, EventArgs e)
     {
-        await Navigation.PopModalAsync();
-        await Shell.Current.GoToAsync("//dashboard/dashboard-content");
+        await _navigation.PopModalAsync();
+        await _navigation.NavigateToAsync(NavigationRoutes.Dashboard);
     }
 }

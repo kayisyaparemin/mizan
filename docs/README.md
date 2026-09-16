@@ -127,6 +127,11 @@ dotnet publish src/CoinFlow.App/CoinFlow.App.csproj -f net8.0-android -c Release
 
 SQLite şema sürümü 17'dir (`SqliteCoinFlowStore.CurrentSchemaVersion`): v10 kesilmiş kart ekstresi içe aktarma, v11 kart ödeme tercihi geçmişi, v12 geçici planlar, v13 dönem gözlemi, v14 kredi türü ve tarihli kapatma tutarı, v15 kredi erken ödeme olayları, v16 ödeme günü hatırlatıcısı ayarı, v17 hatırlatıcı defteri ("Ödedim" / "Ertele" cevapları). v12–v17 ayrıntıları [mimari belgede](ARCHITECTURE.md). Aşağısı v7–v9 tarihçesidir. v8 additive migration snapshot, frozen plan, revision, actual payment/flow ve living breakdown tablolarını ekler; mevcut finans tablolarını drop etmez. Upgrade olan kullanıcıda ilk plan okunurken mevcut canonical durumdan tek bir initial snapshot üretilir; geçmiş aylar için actual uydurulmaz. Önceki build'in 20 Ağustos snapshot'ını yanlışlıkla 10 Ekim'e bağlayan tamamlanmamış planı, ilk okumada 20 Ağustos–10 Eylül planıyla atomik olarak değiştirilir; canonical kullanıcı verileri ve tamamlanmış history değiştirilmez. v7 migration iki planlama faiz varsayımını `%5,00` ile başlatmaya devam eder. Eski global ödeme atama değeri bir kez ilk strategy history kaydına dönüştürülür ve runtime source of truth olmaktan çıkar. Eski kart aggregate alanları yeni kart modeline aktarılır. Kaldırılan mikro harcama, balance snapshot ve acil fon tabloları upgrade sırasında düşürülür.
 
+## Mimari ve Standartlar
+
+Uygulamanın mimari kuralları, katman bağımlılıkları ve Clean Architecture standartları [ARCHITECTURAL_RULES.md](ARCHITECTURAL_RULES.md) dosyasında tanımlanmıştır. Hesaplama kuralları ve domain detayları için [ARCHITECTURE.md](ARCHITECTURE.md) ve proje durum devir notu için [DURUM.md](DURUM.md) belgelerine bakabilirsiniz.
+
 ## CI/CD
 
 Mevcut GitHub Actions development ve stable workflow'ları korunmuştur. Development hattı test edip `Mizan-dev-latest.apk` prerelease asset'i üretir. Stable hattı repository secret'larındaki release keystore ile `Mizan-X.Y.Z.apk` üretir; release anahtarı repoya yazılmaz. Production signing key repository dışında korunmalı ve v1.0.0 sonrası tüm stable Android release'lerinde aynı key kullanılmalıdır.
+

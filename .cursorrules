@@ -1,0 +1,22 @@
+# Mizan Architectural Invariants & Rules
+
+When generating or modifying code in this repository, you MUST strictly adhere to:
+1. docs/ARCHITECTURAL_RULES.md
+2. ARCHITECTURE_RULES.md
+
+Summary of Critical Invariants:
+1. CLEAN ARCHITECTURE DEPENDENCY DIRECTION:
+   CoinFlow.App -> CoinFlow.UI -> CoinFlow.Application -> CoinFlow.Domain
+   Infrastructure -> Application + Domain
+   Domain and Application must NEVER depend on UI or presentation formatters.
+2. NO GOD VIEWMODELS:
+   ViewModels must not exceed 350 lines. Split large ViewModels into child ViewModels or component ViewModels.
+3. NO UI DEPENDENCIES IN VIEWMODELS:
+   ViewModels must never reference `Page`, `NavigationPage`, `Shell.Current`, `Window`, or MAUI UI Controls.
+   Use `INavigationService` and `IDialogService`.
+4. NO SERVICE LOCATOR:
+   Never inject `IServiceProvider` into ViewModels or Pages. Use constructor injection.
+5. NO ASYNC VOID:
+   All async methods in ViewModels and Services must return `Task` or `ValueTask`.
+6. NO CODE METRIC / FILE STRING TESTS:
+   Never write tests that read source code files using `File.ReadAllText`. Write real behavioral unit tests with mocks.
