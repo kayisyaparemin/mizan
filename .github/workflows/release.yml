@@ -9,7 +9,7 @@ on:
       version:
         description: Version name for signing smoke test
         required: false
-        default: '1.18.0'
+        default: '1.18.1'
 
 permissions:
   contents: write
@@ -199,18 +199,17 @@ jobs:
         run: |
           version="${{ steps.version.outputs.version }}"
           cat > release-notes.md <<NOTES
-          # Mizan $version — Clean Architecture & Modern MVVM
+          # Mizan $version — ANR Bug Fix (Soğuk Açılış Kilitlenme Düzeltmesi)
 
-          Bu sürümde uygulamanın mimarisi vibecoding kalıntılarından arındırılmış, Clean Architecture ve Modern MVVM mimarisine dönüştürülmüştür. Tüm finansal hesaplamalar ve iş mantığı %100 test güvencesiyle korunmuştur.
+          Bu sürümde, v1.18.0 mimari refactoring sonrasında uygulamanın soğuk açılışında yaşanan ANR ("Bu uygulama yanıt vermiyor") hatası düzeltilmiştir.
 
-          ### Mimari Yenilikler ve İyileştirmeler
+          ### Düzeltmeler ve İyileştirmeler
 
-          - **Clean Architecture Katmanlaşması:** Domain, Application, Infrastructure ve Presentation katman sınırları netleştirildi.
-          - **Modern MVVM & UI İzolasyonu:** ViewModel'lardaki `Shell.Current` ve `IServiceProvider` gibi tüm doğrudan UI bağımlılıkları temizlendi; navigasyon `INavigationService`, kullanıcı bildirimleri `UserFeedbackService` ile soyutlandı.
-          - **Interface Segregation (ISP):** 40'tan fazla metot içeren monolitik store arayüzü 10 odaklı repository arayüzüne (`ISalaryRepository`, `ILoanRepository`, vb.) ayrıştırıldı.
-          - **Tek Sorumluluk Prensibi (SRP):** 2.100 satırlık dev servis, odaklı use-case servislerine (`FinancialPlanQueryService`, `SimulationWorkflowService`, `PeriodWorkflowService`, `ObligationManagementService`) bölündü.
-          - **350 Satır Kuralı:** Projedeki tüm büyük sınıflar mantıksal partial modüllere bölünerek `src/` altındaki 204 C# dosyasının tamamı $\le 350$ satır sınırına getirildi (0 kural ihlali).
-          - **Tam Test Koruması:** 576/576 birim testi eksiksiz yeşildir.
+          - **UI Dispatcher ANR Kilitlenmesi Giderildi (`UserFeedbackService`):** UI thread'inde çalışırken gereksiz `InvokeOnMainThreadAsync` çağrısından kaynaklanan mesaj kuyruğu kilitlenmesi önlendi; doğrudan UI çağrısı sağlandı.
+          - **Pencere Geri Dönüşü (`CurrentPage`):** Soğuk açılışta `Shell.Current` null iken ve pencere henüz bağlanmamışken oluşan ekran referans sorunu `Application.Current.MainPage` fallback'i ile güvenceye alındı.
+          - **Modal Tamamlama Asenkron Kilidi Çözüldü (`MauiNavigationService`):** `OpenOnboardingModalAsync` ve `OpenInitialStrategyModalAsync` metotlarında modal `page.Completion` beklemesi `InvokeOnMainThreadAsync` dışına çıkarılarak ana iş parçacığının tıkanması engellendi.
+          - **Zaman Aşımı Koruma Kalkanı (`ProfileSelectionPage`):** Açılışta `Loaded` olayının kaçırılması veya gecikmesi riskine karşı 500 ms emniyet zaman aşımı eklendi.
+          - **Mimari ve Test Güvencesi:** 579/579 birim testi eksiksiz yeşildir; 0 uyarı ve 0 hata ile Release APK derlemesi doğrulanmıştır.
           NOTES
 
       - name: Upload signed APK artifact

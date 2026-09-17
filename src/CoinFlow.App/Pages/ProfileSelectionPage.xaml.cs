@@ -51,11 +51,11 @@ public partial class ProfileSelectionPage : ContentPage
         }
     }
 
-    private Task WhenLoadedAsync()
+    private async Task WhenLoadedAsync()
     {
         if (IsLoaded)
         {
-            return Task.CompletedTask;
+            return;
         }
 
         var loaded = new TaskCompletionSource();
@@ -66,7 +66,7 @@ public partial class ProfileSelectionPage : ContentPage
         }
 
         Loaded += OnLoaded;
-        return loaded.Task;
+        await Task.WhenAny(loaded.Task, Task.Delay(500));
     }
 
     private async void OnProfileTapped(object? sender, TappedEventArgs e)

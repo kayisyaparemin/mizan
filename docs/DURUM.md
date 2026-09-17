@@ -1,11 +1,11 @@
 # Mizan — Proje Durumu ve Devir Notu
 
-> Son güncelleme: 17.09.2026 · Son sürüm `v1.18.0`
+> Son güncelleme: 18.09.2026 · Son sürüm `v1.18.1`
 >
 > **Yeni bir sohbet/geliştirici buradan başlar.** Bu dosya tek devir
 > belgesidir; eski `HANDOFF.md` ve `TODO.md` kaldırıldı, hâlâ geçerli olan kısımları
 > burada (TODO tamamen bitmişti). Önce "Devir" bölümünü, sonra "Açık işler"i ve "Ürün invariant'ları"nı
-> oku. Sürüm bölümleri (v1.2.0 → v1.18.0) geriye dönük kayıttır; yalnız
+> oku. Sürüm bölümleri (v1.2.0 → v1.18.1) geriye dönük kayıttır; yalnız
 > dokunacağın alanın bölümünü oku.
 
 ## Devir
@@ -15,8 +15,8 @@
 | | |
 |---|---|
 | Branch | `main`, `origin/main` ile eşit, worktree yok (`git worktree list` yalnız `main`) |
-| Son sürüm | `v1.18.0` — Clean Architecture & Modern MVVM mimari refactoring, 350 satır sınıf limiti (%100 uyum), ISP repository ayrıştırması, UI/Navigasyon soyutlaması (`Mizan-1.18.0.apk`) |
-| Testler | 576/576 (`dotnet test`, ~9 sn) |
+| Son sürüm | `v1.18.1` — ANR Bug Fix (Soğuk açılış kilitlenme düzeltmesi), MainThread dispatcher emniyeti (`Mizan-1.18.1.apk`) |
+| Testler | 579/579 (`dotnet test`, ~8 sn) |
 | Android Release build | 0 uyarı, 0 hata |
 | Şema | v17 (`SqliteCoinFlowStore.CurrentSchemaVersion`) |
 | Veri yeri | profil başına `files/profiles/{id:N}/coinflow.db3` (v1.12.0'dan beri) |
@@ -1257,6 +1257,14 @@ Bu projede on üçüncü kez yalnız ekranda görülen kusur.
   204 `.cs` dosyasının tamamı $\le 350$ satır sınırına getirildi. 350 satırı aşan dosya sayısı: 0.
 - **Testler 576/576 yeşil.** Tüm hesaplama motoru, finansal formüller, projeksiyon
   mekanikleri ve veri tabanı entegrasyon testleri eksiksiz geçiyor.
+
+### v1.18.1 ne getirdi
+
+- **Soğuk Açılış ANR Kilitlenmesi Giderildi.** v1.18.0 mimari refactor'ünden sonra uygulamanın ilk açılışında Android'in "Bu uygulama yanıt vermiyor" (ANR) uyarısı vermesi ve kapanması sorunu kökten çözüldü.
+- **`UserFeedbackService` UI Dispatcher İyileştirmesi.** UI thread'i (`MainThread.IsMainThread`) üzerindeyken `DisplayAlert`, `DisplayPromptAsync` ve `DisplayActionSheet` çağrılarının gereksiz yere `MainThread.InvokeOnMainThreadAsync` kuyruğuna sokulması kaldırıldı; doğrudan çağrılması sağlandı. `CurrentPage()` içine `Application.Current.MainPage` geri dönüşü eklenerek `Shell.Current`'ın henüz oluşmadığı profil seçim ekranında güvenli sayfa referansı garantiye alındı.
+- **`MauiNavigationService` Asenkron Modal Bekleyişi Düzeltildi.** `OpenOnboardingModalAsync` ve `OpenInitialStrategyModalAsync` metotlarında modalın kapanmasını bekleyen `await page.Completion` ifadesi `InvokeOnMainThreadAsync` kapsamı dışına taşındı; böylece UI mesaj pompalamasının kullanıcı etkileşimi bitene kadar tıkanması engellendi. Tüm navigasyon çağrılarına ana iş parçacığı kontrolü eklendi.
+- **`ProfileSelectionPage` Açılış Koruma Kalkanı.** `WhenLoadedAsync` beklemesine 500 ms emniyet zaman aşımı (`Task.WhenAny`) eklendi.
+- **Testler 579/579 yeşil.** Açılış ve navigasyon emniyetleri için eklenen xUnit regresyon testleri dahil tüm testler eksiksiz geçiyor; Release APK derlemesi 0 uyarı ve 0 hata ile doğrulandı.
 
 ## Açık işler
 

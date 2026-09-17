@@ -20,8 +20,10 @@ public sealed class UserFeedbackService : IUserFeedbackService
         string message,
         string accept,
         string cancel) =>
-        MainThread.InvokeOnMainThreadAsync(() =>
-            CurrentPage().DisplayAlert(title, message, accept, cancel));
+        MainThread.IsMainThread
+            ? CurrentPage().DisplayAlert(title, message, accept, cancel)
+            : MainThread.InvokeOnMainThreadAsync(() =>
+                CurrentPage().DisplayAlert(title, message, accept, cancel));
 
     public Task<string?> PromptAsync(
         string title,
@@ -30,21 +32,40 @@ public sealed class UserFeedbackService : IUserFeedbackService
         string cancel,
         string placeholder = "",
         int maxLength = -1) =>
-        MainThread.InvokeOnMainThreadAsync(() =>
-            CurrentPage().DisplayPromptAsync(
+        MainThread.IsMainThread
+            ? CurrentPage().DisplayPromptAsync(
                 title,
                 message,
                 accept,
                 cancel,
                 maxLength: maxLength,
-                placeholder: placeholder));
+                placeholder: placeholder)
+            : MainThread.InvokeOnMainThreadAsync(() =>
+                CurrentPage().DisplayPromptAsync(
+                    title,
+                    message,
+                    accept,
+                    cancel,
+                    maxLength: maxLength,
+                    placeholder: placeholder));
 
-    public Task<string?> ChooseAsync(
+    public async Task<string?> ChooseAsync(
         string title,
         string cancel,
         string? destruction,
-        params string[] options) =>
-        MainThread.InvokeOnMainThreadAsync(async () =>
+        params string[] options)
+    {
+        if (MainThread.IsMainThread)
+        {
+            var directChoice = await CurrentPage().DisplayActionSheet(
+                title,
+                cancel,
+                destruction,
+                options);
+            return directChoice is null || directChoice == cancel ? null : directChoice;
+        }
+
+        return await MainThread.InvokeOnMainThreadAsync(async () =>
         {
             var choice = await CurrentPage().DisplayActionSheet(
                 title,
@@ -53,13 +74,16 @@ public sealed class UserFeedbackService : IUserFeedbackService
                 options);
             return choice is null || choice == cancel ? null : choice;
         });
+    }
 
     private static Task ShowAlertAsync(
         string title,
         string message,
         string button) =>
-        MainThread.InvokeOnMainThreadAsync(() =>
-            CurrentPage().DisplayAlert(title, message, button));
+        MainThread.IsMainThread
+            ? CurrentPage().DisplayAlert(title, message, button)
+            : MainThread.InvokeOnMainThreadAsync(() =>
+                CurrentPage().DisplayAlert(title, message, button));
 
     private static Page CurrentPage()
     {
@@ -67,6 +91,10 @@ public sealed class UserFeedbackService : IUserFeedbackService
         if (Shell.Current?.CurrentPage is { } shellPage)
         {
             page = shellPage;
+        }
+        else if (Microsoft.Maui.Controls.Application.Current?.MainPage is { } mainPage)
+        {
+            page = mainPage;
         }
         else if (Microsoft.Maui.Controls.Application.Current?.Windows
                      .FirstOrDefault()?.Page is { } windowPage)
