@@ -15,8 +15,8 @@ Ayrıntılı rehber için [docs/ARCHITECTURAL_RULES.md](docs/ARCHITECTURAL_RULES
 | **Code-Behind Mantığı** | Click eventleri ile parametre aktarımı ve iş mantığı | XAML `Command` + `CommandParameter` veri bağlama |
 | **Metin Biçimlendirme** | ViewModel içinde Türkçe para/tarih formatı üretmek | XAML `IValueConverter` veya `StringFormat` |
 | **Asenkron Fonksiyonlar** | `async void` kullanımı | `Task` veya `ValueTask` (Event handler'larda `try/catch`) |
-| **Application Katmanı** | 2.100 satırlık God Service (`CoinFlowService`) | Odaklı Use Case / Interactor sınıfları |
-| **Veri Katmanı Arayüzü** | 40+ metotlu God Interface (`ICoinFlowStore`) | Segregated Repositories (`ISalaryRepository`, `ILoanRepository`...) |
+| **Application Katmanı** | 2.100 satırlık God Service (`MizanService`) | Odaklı Use Case / Interactor sınıfları |
+| **Veri Katmanı Arayüzü** | 40+ metotlu God Interface (`IMizanStore`) | Segregated Repositories (`ISalaryRepository`, `ILoanRepository`...) |
 | **Profil / Multi-Tenancy** | Manuel pass-through delegasyon wrapper'ları | .NET DI Container `IServiceScope` yaşam döngüsü |
 | **Test Stratejisi** | `File.ReadAllText` ile kod metni arayan testler (`*SourceTests.cs`) | Mock'lu gerçek xUnit ViewModel ve Use Case birim testleri |
 | **Platform Taşınabilirliği**| `MauiProgram.cs` içine hardcoded Android sınıfları | Saf `net8.0` çekirdek + `#if ANDROID` / platform DI modülleri |

@@ -1,0 +1,179 @@
+using System.Globalization;
+using Mizan.Domain.Calculations;
+
+namespace Mizan.App.Models;
+
+public sealed record SelectionOption<T>(string Label, T Value)
+{
+    public override string ToString() => Label;
+}
+
+public enum FinancialRecordKind
+{
+    Salary,
+    OtherIncome,
+    Loan,
+    CreditCard,
+    TemporaryPlan,
+    InstallmentPlan,
+    LargeExpense,
+    LoanPrepayment
+}
+
+public sealed record FinancialRecordLine(
+    Guid Id,
+    FinancialRecordKind Kind,
+    string Title,
+    string Subtitle,
+    string Amount,
+    string Badge = "",
+    string Insight = "",
+    bool IsWarning = false)
+{
+    public bool CanEditCard => Kind == FinancialRecordKind.CreditCard;
+    public bool CanEditLoan => Kind == FinancialRecordKind.Loan;
+    public bool HasInsight => !string.IsNullOrWhiteSpace(Insight);
+}
+
+public sealed record DatedAmountLine(
+    Guid Id,
+    DateOnly Date,
+    decimal Amount,
+    string Description = "")
+{
+    public string DateText => Date.ToString("dd.MM.yyyy");
+    public string AmountText =>
+        $"{Amount.ToString("N2", CultureInfo.GetCultureInfo("tr-TR"))} TL";
+    public bool HasDescription => !string.IsNullOrWhiteSpace(Description);
+}
+
+/// <summary>
+/// En yakın ekstre dışındaki, gelecek bir kart ekstresinin ay bazlı ödeme
+/// planı satırı. <see cref="IsOverridden"/> true ise o ay için genel plandan
+/// bağımsız bir seçim yapılmıştır.
+/// </summary>
+public sealed record UpcomingStatementLine(
+    DateOnly DueDate,
+    string PeriodText,
+    string EstimateText,
+    string PlanText,
+    bool IsOverridden);
+
+/// <summary>
+/// Açık dönemin donmuş planında kalan, henüz ödenmiş işaretlenmemiş satır.
+/// Kaynağı gelecek projeksiyonu değil, dönemin kendi planıdır (I16).
+/// </summary>
+public sealed record RemainingPaymentLine(
+    string Date,
+    string Name,
+    string Amount,
+    string Detail);
+
+public sealed record CardPaymentPreferenceLine(
+    Guid Id,
+    string Choice,
+    string EffectiveFrom,
+    bool IsCurrent);
+
+/// <summary>
+/// Uyarı önceliği. Her durum için kırmızı kullanmamak adına üç seviye vardır.
+/// </summary>
+public enum DashboardAlertLevel
+{
+    /// Kullanıcının bir şey yapması gerekiyor.
+    Action,
+    /// Bilmesi gerekiyor ama hemen aksiyon şart değil.
+    Attention,
+    /// Sadece bilgi.
+    Information
+}
+
+/// <summary>
+/// Kullanıcıya "ne oldu / neden önemli / ne yapabilirim" üçlüsünü veren uyarı.
+/// Teknik exception metinleri buraya girmez.
+/// </summary>
+public sealed record DashboardAlert(
+    DashboardAlertLevel Level,
+    string Title,
+    string Message,
+    string ActionText = "",
+    System.Windows.Input.ICommand? Action = null)
+{
+    public bool IsAction => Level == DashboardAlertLevel.Action;
+    public bool IsAttention => Level == DashboardAlertLevel.Attention;
+    public bool HasAction =>
+        Action is not null && !string.IsNullOrWhiteSpace(ActionText);
+}
+
+public sealed record StrategyHistoryLine(
+    Guid Id,
+    string EffectiveDate,
+    string Mode,
+    string Note,
+    bool IsFuture);
+
+public sealed class ProjectionLine(
+    CashFlowPeriodProjection projection,
+    string period,
+    string assignment,
+    string availableAfterMandatory,
+    string carryOverDeficit,
+    bool hasCarryOverDeficit,
+    string totalInterest,
+    bool hasInterest,
+    string EndingProjectedBalance,
+    string beforeSalaryWarning,
+    bool hasBeforeSalaryWarning,
+    bool hasEstimatedPayment,
+    bool hasUndeterminedPayment,
+    string income = "",
+    string mandatory = "",
+    string living = "")
+{
+    // §9: kullanıcının dönem kartında ilk aradığı üç kalem.
+    public string Income { get; } = income;
+    public string Mandatory { get; } = mandatory;
+    public string Living { get; } = living;
+    public CashFlowPeriodProjection Projection { get; } = projection;
+    public string Period { get; } = period;
+    public string Assignment { get; } = assignment;
+    public string AvailableAfterMandatory { get; } = availableAfterMandatory;
+    public string CarryOverDeficit { get; } = carryOverDeficit;
+    public bool HasCarryOverDeficit { get; } = hasCarryOverDeficit;
+    public string TotalInterest { get; } = totalInterest;
+    public bool HasInterest { get; } = hasInterest;
+    public string EndingProjectedBalance { get; } = EndingProjectedBalance;
+    public string BeforeSalaryWarning { get; } = beforeSalaryWarning;
+    public bool HasBeforeSalaryWarning { get; } = hasBeforeSalaryWarning;
+    public bool HasEstimatedPayment { get; } = hasEstimatedPayment;
+    public bool HasUndeterminedPayment { get; } = hasUndeterminedPayment;
+}
+
+/// <summary>
+/// Bir kartın bu dönemdeki ödemesi: donmuş planın dediği ile kartın şu anki
+/// durumunun dediği.
+/// </summary>
+public sealed record CardProgressLine(
+    string Name,
+    string DueDate,
+    string Planned,
+    string Current);
+
+/// <summary>
+/// Simülatörde bir kredinin erken ödeme sonucu: ne ödenir, kredi ne zaman
+/// biter, ömrü boyunca ne kadar faiz ödenmez.
+/// </summary>
+public sealed record LoanImpactLine(
+    string Title,
+    string Detail,
+    string Saving);
+
+/// <summary>12 Dönem'deki kredi kapatma önerisinin bir satırı.</summary>
+public sealed record LoanAdviceLine(
+    Guid LoanId,
+    string Title,
+    string Headline,
+    string Detail,
+    bool IsRecommended,
+    bool NeedsPrincipal,
+    DateOnly? Date);

@@ -1,0 +1,450 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:controls="clr-namespace:Mizan.App.Controls"
+             x:Class="Mizan.App.Pages.CommitmentsPage"
+             Title="Finansal Yapı">
+    <ScrollView x:Name="PageScroll">
+        <VerticalStackLayout Padding="20,18,20,36" Spacing="16">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                <VerticalStackLayout Spacing="2">
+                    <Label Text="FİNANSAL KAYITLAR" Style="{StaticResource Eyebrow}" />
+                    <Label Text="Finansal Yapı" Style="{StaticResource PageTitle}" />
+                    <Label Text="{Binding StructureSummary}" Style="{StaticResource MutedText}" />
+                </VerticalStackLayout>
+                <Button Grid.Column="1"
+                        Text="+ Ekle"
+                        Clicked="OnAddClicked"
+                        VerticalOptions="Center"
+                        Padding="14,8"
+                        MinimumHeightRequest="42" />
+            </Grid>
+
+            <Border IsVisible="{Binding HasActiveForm}"
+                    BackgroundColor="{StaticResource SoftSky}">
+                <VerticalStackLayout Spacing="10">
+                    <Label Text="{Binding FormTitle}" Style="{StaticResource SectionTitle}" />
+
+                    <!-- Simülatördeki plan türü seçimiyle aynı tasarım: grup çipi ve
+                         açıklamalı kartlar. Düzenlemede gizlidir. BindingContext alt
+                         elemanda; görünürlük sayfanın kendi bağlamından okunur. -->
+                    <ContentView IsVisible="{Binding ShowEntryPicker}">
+                        <VerticalStackLayout Spacing="9">
+                            <Label Text="Ne eklemek istiyorsun?" Style="{StaticResource FieldLabel}" />
+                            <controls:EntryTypePickerView BindingContext="{Binding EntryPicker}" />
+                        </VerticalStackLayout>
+                    </ContentView>
+                    <Label Text="{Binding FormLead}" Style="{StaticResource MutedText}" />
+
+                    <!-- Simülatörün koşul formu: harcama, borç ve tek seferlik gelir
+                         buradan doğrudan kaydedilir. -->
+                    <ContentView IsVisible="{Binding IsScenarioEntry}">
+                        <controls:ScenarioConditionFormView BindingContext="{Binding EntryForm}" />
+                    </ContentView>
+
+                    <Label Text="Ad / açıklama" Style="{StaticResource FieldLabel}" IsVisible="{Binding IsRecordForm}" />
+                    <Entry Text="{Binding Name}" Placeholder="{Binding NamePlaceholder}" IsVisible="{Binding IsRecordForm}" />
+
+                    <VerticalStackLayout IsVisible="{Binding IsSalary}" Spacing="7">
+                        <Label Text="Gelir tutarı" Style="{StaticResource FieldLabel}" />
+                        <Entry Text="{Binding Amount}" Placeholder="Aylık net tutar, örn. 45.000" Keyboard="Numeric" />
+                        <Label Text="Geçerlilik tarihi" Style="{StaticResource FieldLabel}" />
+                        <DatePicker Date="{Binding EffectiveDate}" />
+                    </VerticalStackLayout>
+
+                    <VerticalStackLayout IsVisible="{Binding IsLoan}" Spacing="7">
+                        <Label Text="Banka" Style="{StaticResource FieldLabel}" />
+                        <Entry Text="{Binding Bank}" Placeholder="Kredinin bankası" />
+                        <Label Text="Aylık ödeme" Style="{StaticResource FieldLabel}" />
+                        <Entry Text="{Binding Amount}" Placeholder="Aylık taksit, örn. 7.500" Keyboard="Numeric" />
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                            <VerticalStackLayout Spacing="6">
+                                <Label Text="Ödeme günü" Style="{StaticResource FieldLabel}" />
+                                <Entry Text="{Binding PaymentDay}" Placeholder="1–31" Keyboard="Numeric" />
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Grid.Column="1" Spacing="6">
+                                <Label Text="Kalan taksit" Style="{StaticResource FieldLabel}" />
+                                <Entry Text="{Binding InstallmentCount}" Placeholder="Örn. 24" Keyboard="Numeric" />
+                            </VerticalStackLayout>
+                        </Grid>
+                        <Label Text="İlk / sonraki ödeme tarihi" Style="{StaticResource FieldLabel}" />
+                        <DatePicker Date="{Binding NextPaymentDate}" />
+                        <Label Text="Kredi türü" Style="{StaticResource FieldLabel}" />
+                        <Picker ItemsSource="{Binding LoanKinds}" SelectedItem="{Binding SelectedLoanKind}" />
+                        <Label Text="Kalan anapara" Style="{StaticResource FieldLabel}" />
+                        <Entry Text="{Binding RemainingDebt}" Placeholder="Bilmiyorsan boş bırak" Keyboard="Numeric" />
+                        <Label Text="Bankanın gösterdiği kalan anapara — kalan taksitlerin toplamı değil."
+                               Style="{StaticResource MutedText}"
+                               FontSize="12" />
+                        <!-- Tarih sorulmaz: "tutarı aldığın gün" kredinin çekildiği gün
+                             diye okunuyordu. Banka tutarı yalnız görüldüğü gün geçerli;
+                             bugünün tarihiyle saklanır. -->
+                        <Label Text="Bankanın bugünkü erken kapama tutarı (isteğe bağlı)" Style="{StaticResource FieldLabel}" />
+                        <Entry Text="{Binding EarlyClosureAmount}" Placeholder="Bilmiyorsan boş bırak" Keyboard="Numeric" />
+                        <Label Text="{Binding EarlyClosureNote}"
+                               IsVisible="{Binding HasEarlyClosureNote}"
+                               Style="{StaticResource MutedText}"
+                               FontSize="12" />
+                        <Label Text="Banka uygulamasında bugün gördüğün erken kapama tutarı. Girersen faiz ve anapara bu tutardan hesaplanır; kalan anaparadan daha güvenilirdir."
+                               Style="{StaticResource MutedText}"
+                               FontSize="12" />
+                    </VerticalStackLayout>
+
+                    <VerticalStackLayout IsVisible="{Binding IsPlan}" Spacing="8">
+                        <Label Text="Ödeme takvimi" Style="{StaticResource SectionTitle}" />
+                        <Grid ColumnDefinitions="*,*,Auto" ColumnSpacing="6">
+                            <DatePicker Date="{Binding PlanPaymentDate}" />
+                            <Entry Grid.Column="1" Text="{Binding PlanPaymentAmount}" Placeholder="Tutar" Keyboard="Numeric" />
+                            <Button Grid.Column="2" Text="Ekle" Command="{Binding AddPlanPaymentCommand}" />
+                        </Grid>
+                        <VerticalStackLayout BindableLayout.ItemsSource="{Binding PlanInstallments}" Spacing="6">
+                            <BindableLayout.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid ColumnDefinitions="*,Auto,Auto" Padding="8">
+                                        <Label Text="{Binding DateText}" />
+                                        <Label Grid.Column="1" Text="{Binding AmountText}" />
+                                        <Button Grid.Column="2"
+                                                Text="Sil"
+                                                CommandParameter="{Binding .}"
+                                                Clicked="OnRemovePlanPaymentClicked"
+                                                MinimumHeightRequest="36"
+                                                Padding="10,4" />
+                                    </Grid>
+                                </DataTemplate>
+                            </BindableLayout.ItemTemplate>
+                        </VerticalStackLayout>
+                    </VerticalStackLayout>
+
+                    <VerticalStackLayout IsVisible="{Binding IsCard}" Spacing="8">
+                        <Label Text="Banka" Style="{StaticResource FieldLabel}" />
+                        <Entry Text="{Binding Bank}" Placeholder="Kartın bankası" />
+                        <Label Text="Kart limiti" Style="{StaticResource FieldLabel}" />
+                        <Entry Text="{Binding CardLimit}" Placeholder="Örn. 50.000" Keyboard="Numeric" />
+                        <Label Text="Kesilmiş bir ekstren var mı?"
+                               Style="{StaticResource FieldLabel}" />
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                            <Button Text="Evet"
+                                    Command="{Binding UseActualStatementForCardCommand}" />
+                            <Button Grid.Column="1"
+                                    Text="Hayır"
+                                    Command="{Binding UseLegacyCardSetupCommand}"
+                                    Style="{StaticResource SecondaryButton}"
+                                    BackgroundColor="{StaticResource Canvas}" />
+                        </Grid>
+                        <VerticalStackLayout IsVisible="{Binding CardHasActualStatement}"
+                                             Spacing="8">
+                            <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                                <Button Text="Ekstreden İçeri Aktar"
+                                        Command="{Binding ImportCardStatementPdfCommand}"
+                                        IsEnabled="{Binding CanInteract}" />
+                                <Label Grid.Column="1"
+                                       Text="PDF yerel okunur; dosya saklanmaz."
+                                       Style="{StaticResource MutedText}"
+                                       VerticalTextAlignment="Center" />
+                            </Grid>
+                            <HorizontalStackLayout Spacing="8"
+                                                   IsVisible="{Binding IsBusy}">
+                                <ActivityIndicator IsRunning="{Binding IsBusy}" />
+                                <Label Text="{Binding BusyMessage}"
+                                       VerticalTextAlignment="Center"
+                                       Style="{StaticResource MutedText}" />
+                                <Button Text="İptal"
+                                        Command="{Binding CancelStatementImportCommand}"
+                                        IsVisible="{Binding IsStatementImporting}"
+                                        Style="{StaticResource SecondaryButton}" />
+                            </HorizontalStackLayout>
+                            <Label Text="{Binding CardStatementImportWarnings}"
+                                   IsVisible="{Binding HasCardStatementImportWarnings}"
+                                   TextColor="{StaticResource Error}" />
+                            <Label Text="Ekstre tutarı" Style="{StaticResource FieldLabel}" />
+                            <Entry Text="{Binding CardStatementAmount}" Placeholder="Ekstredeki toplam borç" Keyboard="Numeric" />
+                            <Label Text="Asgari ödeme" Style="{StaticResource FieldLabel}" />
+                            <Entry Text="{Binding CardStatementMinimum}" Placeholder="Ekstredeki asgari tutar" Keyboard="Numeric" />
+                            <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                                <VerticalStackLayout Spacing="6">
+                                    <Label Text="Kesim tarihi" Style="{StaticResource FieldLabel}" />
+                                    <DatePicker Date="{Binding CardStatementDate}" />
+                                </VerticalStackLayout>
+                                <VerticalStackLayout Grid.Column="1" Spacing="6">
+                                    <Label Text="Son ödeme" Style="{StaticResource FieldLabel}" />
+                                    <DatePicker Date="{Binding CardStatementDueDate}" />
+                                </VerticalStackLayout>
+                            </Grid>
+                            <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                                <VerticalStackLayout Spacing="6">
+                                    <Label Text="Sonraki tahmini kesim" Style="{StaticResource FieldLabel}" />
+                                    <Label Text="{Binding CardNextStatementDate}"
+                                           FontFamily="OpenSansSemibold" />
+                                </VerticalStackLayout>
+                                <VerticalStackLayout Grid.Column="1" Spacing="6">
+                                    <Label Text="Sonraki tahmini son ödeme" Style="{StaticResource FieldLabel}" />
+                                    <Label Text="{Binding CardNextDueDate}"
+                                           FontFamily="OpenSansSemibold" />
+                                </VerticalStackLayout>
+                            </Grid>
+                            <Label Text="Bu ekstreyi nasıl ödemeyi planlıyorsun?"
+                                   Style="{StaticResource FieldLabel}" />
+                            <Picker ItemsSource="{Binding CurrentStatementPaymentModes}"
+                                    SelectedItem="{Binding SelectedCurrentStatementPaymentMode}" />
+                            <Entry Text="{Binding CurrentStatementCustomPayment}"
+                                   IsVisible="{Binding IsCurrentStatementCustomPayment}"
+                                   Placeholder="Özel ödeme tutarı"
+                                   Keyboard="Numeric" />
+                        </VerticalStackLayout>
+                        <Grid ColumnDefinitions="*,*"
+                              ColumnSpacing="8"
+                              IsVisible="{Binding IsLegacyCardSetup}">
+                            <VerticalStackLayout Spacing="6">
+                                <Label Text="Devreden bakiye" Style="{StaticResource FieldLabel}" />
+                                <Entry Text="{Binding CarriedBalance}" Placeholder="Yoksa boş bırak" Keyboard="Numeric" />
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Grid.Column="1" Spacing="6">
+                                <Label Text="Ekstreleşmemiş" Style="{StaticResource FieldLabel}" />
+                                <Entry Text="{Binding UnbilledSpending}" Placeholder="Yoksa boş bırak" Keyboard="Numeric" />
+                            </VerticalStackLayout>
+                        </Grid>
+                        <VerticalStackLayout IsVisible="{Binding IsLegacyCardSetup}"
+                                             Spacing="6">
+                            <Label Text="Bakiye tarihi" Style="{StaticResource FieldLabel}" />
+                            <DatePicker Date="{Binding CardBalanceDate}" />
+                        </VerticalStackLayout>
+                        <Grid ColumnDefinitions="*,*,*" ColumnSpacing="7">
+                            <VerticalStackLayout>
+                                <Label Text="Kesim günü" Style="{StaticResource FieldLabel}" />
+                                <Entry Text="{Binding ClosingDay}" Placeholder="1–31" Keyboard="Numeric" />
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Grid.Column="1">
+                                <Label Text="Son ödeme" Style="{StaticResource FieldLabel}" />
+                                <Entry Text="{Binding DueDay}" Placeholder="1–31" Keyboard="Numeric" />
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Grid.Column="2">
+                                <Label Text="Asgari %" Style="{StaticResource FieldLabel}" />
+                                <Entry Text="{Binding MinimumRate}" Placeholder="Örn. 40" Keyboard="Numeric" />
+                            </VerticalStackLayout>
+                        </Grid>
+
+                        <!-- §14: varsayılan davranış kuralları gelişmiş bölümde. -->
+                        <Button Text="Gelişmiş ödeme ayarları"
+                                Style="{StaticResource LinkButton}"
+                                Command="{Binding ToggleAdvancedCardOptionsCommand}" />
+                        <VerticalStackLayout Spacing="8"
+                                             IsVisible="{Binding ShowAdvancedCardOptions}">
+                            <Label Text="Sonraki ekstrelerde varsayılan ödeme şeklin" Style="{StaticResource FieldLabel}" />
+                            <Picker ItemsSource="{Binding PaymentStrategies}" SelectedItem="{Binding SelectedPaymentStrategy}" />
+                            <Entry Text="{Binding FixedPaymentAmount}"
+                                   IsVisible="{Binding IsFixedPaymentStrategy}"
+                                   Placeholder="Her ekstrede ödeyeceğin sabit tutar"
+                                   Keyboard="Numeric" />
+
+                            <Label Text="Henüz karar vermediğin ekstreler tahminde nasıl sayılsın?" Style="{StaticResource FieldLabel}" />
+                            <Picker ItemsSource="{Binding ProjectionFallbackStrategies}" SelectedItem="{Binding SelectedProjectionFallbackStrategy}" />
+                            <Entry Text="{Binding ProjectionFallbackFixedAmount}"
+                                   IsVisible="{Binding IsFixedProjectionFallback}"
+                                   Placeholder="Tahminde kullanılacak sabit tutar"
+                                   Keyboard="Numeric" />
+                            <Label Text="Bu ayarlar yalnız tahmini etkiler; gerçek ödemeni her ekstrede sen belirlersin."
+                                   Style="{StaticResource MutedText}" />
+                        </VerticalStackLayout>
+
+                        <Label Text="Gelecek kart harcamaları" Style="{StaticResource SectionTitle}" />
+                        <Grid ColumnDefinitions="*,*,Auto" ColumnSpacing="6">
+                            <DatePicker Date="{Binding CardChargeDate}" />
+                            <Entry Grid.Column="1" Text="{Binding CardChargeAmount}" Placeholder="Tutar" Keyboard="Numeric" />
+                            <Button Grid.Column="2" Text="Ekle" Command="{Binding AddCardChargeCommand}" />
+                        </Grid>
+                        <VerticalStackLayout BindableLayout.ItemsSource="{Binding CardFutureCharges}" Spacing="6">
+                            <BindableLayout.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid ColumnDefinitions="*,Auto,Auto"
+                                          RowDefinitions="Auto,Auto"
+                                          Padding="8">
+                                        <Label Text="{Binding DateText}" />
+                                        <Label Grid.Column="1" Text="{Binding AmountText}" />
+                                        <Button Grid.Column="2"
+                                                Text="Sil"
+                                                CommandParameter="{Binding .}"
+                                                Clicked="OnRemoveCardChargeClicked"
+                                                MinimumHeightRequest="36"
+                                                Padding="10,4" />
+                                        <Label Grid.Row="1"
+                                               Grid.ColumnSpan="2"
+                                               Text="{Binding Description}"
+                                               IsVisible="{Binding HasDescription}"
+                                               Style="{StaticResource MutedText}" />
+                                    </Grid>
+                                </DataTemplate>
+                            </BindableLayout.ItemTemplate>
+                        </VerticalStackLayout>
+                    </VerticalStackLayout>
+
+                    <Button Text="{Binding SaveButtonText}"
+                            Command="{Binding SaveCommand}"
+                            IsEnabled="{Binding CanInteract}" />
+                    <!-- SecondaryButton da SoftSky; bu zeminde görünmüyordu. -->
+                    <Button Text="Vazgeç"
+                            Command="{Binding CancelEditingCardCommand}"
+                            Style="{StaticResource SecondaryButton}"
+                            BackgroundColor="{StaticResource Canvas}" />
+                    <Label Text="{Binding StatusMessage}" IsVisible="{Binding HasStatus}" TextColor="{StaticResource Error}" />
+                </VerticalStackLayout>
+            </Border>
+
+            <Border>
+                <VerticalStackLayout Spacing="9">
+                    <Label Text="Gelirler" Style="{StaticResource SectionTitle}" />
+                    <Label Text="Henüz gelir eklemedin." Style="{StaticResource EmptyStateTitle}" IsVisible="{Binding HasNoIncomeItems}" />
+                    <Label Text="Maaşını eklediğinde Mizan dönemlerini ve projeksiyonunu buradan kurmaya başlar." Style="{StaticResource EmptyStateBody}" IsVisible="{Binding HasNoIncomeItems}" />
+                    <VerticalStackLayout BindableLayout.ItemsSource="{Binding IncomeItems}" Spacing="8">
+                        <BindableLayout.ItemTemplate>
+                            <DataTemplate>
+                                <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto" Padding="8">
+                                    <Label Text="{Binding Title}" FontFamily="OpenSansSemibold" FontSize="16" />
+                                    <Label Grid.Column="1" Text="{Binding Amount}" FontFamily="OpenSansSemibold" />
+                                    <Label Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding Subtitle}" Style="{StaticResource MutedText}" />
+                                    <Button Grid.Row="2"
+                                            Grid.ColumnSpan="2"
+                                            Text="Sil"
+                                            CommandParameter="{Binding .}"
+                                            Clicked="OnDeleteClicked"
+                                            Style="{StaticResource SecondaryButton}" />
+                                </Grid>
+                            </DataTemplate>
+                        </BindableLayout.ItemTemplate>
+                    </VerticalStackLayout>
+                </VerticalStackLayout>
+            </Border>
+
+            <Border BackgroundColor="{StaticResource SoftSky}">
+                <VerticalStackLayout Spacing="9">
+                    <Label Text="Kredi Kartları" Style="{StaticResource SectionTitle}" />
+                    <Label Text="Henüz kredi kartı eklemedin." Style="{StaticResource EmptyStateTitle}" IsVisible="{Binding HasNoCreditCardItems}" />
+                    <Label Text="İlk kartını eklediğinde gelecek ekstrelerini ve ödeme planını burada göreceksin." Style="{StaticResource EmptyStateBody}" IsVisible="{Binding HasNoCreditCardItems}" />
+                    <VerticalStackLayout BindableLayout.ItemsSource="{Binding CreditCardItems}" Spacing="8">
+                        <BindableLayout.ItemTemplate>
+                            <DataTemplate>
+                                <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto" Padding="8">
+                                    <Label Text="{Binding Title}" FontFamily="OpenSansSemibold" FontSize="16" />
+                                    <Label Grid.Column="1" Text="{Binding Amount}" FontFamily="OpenSansSemibold" />
+                                    <Label Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding Badge}" Style="{StaticResource MutedText}" />
+                                    <HorizontalStackLayout Grid.Row="2" Grid.ColumnSpan="2" Spacing="8">
+                                        <Button Text="Kartı Aç"
+                                                CommandParameter="{Binding .}"
+                                                Clicked="OnEditCardClicked" />
+                                        <Button Text="Sil"
+                                                CommandParameter="{Binding .}"
+                                                Clicked="OnDeleteClicked"
+                                                Style="{StaticResource SecondaryButton}" />
+                                    </HorizontalStackLayout>
+                                </Grid>
+                            </DataTemplate>
+                        </BindableLayout.ItemTemplate>
+                    </VerticalStackLayout>
+                </VerticalStackLayout>
+            </Border>
+
+            <Border>
+                <VerticalStackLayout Spacing="9">
+                    <Label Text="Krediler" Style="{StaticResource SectionTitle}" />
+                    <Label Text="Henüz kredi eklemedin." Style="{StaticResource EmptyStateTitle}" IsVisible="{Binding HasNoLoanItems}" />
+                    <Label Text="Kredi taksitlerin dönem planına otomatik olarak dahil edilir." Style="{StaticResource EmptyStateBody}" IsVisible="{Binding HasNoLoanItems}" />
+                    <VerticalStackLayout BindableLayout.ItemsSource="{Binding LoanItems}" Spacing="8">
+                        <BindableLayout.ItemTemplate>
+                            <DataTemplate>
+                                <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="4" Padding="8">
+                                    <Label Text="{Binding Title}" FontFamily="OpenSansSemibold" FontSize="16" />
+                                    <Label Grid.Column="1" Text="{Binding Amount}" FontFamily="OpenSansSemibold" />
+                                    <Label Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding Subtitle}" Style="{StaticResource MutedText}" />
+                                    <Label Grid.Row="2"
+                                           Grid.ColumnSpan="2"
+                                           Text="{Binding Insight}"
+                                           IsVisible="{Binding HasInsight}"
+                                           FontSize="13"
+                                           TextColor="{StaticResource PositiveText}">
+                                        <Label.Triggers>
+                                            <DataTrigger TargetType="Label"
+                                                         Binding="{Binding IsWarning}"
+                                                         Value="True">
+                                                <Setter Property="TextColor"
+                                                        Value="{StaticResource WarningText}" />
+                                            </DataTrigger>
+                                        </Label.Triggers>
+                                    </Label>
+                                    <HorizontalStackLayout Grid.Row="3" Grid.ColumnSpan="2" Spacing="8">
+                                        <Button Text="Düzenle"
+                                                IsVisible="{Binding CanEditLoan}"
+                                                CommandParameter="{Binding .}"
+                                                Clicked="OnEditLoanClicked" />
+                                        <Button Text="Sil"
+                                                CommandParameter="{Binding .}"
+                                                Clicked="OnDeleteClicked"
+                                                Style="{StaticResource SecondaryButton}" />
+                                    </HorizontalStackLayout>
+                                </Grid>
+                            </DataTemplate>
+                        </BindableLayout.ItemTemplate>
+                    </VerticalStackLayout>
+                </VerticalStackLayout>
+            </Border>
+
+            <Border BackgroundColor="{StaticResource SoftPink}">
+                <VerticalStackLayout Spacing="9">
+                    <Label Text="Düzenli Ödemeler" Style="{StaticResource SectionTitle}" />
+                    <Label Text="Henüz düzenli ödeme eklemedin." Style="{StaticResource EmptyStateTitle}" IsVisible="{Binding HasNoRegularPaymentItems}" />
+                    <Label Text="Kira, abonelik veya taksit gibi tekrar eden ödemelerini buraya ekleyebilirsin." Style="{StaticResource EmptyStateBody}" IsVisible="{Binding HasNoRegularPaymentItems}" />
+                    <VerticalStackLayout BindableLayout.ItemsSource="{Binding RegularPaymentItems}" Spacing="8">
+                        <BindableLayout.ItemTemplate>
+                            <DataTemplate>
+                                <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto" Padding="8">
+                                    <Label Text="{Binding Title}" FontFamily="OpenSansSemibold" FontSize="16" />
+                                    <Label Grid.Column="1" Text="{Binding Amount}" FontFamily="OpenSansSemibold" />
+                                    <Label Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding Subtitle}" Style="{StaticResource MutedText}" />
+                                    <Button Grid.Row="2"
+                                            Grid.ColumnSpan="2"
+                                            Text="Sil"
+                                            CommandParameter="{Binding .}"
+                                            Clicked="OnDeleteClicked"
+                                            Style="{StaticResource SecondaryButton}" />
+                                </Grid>
+                            </DataTemplate>
+                        </BindableLayout.ItemTemplate>
+                    </VerticalStackLayout>
+                </VerticalStackLayout>
+            </Border>
+
+            <Border>
+                <VerticalStackLayout Spacing="9">
+                    <Label Text="Tek Seferlik / Geçici Ödemeler" Style="{StaticResource SectionTitle}" />
+                    <Label Text="Henüz tek seferlik ödeme eklemedin." Style="{StaticResource EmptyStateTitle}" IsVisible="{Binding HasNoOneTimePaymentItems}" />
+                    <Label Text="Belirli bir tarihte yapacağın büyük ödemeleri ekleyince dönem tahminine yansır." Style="{StaticResource EmptyStateBody}" IsVisible="{Binding HasNoOneTimePaymentItems}" />
+                    <VerticalStackLayout BindableLayout.ItemsSource="{Binding OneTimePaymentItems}" Spacing="8">
+                        <BindableLayout.ItemTemplate>
+                            <DataTemplate>
+                                <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto" Padding="8">
+                                    <Label Text="{Binding Title}" FontFamily="OpenSansSemibold" FontSize="16" />
+                                    <Label Grid.Column="1" Text="{Binding Amount}" FontFamily="OpenSansSemibold" />
+                                    <Label Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding Subtitle}" Style="{StaticResource MutedText}" />
+                                    <Button Grid.Row="2"
+                                            Grid.ColumnSpan="2"
+                                            Text="Sil"
+                                            CommandParameter="{Binding .}"
+                                            Clicked="OnDeleteClicked"
+                                            Style="{StaticResource SecondaryButton}" />
+                                </Grid>
+                            </DataTemplate>
+                        </BindableLayout.ItemTemplate>
+                    </VerticalStackLayout>
+                </VerticalStackLayout>
+            </Border>
+
+            <Label Text="{Binding StatusMessage}"
+                   IsVisible="{Binding HasStatus}"
+                   TextColor="{StaticResource Error}" />
+            <ActivityIndicator IsRunning="{Binding IsBusy}"
+                               IsVisible="{Binding IsBusy}" />
+            <Label Text="{Binding BusyMessage}"
+                   IsVisible="{Binding IsBusy}"
+                   HorizontalTextAlignment="Center"
+                   Style="{StaticResource MutedText}" />
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

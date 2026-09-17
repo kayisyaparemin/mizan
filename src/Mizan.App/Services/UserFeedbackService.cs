@@ -1,0 +1,169 @@
+
+namespace Mizan.App.Services;
+
+public sealed class UserFeedbackService : IUserFeedbackService
+{
+    public Task ShowSuccessAsync(
+        string message,
+        string title = "Kaydedildi",
+        string button = "Tamam") =>
+        ShowAlertAsync(title, message, button);
+
+    public Task ShowErrorAsync(
+        string message,
+        string title = "Kaydedilemedi",
+        string button = "Tamam") =>
+        ShowAlertAsync(title, message, button);
+
+    public async Task<bool> ConfirmAsync(
+        string title,
+        string message,
+        string accept,
+        string cancel)
+    {
+        try
+        {
+            return MainThread.IsMainThread
+                ? await CurrentPage().DisplayAlert(title, message, accept, cancel)
+                : await MainThread.InvokeOnMainThreadAsync(() =>
+                    CurrentPage().DisplayAlert(title, message, accept, cancel));
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    public async Task<string?> PromptAsync(
+        string title,
+        string message,
+        string accept,
+        string cancel,
+        string placeholder = "",
+        int maxLength = -1)
+    {
+        try
+        {
+            return MainThread.IsMainThread
+                ? await CurrentPage().DisplayPromptAsync(
+                    title,
+                    message,
+                    accept,
+                    cancel,
+                    maxLength: maxLength,
+                    placeholder: placeholder)
+                : await MainThread.InvokeOnMainThreadAsync(() =>
+                    CurrentPage().DisplayPromptAsync(
+                        title,
+                        message,
+                        accept,
+                        cancel,
+                        maxLength: maxLength,
+                        placeholder: placeholder));
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    public async Task<string?> ChooseAsync(
+        string title,
+        string cancel,
+        string? destruction,
+        params string[] options)
+    {
+        try
+        {
+            if (MainThread.IsMainThread)
+            {
+                var directChoice = await CurrentPage().DisplayActionSheet(
+                    title,
+                    cancel,
+                    destruction,
+                    options);
+                return directChoice is null || directChoice == cancel ? null : directChoice;
+            }
+
+            return await MainThread.InvokeOnMainThreadAsync(async () =>
+            {
+                var choice = await CurrentPage().DisplayActionSheet(
+                    title,
+                    cancel,
+                    destruction,
+                    options);
+                return choice is null || choice == cancel ? null : choice;
+            });
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static async Task ShowAlertAsync(
+        string title,
+        string message,
+        string button)
+    {
+        try
+        {
+            if (MainThread.IsMainThread)
+            {
+                await CurrentPage().DisplayAlert(title, message, button);
+            }
+            else
+            {
+                await MainThread.InvokeOnMainThreadAsync(() =>
+                    CurrentPage().DisplayAlert(title, message, button));
+            }
+        }
+        catch
+        {
+            // Pencere veya sayfa hazır değilse hata bastırılır; uygulama çökmez.
+        }
+    }
+
+    private static Page CurrentPage()
+    {
+        Page? page = null;
+        if (Shell.Current?.CurrentPage is { } shellPage)
+        {
+            page = shellPage;
+        }
+        else if (Microsoft.Maui.Controls.Application.Current?.MainPage is { } mainPage)
+        {
+            page = mainPage;
+        }
+        else if (Microsoft.Maui.Controls.Application.Current?.Windows
+                     .FirstOrDefault()?.Page is { } windowPage)
+        {
+            page = windowPage;
+        }
+
+        return page is null
+            ? throw new InvalidOperationException("Geçerli ekran bulunamadı.")
+            : ResolveTopPage(page);
+    }
+
+    private static Page ResolveTopPage(Page page)
+    {
+        // ModalStack is shared across the navigation context, so its top entry
+        // is the visible modal regardless of which page we ask for it. Read it
+        // once instead of looping: re-selecting the same top modal in a while
+        // loop never terminates and pins the UI thread at 100% CPU (ANR).
+        var top = page.Navigation.ModalStack.LastOrDefault() ?? page;
+        return DescendToVisiblePage(top);
+    }
+
+    private static Page DescendToVisiblePage(Page page) => page switch
+    {
+        NavigationPage { CurrentPage: { } current } =>
+            DescendToVisiblePage(current),
+        FlyoutPage { Detail: { } detail } =>
+            DescendToVisiblePage(detail),
+        TabbedPage { CurrentPage: { } current } =>
+            DescendToVisiblePage(current),
+        _ => page
+    };
+}

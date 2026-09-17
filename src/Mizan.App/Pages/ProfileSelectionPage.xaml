@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:Mizan.App.ViewModels"
+             xmlns:models="clr-namespace:Mizan.App.Models"
+             x:Class="Mizan.App.Pages.ProfileSelectionPage"
+             x:DataType="vm:ProfileSelectionViewModel"
+             Title="Profil Seç">
+    <ScrollView>
+        <VerticalStackLayout Padding="20,56,20,40" Spacing="16">
+            <Label Text="MİZAN" Style="{StaticResource Eyebrow}" />
+            <Label Text="Profil Seç" Style="{StaticResource PageTitle}" />
+            <Label Text="Her profilin verisi ayrı tutulur. Bir profilde yaptığın hiçbir şey diğerlerini etkilemez."
+                   Style="{StaticResource MutedText}" />
+
+            <VerticalStackLayout BindableLayout.ItemsSource="{Binding Profiles}" Spacing="10">
+                <BindableLayout.ItemTemplate>
+                    <DataTemplate x:DataType="models:ProfileCardItem">
+                        <Border Padding="14,12">
+                            <Border.GestureRecognizers>
+                                <TapGestureRecognizer Tapped="OnProfileTapped" />
+                            </Border.GestureRecognizers>
+                            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                                <Border WidthRequest="46"
+                                        HeightRequest="46"
+                                        Padding="0"
+                                        StrokeThickness="0"
+                                        StrokeShape="RoundRectangle 23"
+                                        BackgroundColor="{StaticResource SoftLavender}"
+                                        VerticalOptions="Center">
+                                    <Label Text="{Binding Initial}"
+                                           FontFamily="OpenSansSemibold"
+                                           FontSize="19"
+                                           HorizontalOptions="Center"
+                                           VerticalOptions="Center" />
+                                </Border>
+                                <VerticalStackLayout Grid.Column="1" Spacing="2" VerticalOptions="Center">
+                                    <Label Text="{Binding Name}" Style="{StaticResource SectionTitle}" />
+                                    <Label Text="{Binding Detail}" Style="{StaticResource MutedText}" />
+                                </VerticalStackLayout>
+                                <Button Grid.Column="2"
+                                        Text="Düzenle"
+                                        Style="{StaticResource LinkButton}"
+                                        VerticalOptions="Center"
+                                        Clicked="OnProfileOptionsClicked" />
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </BindableLayout.ItemTemplate>
+            </VerticalStackLayout>
+
+            <!-- Yeni kurulum: hiç profil yok. -->
+            <Border IsVisible="{Binding IsFirstRun}"
+                    BackgroundColor="{StaticResource SoftSky}"
+                    StrokeThickness="0">
+                <VerticalStackLayout Spacing="10">
+                    <Label Text="Mizan'a hoş geldin" Style="{StaticResource SectionTitle}" />
+                    <Label Style="{StaticResource AlertBody}">
+                        <Label.FormattedText>
+                            <FormattedString>
+                                <Span Text="Daha önce Mizan kullandıysan yedeğinden kaldığın yerden devam edebilirsin. Yedekler " />
+                                <Span Text="{Binding BackupLocation}" FontFamily="OpenSansSemibold" />
+                                <Span Text=" klasöründe durur." />
+                            </FormattedString>
+                        </Label.FormattedText>
+                    </Label>
+                    <Button Text="Yedekten Geri Yükle"
+                            IsEnabled="{Binding CanInteract}"
+                            Clicked="OnRestoreClicked" />
+                    <Button Text="Temiz Başla"
+                            Style="{StaticResource SecondaryButton}"
+                            IsEnabled="{Binding CanInteract}"
+                            Clicked="OnCreateClicked" />
+                </VerticalStackLayout>
+            </Border>
+
+            <Button Text="Yeni Profil"
+                    IsVisible="{Binding HasProfiles}"
+                    IsEnabled="{Binding CanInteract}"
+                    Clicked="OnCreateClicked" />
+            <Button Text="Yedekten Ekle"
+                    Style="{StaticResource SecondaryButton}"
+                    IsVisible="{Binding HasProfiles}"
+                    IsEnabled="{Binding CanInteract}"
+                    Clicked="OnAddFromBackupClicked" />
+            <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" />
+            <Label Text="{Binding StatusMessage}"
+                   IsVisible="{Binding HasStatus}"
+                   TextColor="{StaticResource Error}" />
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

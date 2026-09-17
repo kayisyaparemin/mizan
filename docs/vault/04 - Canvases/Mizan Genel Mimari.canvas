@@ -1,0 +1,25 @@
+{
+	"nodes":[
+		{"id":"pillar1","type":"file","file":"02 - Architecture & Classes/CashFlowPeriodCalculator.md","x":-360,"y":-100,"width":360,"height":380,"color":"2"},
+		{"id":"pillar1_rule","type":"file","file":"01 - Business Rules/BR-RECON-01 - Donem Mutabakati ve Gozlem Noktasi.md","x":-360,"y":790,"width":360,"height":350,"color":"2"},
+		{"id":"pillar2_rule","type":"file","file":"01 - Business Rules/BR-PROJ-01 - 12 Aylik Kumulatif Likidite ve Finansman Acigi.md","x":190,"y":900,"width":380,"height":350,"color":"3"},
+		{"id":"pillar3_rule","type":"file","file":"01 - Business Rules/BR-SIM-01 - Senaryo Kosul Izolasyonu ve Canliya Aktarim.md","x":750,"y":770,"width":360,"height":350,"color":"4"},
+		{"id":"pillar4_rule","type":"file","file":"01 - Business Rules/BR-CARD-01 - Kredi Karti Carry Faizi ve Asgari Tutar Mantigi.md","x":1300,"y":900,"width":360,"height":350,"color":"5"},
+		{"id":"pillar5_rule","type":"file","file":"01 - Business Rules/BR-REMIND-01 - Operasyonel Hatirlatici ve Vade Erteleme.md","x":1440,"y":240,"width":360,"height":350,"color":"6"},
+		{"id":"header","type":"text","text":"# 🏛️ Mizan: 12 Aylık Finansal Projeksiyon & Karar Motoru\n\n**5 Taşıyıcı Sütun ve Çekirdek Bağımlılık Haritası**","x":670,"y":-680,"width":550,"height":120,"color":"1"},
+		{"id":"pillar2","type":"file","file":"02 - Architecture & Classes/FinancialProjectionCalculator.md","x":40,"y":-680,"width":380,"height":400,"color":"3"},
+		{"id":"pillar3","type":"file","file":"02 - Architecture & Classes/SimulationCalculator.md","x":490,"y":50,"width":360,"height":380,"color":"4"},
+		{"id":"pillar4","type":"file","file":"02 - Architecture & Classes/CreditCardStatementCalculator.md","x":1010,"y":-140,"width":360,"height":380,"color":"5"},
+		{"id":"pillar5","type":"file","file":"02 - Architecture & Classes/PaymentReminderPlanner.md","x":1440,"y":-620,"width":360,"height":380,"color":"6"}
+	],
+	"edges":[
+		{"id":"edge_p1_p2","fromNode":"pillar1","fromSide":"right","toNode":"pillar2","toSide":"left","label":"Dönem Sınırlarını Sağlar"},
+		{"id":"edge_p4_p2","fromNode":"pillar4","fromSide":"left","toNode":"pillar2","toSide":"right","label":"Kart Ekstrelerini Besler"},
+		{"id":"edge_p3_p2","fromNode":"pillar3","fromSide":"left","toNode":"pillar2","toSide":"right","label":"Baseline & Scenario Projeksiyonu"},
+		{"id":"edge_p1_rule","fromNode":"pillar1","fromSide":"bottom","toNode":"pillar1_rule","toSide":"top"},
+		{"id":"edge_p2_rule","fromNode":"pillar2","fromSide":"bottom","toNode":"pillar2_rule","toSide":"top"},
+		{"id":"edge_p3_rule","fromNode":"pillar3","fromSide":"bottom","toNode":"pillar3_rule","toSide":"top"},
+		{"id":"edge_p4_rule","fromNode":"pillar4","fromSide":"bottom","toNode":"pillar4_rule","toSide":"top"},
+		{"id":"edge_p5_rule","fromNode":"pillar5","fromSide":"bottom","toNode":"pillar5_rule","toSide":"top"}
+	]
+}

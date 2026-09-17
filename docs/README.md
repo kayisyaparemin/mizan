@@ -1,137 +1,121 @@
-# Mizan
+# Mizan: Ürün Manifestosu, Vizyon, Misyon ve Değer Önerisi Belgesi
 
-Mizan, maaş gününden bir sonraki maaş gününe kadar olan dönemi esas alan, bugünkü finansal durumdan devam edildiğinde önümüzdeki maaş dönemlerinin nasıl görüneceğini gösteren Android öncelikli, çevrimdışı bir kişisel finans uygulamasıdır.
+---
 
-Uygulama mikro harcama takibi yapmaz. Ana kavramlar maaş dönemi, toplam gelir, zorunlu ödeme, yaşam bütçesi, dönem neti ve dönem sonu durumudur.
+## 1. Giriş ve Manifestonun Amacı
 
-Mizan ayrıca finansal durumu dönemsel doğruluk noktalarıyla yeniler. Kullanıcı her kahveyi veya market fişini girmez; dönem kapanınca planlanan ödemeleri doğrular, tek bir toplam yaşam gideri girer ve yeni planlama başlangıç durumunu onaylar.
+**Mizan**, bireylerin ve düzensiz nakit akışına sahip işletme/ticaret sahiplerinin finansal dengesini sağlamak, belirsizliği ortadan kaldırmak ve ileriye dönük finansal kararları simüle edilebilir hale getirmek amacıyla tasarlanmış modern bir nakit akışı ve finansal projeksiyon platformudur.
 
-## Finans modeli
+Geliştirme sürecinin başında maaşlı çalışanların bir maaş gününden diğerine uzanan taahhütlerini yönetmek üzere kurgulanan sistem; zamanla düzensiz gelirleri, ticari nakit döngülerini, erken borç kapama optimizasyonlarını, çoklu senaryo simülatörünü ve dönem içi akıllı hatırlatıcıları kapsayan kapsamlı bir nakit orkestrasyonuna evrilmiştir.
 
-Her maaş dönemi `[başlangıç, sonraki maaş günü)` aralığıdır. Dönem başlangıcı dahildir, sonraki maaş günü dahil değildir.
+Bu belge; UI/UX, Google Flow ekran tasarımları, kod tabanı terminolojisi ve pazarlama diline zemin oluşturacak **resmi ürün manifestosudur**.
 
-Kullanıcının ödemeleri maaş bütçesine atama düzeni effective-dated bir geçmiş olarak tutulur:
+---
 
-- **Gelecek dönemi karşılarım:** Maaş tarihi dahil, sonraki maaş tarihi hariç ödemeler aynı maaşa atanır.
-- **Geçmiş dönemi kapatırım:** Önceki maaş tarihinden sonraki ödemeler mevcut maaşa atanır; maaş günündeki ödeme geriye kaymaz.
+## 2. Vizyon (Nereye Ulaşmak İstiyoruz?)
 
-Kredi, kart ve planların gerçek ödeme tarihleri bu tercihten etkilenmez. `PaymentAssignmentStrategyResolver` her maaş için o tarihte yürürlükteki kaydı seçer; `SalaryFundingPlanner` coverage frontier ile geçiş boşluğu veya mükerrer atama üretmeden yalnız bütçe atamasını yapar. Maaştan önce vadesi gelen ödemeler ayrıca uyarı olarak gösterilir.
+> **"Kişisel ve ticari finans yönetiminde; geriye dönük muhasebe tutma yorgunluğunu ortadan kaldırarak, herkesin gelecekteki nakit akışını ve finansal kaderini bugünden net biçimde görebildiği, kararlarını güvenle simüle edebildiği standart nakit zekası platformu olmak."**
 
-Kalıcı `ProjectionAnchorDate`, günlük hayatın projection dışında kabul edildiği snapshot sınırıdır; banka bakiyesi değildir. Projection bu sınırdaki veya sonrasındaki ilk maaştan başlar. İlk düzen `UpcomingPeriod` ise anchor ile ilk maaş arasındaki exact yükümlülükler dashboard'da “Sonraki Maaştan Önce” bölümünde ayrı gösterilir.
+Mizan, kullanıcılarına *"Geçen ay nereye harcadım?"* sorusunun pişmanlığını değil; *"Önümüzdeki 12 ay boyunca hangi kararı alırsam nakit dengem nasıl etkilenir?"* sorusunun berraklığını ve kontrolünü sunar.
 
-```text
-Toplam Gelir = Maaş + Döneme denk gelen diğer gelirler
-Zorunlu Ödeme = Krediler + Kart ödemeleri + geçici/taksitli/diğer planlı ödemeler
-Zorunlu Ödemeler Sonrası = Toplam Gelir - Zorunlu Ödeme
-Dönem Neti = Zorunlu Ödemeler Sonrası - Yaşam Bütçesi - Planlı büyük nakit giderler
-Faiz Öncesi Dönem Sonu Durumu = Dönem Başı Durumu + Dönem Neti
-Finansman Açığı Faizi = max(0, -Faiz Öncesi Dönem Sonu Durumu) × Açık Faiz Oranı
-Dönem Sonu Tahmini Durum = Faiz Öncesi Dönem Sonu Durumu - Finansman Açığı Faizi
+---
+
+## 3. Misyon (Neyi, Nasıl ve Kimin İçin Yapıyoruz?)
+
+> **"Kullanıcıları tek tek fiş ve mikro harcama girme yükünden kurtararak; deterministik matematiksel projeksiyonlar, dönemsel mutabakat noktaları (checkpoints) ve senaryo simülatörleri aracılığıyla, gelir yapısı ne kadar karmaşık olursa olsun herkesin finansal dengesini (mizanını) korumasını sağlamak."**
+
+Mizan bu misyonu şu temel ilkelerle hayata geçirir:
+
+1. **Mikro Harcama Takibini Reddetmek:** Her kahveyi, market fişini tek tek kaydettirmez. Serbest yaşam bütçesini tek bir havuz olarak ele alır.
+
+
+2. **Deterministik ve Şeffaf Hesaplama:** Banka algoritması karmaşıklığında ancak kullanıcı dostu netlikte; kredi kartı carry faizini, finansman açığı maliyetini ve anapara amortismanlarını kuruşu kuruşuna gösterir.
+
+
+3. **Senaryo Odaklı Karar Desteği:** Kullanıcı borçlanmadan, yeni bir harcama yapmadan veya bir krediyi erken kapatmadan önce bunun 12 aylık projeksiyondaki net sonucunu canlı simülatörde test eder.
+
+
+4. **Kişisel Veri Mahremiyeti ve Çevrimdışı Güç:** Kullanıcının en hassas verisi olan finansal durumunu uzak sunuculara bağımlı kılmadan, cihaz üzerinde (offline-first) tam güvenlik ve hızla işletir.
+
+
+
+---
+
+## 4. Temel Değer Önerisi (Value Proposition)
+
+### Mikro Takip Değil, Makro Denge (Mizan)
+
+Geleneksel bütçe uygulamaları kullanıcıyı veri giriş memuruna dönüştürür ve birkaç hafta içinde terk edilir. Mizan ise **dönem kapanış mutabakatı (Plan vs. Gerçek)** mantığıyla çalışır:
+
+* Dönem başında plan dondurulur.
+
+
+* Dönem içinde tek bir operasyonel gözlem yapılır.
+
+
+* Dönem bittiğinde gerçekleşen zorunlu ödemeler teyit edilir, fiili yaşam gideri tek kalemde yazılır ve yeni dönemin açılışı tek dokunuşla başlatılır.
+
+
+
+### Kimler İçin?
+
+* **Maaşlı Profesyoneller:** Kredi kartı ekstreleri, tüketici kredileri ve birikim hedefleri arasında ay sonunu ve gelecek 12 ayı faiz tuzağına düşmeden planlamak isteyenler.
+
+
+* **Esnaf, Serbest Meslek ve Düzensiz Gelir Sahipleri:** Gelir tarihleri ve tutarları değişken olan, ancak kira, vergi, tedarikçi ve kredi gibi sabit yükümlülükleri düzenli işleyen; likidite açığı riskini önceden öngörmek zorunda olanlar.
+* **Finansal Optimizasyon Arayanlar:** Elindeki nakit fazlasıyla hangi krediyi ne zaman kapatırsa ne kadar faiz tasarrufu sağlayacağını hesaplayan analitik kullanıcılar.
+
+
+
+---
+
+## 5. Ürünün 5 Temel Taşıyıcı Sütunu
+
+```
+                  ┌─────────────────────────────────────────┐
+                  │              M I Z A N                  │
+                  │   Finansal Projeksiyon & Karar Motoru   │
+                  └────────────────────┬────────────────────┘
+                                       │
+     ┌──────────────────┬──────────────┴─────┬──────────────────┬─────────────────┐
+     │                  │                    │                  │                 │
+┌────┴─────────┐ ┌──────┴────────┐ ┌─────────┴────────┐ ┌───────┴────────┐ ┌──────┴─────────┐
+│ 1. Dönem     │ │ 2. İleriye    │ │ 3. Akıllı        │ │ 4. Gerçekçi    │ │ 5. Operasyonel  │
+│ Döngüsü ve   │ │ Dönük 12 Aylık│ │ Senaryo          │ │ Maliyet & Faiz │ │ Takip ve        │
+│ Mutabakat    │ │ Projeksiyon   │ │ Simülatörü       │ │ Modellemesi    │ │ Hatırlatıcı     │
+│[cite: 1]    │ │[cite: 1]     │ │[cite: 1]        │ │[cite: 1]      │ │[cite: 1]       │
+└──────────────┘ └───────────────┘ └──────────────────┘ └────────────────┘ └─────────────────┘
+
 ```
 
-Negatif dönem sonu tahmini durum, hesaplanan finansman açığı faiziyle birlikte sonraki maaş dönemine aynen `OpeningProjectedSavings` olarak taşınır. UI bunu **devreden finansman açığı** olarak gösterir. Bu değer yeni kredi, kart borcu veya zorunlu ödeme değildir; yalnız kümülatif planlama başlangıç durumudur ve dönem sonu hesabında ikinci kez çıkarılmaz.
+1. **Dönem Döngüsü ve Mutabakat (Plan vs. Gerçek):** Finansal hayatı dondurulmuş planlar ve gerçekleşmeler ekseninde disipline eder; sapmaları (Reconciliation Adjustment) net biçimde raporlar.
 
-Devreden kart borcuna aylık planlama faizi, o bakiyenin girdiği ekstrede bir kez işlenir ve ekstre tutarına eklenir; ödeme sonrası kalan principal faizsiz devreder, faizi bir sonraki ekstrede işlenir. Bu nedenle ekstresini tamamen ödeyen kullanıcı da devraldığı borcun faizini öder. Bankanın kestiği gerçek ekstre nihai tutardır, üzerine faiz eklenmez. Kart faizi ayrı bir kalem olarak mevcut maaş döneminin zorunlu ödemesine tekrar yazılmaz; nakit etkisi ekstre ödemesinin içindedir. Kart carry faizi ile genel finansman açığı faizi iki ayrı state ve summary olarak tutulur; ikisi de varsayılan `%5,00`, `decimal` ve iki hane `AwayFromZero` yuvarlama kullanır.
 
-Maaş, tek seferlik gelir, kredi, kart harcaması, kart vadesi, geçici ödeme ve büyük giderlerin tamamı exact date ile ilgili maaş dönemine yerleşir. Ayın 29/30/31'i için takvim sonu kırpma kuralı merkezi olarak uygulanır.
+2. **İleriye Dönük 12 Aylık Projeksiyon:** Anchor snapshot noktasından başlayarak tam 1 yıl boyunca kümülatif likiditeyi ve finansman açıklarını gün gün hesaplar.
 
-## Güncel durum ve Plan vs Gerçek
 
-İlk tamamlanmış finansal plan bir `FinancialSnapshot` ve bu doğruluk noktasından sonraki ilk maaş checkpoint'ına kadar dondurulan bir `PeriodPlanSnapshot` oluşturur. `NextReviewDate`, snapshot tarihinden **strictly after** olan ilk geçerli maaş tarihidir; snapshot maaş günündeyse bir sonraki ay kullanılır. Dashboard, 12 Dönem ve Simulator için güncel başlangıç kaynağı son snapshot'ın `ProjectionStartingSavings` ve `ProjectionAnchorDate` değerleridir. Geçmiş plan hiçbir zaman tekrar hesaplanmaz.
+3. **Akıllı Senaryo Simülatörü:** Geçici planlar (Temporary Plans) oluşturma, koşulları tek tek açıp kapatarak test etme ve tek tuşla canlı finansal yapıya aktarma ("Planı Uygula") gücü sunar.
 
-İlk kullanım maaş döneminin ortasındaysa review penceresi `SnapshotDate < hareket tarihi <= ReviewDate` sınırıyla kısmi oluşturulur. Örneğin 20 Ağustos snapshot'ı 10 Eylül'de review edilir; 5 Eylül kart ve 7 Eylül kredi ödemeleri plana girerken 18 Eylül ödemesi girmez. 30.000 TL aylık yaşam bütçesi, 10 Ağustos–10 Eylül arasındaki 31 günün snapshot sonrasındaki 21 gününe `AwayFromZero` iki hane yuvarlamayla oranlanır: 20.322,58 TL. Snapshot maaş günündeyse sonraki dönem tam bütçeyi kullanır. Bu tarihsel review penceresi 12 Dönem projection ekranından ayrı bir çıktıdır ve 12 dönemlik hesap motorunun dönemlerini değiştirmez.
 
-Review tarihi geldiğinde (`CurrentDate >= ReviewAvailableFrom`) üç adımlı akış açılır:
+4. **Gerçekçi Maliyet ve Faiz Modellemesi:** Kredi kartı ekstre carry faizleri ve açık faizlerini gerçek bankacılık yuvarlama ve kurallarıyla hesaplayarak kullanıcıyı sürpriz açık maliyetlerine karşı uyarır.
 
-1. **Planın:** Dönem başında dondurulan gelir, ödemeler, yaşam bütçesi, faiz ve dönem sonu görülür. İsteğe bağlı revizyon original planı değiştirmeden ayrı saklanır.
-2. **Gerçekte Ne Oldu?:** Planlı ödemeler listelenir; ödendi, farklı tutar veya ödenmedi seçilir. Tutar kutuları boş gelir, boş bırakılan tutar planlananı kabul eder. Tek toplam yaşam gideri yeterlidir. İsteğe bağlı yaşam kırılımı, plan dışı büyük ödeme ve plan dışı gelir eklenebilir.
-3. **Sonuç:** Son plan, gerçek ve fark gösterilir. Kullanıcı yeni başlangıç durumunu doğrular; kayıt tek SQLite transaction'ında actual, canonical borç durumu, yeni current snapshot ve yeni frozen planı oluşturur.
 
-```text
-Yeni Başlangıç Durumu Önerisi =
-  Önceki Başlangıç Durumu
-  + Planlanan Gelir
-  + Plan Dışı Gelir
-  - Gerçekleşen Planlı Ödemeler
-  - Toplam Yaşam Gideri
-  - Dönemde Ödenen Diğer Faiz
-  - Plan Dışı Büyük Ödemeler
-```
+5. **Operasyonel Takip ve Hatırlatıcı:** Rahat ve agresif bildirim modları, tek dokunuşla "Ödedim" / "Ertele" aksiyonları ile dönem içindeki taahhütlerin kaçırılmasını engeller.
 
-Kullanıcı öneriyi gerçek finansal durumuyla düzeltebilir; fark `ReconciliationAdjustment` olarak geçmişe yazılır. Yaşam giderinin gerçek değeri gelecek ayın global yaşam bütçesini sessizce değiştirmez. Kart/kredi/ödeme planı actual durumları ise canonical kayıtları ilerlettiği için sonraki projection ve Simulator tarafından görülür.
 
-## Ekranlar
 
-Sol üstteki native Shell hamburger menüsü altı kök bölüm içerir; bottom TabBar yoktur:
+---
 
-1. **Ana Sayfa — içinde bulunduğun dönem.** Ekran tek zaman dilimine aittir (I16): buradaki her rakam dönemin donmuş planından veya gözlem defterinden gelir, gelecek projeksiyonundan değil. Üstte mevcut tutar — girdiğin değer bir **gözlemdir**, planı ve geçmiş kaydını değiştirmez (I14). Altında üç blok: **PLAN** (dönem başında dondurulan taahhüt), **GİDİŞAT** (gözlemden türetilen parametre karşılaştırması — yaşam gideri havuzu *planlanan / harcanan / kalan*, kart başına *planlanan ekstre / mevcut ekstre*, açık faizi ve dönem sonu *planlanan / mevcut*; gözlem yoksa hiç görünmez), **KALAN** (vadesi henüz gelmemiş plan satırları). KALAN'ın altında **Ödeme günü hatırlatıcısı**: Kapalı · Rahat (ödeme günü sabahı tek bildirim) · Agresif (3 gün önce, bir gün önce akşam, ödeme günü sabah ve akşam); aynı güne düşen ödemeler tek bildirimde toplanır; kart sıradaki ödeme günlerini bugüne göre ("3 gün sonra") gösterir. Bildirimde **Ödedim** ve **Ertele** düğmeleri var: ödenen kalan ödemelerden düşer ve KALAN ile kartın arasındaki **Ödediklerin** listesinde saydam yeşil durur (dokununca geri alınır); ertelenen kartta saydam kırmızı "Ertelendi" satırı olur, 3 saat sonra yeniden hatırlatılır, dokununca "Bu ödeme yapıldı mı?" sorulur. "Deneme bildirimi gönder" ödeme gününü beklemeden akışı gösterir. Aynı kart ve Ödediklerin "Bu dönem nasıl oluşuyor" ekranında da durur. Dönem checkpoint'e geldiğinde "Bu dönemi kapat" açılır. 12 Dönem, Geçmiş ve Simülatör'e giden bağlantılar rakam taşımaz.
-2. **12 Dönem:** Compact dönem kartları 12 dönemi hızlı taratır. Karta dokununca ortak full-screen **Dönem Detayı** açılır; summary, finansal akış, açık, zorunlu kırılımı, faiz ve her exact ödeme ayrı görsel satırda gösterilir. **Kredi Kapatma** kartı her kredi için 12 dönem içindeki taksit günlerini dener ve kapatmanın hiçbir dönemde finansman açığı oluşturmadığı ve toplamda kazandırdığı en erken günü önerir (*"18 Aralık 2026 tarihinde 33.177 TL ile kapatabilirsin"*); uygun gün yoksa sebebini söyler, öneriyi tek dokunuşla Simülatörde açar.
-3. **Simülatör:** Koşullar switch ile açılıp kapanır; kapalı koşul hesaba girmez ve 12 dönemlik liste anında yeniden hesaplanır. Hiçbiri açık değilken liste baz projeksiyonu gösterir. Kurulan koşul listesi **geçici plan** olarak adlandırılıp saklanabilir: kalıcıdır, uygulama kapansa da kaybolmaz, listeden geri yüklenince ekrandaki planın yerine geçer ve koşulların açık/kapalı durumunu da taşır. Geçici plan bir denemedir; projeksiyona girmez, gerçek kayda dönüşmesi için **Planı Uygula** gerekir ve uygulamak saklanan planı silmez. Plan türü önce grupla, sonra açıklamalı kartla seçilir (her grupta en fazla üç tür): **Harcama** — nakit ödeme, kartla harcama (taksit sayısı 1 ise tek çekim), düzenli ödeme; **Borç / Kredi** — kredi / finansman çekme, taksitli nakit borç, krediye erken ödeme (tamamen kapat / ara ödeme · vade kısalt / taksit azalt); **Gelir** — tek seferlik gelir, gelir değişikliği; **Ayar** — kart ödeme şekli, gelir kullanım düzeni. Erken ödemede kredinin ömrü boyunca ödenmeyecek faizi ayrıca gösterir; baseline ve scenario faiz yükünü karşılaştırır. Dönem kartı aynı Dönem Detayı sayfasını baseline/senaryo/delta modu ile kullanır.
-4. **Finansal Yapı:** Gelirler, kredi kartları, krediler, düzenli ödemeler ve tek seferlik/geçici ödemeler yönetimi. "+ Ekle" simülatördeki gibi grup çipleri ve açıklamalı kartlar açar: **Harcama**, **Borç / Kredi** ve **Gelir** altındaki simüle edilebilen türler simülatörün formunu açar ve kaydı simülasyonu uygulamakla aynı yoldan doğrudan yazar; **Gelir** altındaki maaş / gelir değişikliği ile **Hesap** altındaki kredi kartı, bankadaki kredi ve tutarı aydan aya değişen ödeme planı kendi formlarındadır. Formlar örnek değerle dolu gelmez; örnekler placeholder'dadır. Her kredi kalan anaparasını, taksitten türetilen aylık faizini ve bugünkü kapatma tutarını gösterir; uygulanmış erken ödemeler kredinin altında durur ve silinerek geri alınır. Kart kontrol ekranı zaman eksenine göre okunur — **ŞU AN** (kesilmiş ekstre ve onun kararı), **SIRADAKİ** (gelecek ekstreler, istenirse vadeye özel override), **GENEL** (kartın varsayılan şekli ve kararsız ekstrelerde hesaplama varsayımı; varsayılan kapalı). Dört karar da aynı "asgari/tamamı" kelimeleriyle sunuluyordu; ayrımı yapan tek şey kapsam olduğu için başlıklar kapsamı söyler.
-5. **Geçmiş:** Kapanmış dönemlerde Original Plan, varsa Son Plan, Gerçek, kategori farkları, ödeme durumları ve yeni güncel durum.
-6. **Ayarlar:** Dönem günü, yaşam bütçesi, kart carry/açık faiz varsayımları, read-only düzen geçmişi ve development araçları. Mevcut tutar burada değil, Ana Sayfa'dadır; iki yerde düzenlenebilmesi hangisinin çapayı ilerlettiğini belirsizleştiriyordu.
+## 6. Dil, Ton ve UX İlkeleri
 
-Simülatörde **Simülasyon Yap** yalnız bellekte hypothetical bir plan üretir. **Planı Uygula** açık onaydan sonra scenario türünü canonical finans kaydına dönüştürür; aynı application kimliği ikinci kez yükümlülük oluşturmaz. Uygulanan kayıt Finansal Yapı içindeki doğru bölümde veya seçili kart kontrolünde hemen açılabilir ve sonraki simulator baseline hesabına normal gerçek veri olarak girer.
+* **Ciddi, Olgun ve Finansal Dil:** "Cebinde ne kaldı?", "Harcama canavarı" gibi laubali ifadeler yerine; **"Dönem Neti"**, **"Serbest Harcama Limiti"**, **"Finansman Açığı"**, **"Dönem Mutabakatı"** gibi güven veren terminoloji kullanılır.
 
-Ayarlar, düzen geçmişini yalnız bilgi amaçlı gösterir. Kullanıcı bir sonraki değişikliğin başlayacağı dönemi seçer; uygulama eski kayıtları değiştirmeden yeni effective-dated event ekler. Yalnız henüz başlamamış planlanan değişiklik düzenlenebilir veya iptal edilebilir.
 
-## Mimari
+* **Kalıcı Değer vs. Anlık Gözlem:** Kullanıcının ana ekranda girdiği mevcut bakiye bir projeksiyon çöpü değil; sistemin yönünü doğrulamaya yarayan bir "Gözlem Noktası"dır. Planı bozmaz, sapmayı gösterir.
 
-```text
-CoinFlow.sln
-├─ src/CoinFlow.Domain          # Saf, deterministic finans motoru
-├─ src/CoinFlow.Application     # Kullanım senaryoları ve store sözleşmesi
-├─ src/CoinFlow.Infrastructure  # SQLite, migration ve development seed
-├─ src/CoinFlow.App             # .NET MAUI Android + MVVM UI
-└─ tests/CoinFlow.Tests         # Unit ve SQLite entegrasyon testleri
-```
 
-Projection ve simulator aynı `FinancialProjectionCalculator` çekirdeğini kullanır. Ayrıntılar için [mimari belgeye](ARCHITECTURE.md), güncel durum ve devir notu için [DURUM.md](DURUM.md)'ye bakın.
+* **Görsel Tasarım Dili:** Neon ve aşırı doygun renkler yerine; derin lacivert/arduvaz zeminler, net tipografi, güven verici kobalt mavisi ve ölçülü finansal durum renkleri (zümrüt yeşili / koyu kırmızı) hakimdir.
 
-## Development seed
+---
 
-Fresh development ve production veritabanları finansal olarak boş açılır; otomatik seed çalışmaz. Development build'de Ayarlar altındaki bağımsız **Seed Data Yükle** aksiyonu şu kanonik planı yükler:
-
-- Maaş: 01.01.2026'dan itibaren 115.000 TL, 01.01.2027'den itibaren 132.250 TL
-- Garanti BBVA: 14.501,23 TL, 22 taksit
-- Burgan Bank: 7.374,59 TL, 9 taksit
-- Eminevim: 20.09.2026 28.167,40 TL; 20.10.2026 28.167,40 TL; 20.11.2026 55.492,20 TL
-- Axess: limit 607.350 TL; devreden 35.201,77 TL; dönem içi 61.283,91 TL; exact future charges
-- Yaşam bütçesi: 30.000 TL; başlangıç durumu: 0 TL
-- Kart carry ve finansman açığı aylık planlama faizi: `%5,00`
-- Projection anchor: 20.08.2026; ilk projection maaşı: 10.09.2026
-- İlk gelir kullanım düzeni: `UpcomingPeriod`
-
-Seed yalnızca development build'de kullanıcı isteğiyle çalışır. Sabit kimliklerle upsert edildiği için boş veya mevcut veritabanına tekrar yüklenmesi kayıt çoğaltmaz. Ayrı **Verileri Sil** aksiyonu snapshot/Plan vs Gerçek geçmişi dahil tüm finans kayıtlarını, strategy history'yi ve projection anchor/bütçelerini temizler; şemayı korur ve seed yüklemez. Kullanıcı boş durumda ilk maaşını kaydedince anchor bir kez oluşturulur ve maaş kullanım düzenini seçen onboarding açılır.
-
-## Yerel doğrulama
-
-Gereksinimler: .NET SDK 8, MAUI Android workload, JDK 17 ve Android SDK 34.
-
-```powershell
-dotnet restore CoinFlow.sln
-dotnet test tests/CoinFlow.Tests/CoinFlow.Tests.csproj -c Release
-dotnet build src/CoinFlow.App/CoinFlow.App.csproj -c Release
-```
-
-Development APK üretimi:
-
-```powershell
-dotnet publish src/CoinFlow.App/CoinFlow.App.csproj -f net8.0-android -c Release `
-  -p:AndroidPackageFormat=apk -p:RunAOTCompilation=false `
-  -p:CoinFlowDevBuild=true -p:CoinFlowVersion=0.0.0-dev `
-  -p:CoinFlowBuildNumber=1 -p:CoinFlowCommit=local
-```
-
-## Migration
-
-SQLite şema sürümü 17'dir (`SqliteCoinFlowStore.CurrentSchemaVersion`): v10 kesilmiş kart ekstresi içe aktarma, v11 kart ödeme tercihi geçmişi, v12 geçici planlar, v13 dönem gözlemi, v14 kredi türü ve tarihli kapatma tutarı, v15 kredi erken ödeme olayları, v16 ödeme günü hatırlatıcısı ayarı, v17 hatırlatıcı defteri ("Ödedim" / "Ertele" cevapları). v12–v17 ayrıntıları [mimari belgede](ARCHITECTURE.md). Aşağısı v7–v9 tarihçesidir. v8 additive migration snapshot, frozen plan, revision, actual payment/flow ve living breakdown tablolarını ekler; mevcut finans tablolarını drop etmez. Upgrade olan kullanıcıda ilk plan okunurken mevcut canonical durumdan tek bir initial snapshot üretilir; geçmiş aylar için actual uydurulmaz. Önceki build'in 20 Ağustos snapshot'ını yanlışlıkla 10 Ekim'e bağlayan tamamlanmamış planı, ilk okumada 20 Ağustos–10 Eylül planıyla atomik olarak değiştirilir; canonical kullanıcı verileri ve tamamlanmış history değiştirilmez. v7 migration iki planlama faiz varsayımını `%5,00` ile başlatmaya devam eder. Eski global ödeme atama değeri bir kez ilk strategy history kaydına dönüştürülür ve runtime source of truth olmaktan çıkar. Eski kart aggregate alanları yeni kart modeline aktarılır. Kaldırılan mikro harcama, balance snapshot ve acil fon tabloları upgrade sırasında düşürülür.
-
-## Mimari ve Standartlar
-
-Uygulamanın mimari kuralları, katman bağımlılıkları ve Clean Architecture standartları [ARCHITECTURAL_RULES.md](ARCHITECTURAL_RULES.md) dosyasında tanımlanmıştır. Hesaplama kuralları ve domain detayları için [ARCHITECTURE.md](ARCHITECTURE.md) ve proje durum devir notu için [DURUM.md](DURUM.md) belgelerine bakabilirsiniz.
-
-## CI/CD
-
-Mevcut GitHub Actions development ve stable workflow'ları korunmuştur. Development hattı test edip `Mizan-dev-latest.apk` prerelease asset'i üretir. Stable hattı repository secret'larındaki release keystore ile `Mizan-X.Y.Z.apk` üretir; release anahtarı repoya yazılmaz. Production signing key repository dışında korunmalı ve v1.0.0 sonrası tüm stable Android release'lerinde aynı key kullanılmalıdır.
-
+Bu belge, repoya `docs/VISION_AND_MISSION.md` olarak eklenebilir veya Google Flow arayüz çizimlerinde ürünün değişmez anayasası olarak referans alınabilir.

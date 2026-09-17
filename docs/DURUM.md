@@ -1,11 +1,11 @@
 # Mizan — Proje Durumu ve Devir Notu
 
-> Son güncelleme: 18.09.2026 · Son sürüm `v1.18.1`
+> Son güncelleme: 18.09.2026 · Son sürüm `v1.18.2`
 >
 > **Yeni bir sohbet/geliştirici buradan başlar.** Bu dosya tek devir
 > belgesidir; eski `HANDOFF.md` ve `TODO.md` kaldırıldı, hâlâ geçerli olan kısımları
 > burada (TODO tamamen bitmişti). Önce "Devir" bölümünü, sonra "Açık işler"i ve "Ürün invariant'ları"nı
-> oku. Sürüm bölümleri (v1.2.0 → v1.18.1) geriye dönük kayıttır; yalnız
+> oku. Sürüm bölümleri (v1.2.0 → v1.18.2) geriye dönük kayıttır; yalnız
 > dokunacağın alanın bölümünü oku.
 
 ## Devir
@@ -15,10 +15,10 @@
 | | |
 |---|---|
 | Branch | `main`, `origin/main` ile eşit, worktree yok (`git worktree list` yalnız `main`) |
-| Son sürüm | `v1.18.1` — ANR Bug Fix (Soğuk açılış kilitlenme düzeltmesi), MainThread dispatcher emniyeti (`Mizan-1.18.1.apk`) |
-| Testler | 579/579 (`dotnet test`, ~8 sn) |
+| Son sürüm | `v1.18.2` — Açılış Çökmesi Çözümü & İsimlendirme Refactoring (`Mizan-1.18.2.apk`) |
+| Testler | 583/583 (`dotnet test`, ~8 sn) |
 | Android Release build | 0 uyarı, 0 hata |
-| Şema | v17 (`SqliteCoinFlowStore.CurrentSchemaVersion`) |
+| Şema | v17 (`SqliteMizanStore.CurrentSchemaVersion`) |
 | Veri yeri | profil başına `files/profiles/{id:N}/coinflow.db3` (v1.12.0'dan beri) |
 | Yedek yeri | `/storage/emulated/0/Mizan/Mizan-yedek-YYYY-MM-DD.zip` (dev build: `Mizan Dev`), v1.13.0'dan beri |
 
@@ -54,16 +54,16 @@ Hepsini **repo kökünden** çalıştır. `global.json` SDK'yı 8.0.424'e sabitl
 repo dışından çalıştırırsan makinedeki .NET 10 seçilir.
 
 ```powershell
-dotnet test tests/CoinFlow.Tests/CoinFlow.Tests.csproj -c Release
-dotnet build src/CoinFlow.App/CoinFlow.App.csproj -c Release
+dotnet test tests/Mizan.Tests/Mizan.Tests.csproj -c Release
+dotnet build src/Mizan.App/Mizan.App.csproj -c Release
 # Dev build'i açık emülatöre kur (paket: com.coinflow.mobile.dev, ad "Mizan Dev")
-dotnet build src/CoinFlow.App/CoinFlow.App.csproj -f net8.0-android -c Debug -p:CoinFlowDevBuild=true -p:EmbedAssembliesIntoApk=true -t:Install
+dotnet build src/Mizan.App/Mizan.App.csproj -f net8.0-android -c Debug -p:MizanDevBuild=true -p:EmbedAssembliesIntoApk=true -t:Install
 emulator -avd mizan34
 adb shell monkey -p com.coinflow.mobile.dev -c android.intent.category.LAUNCHER 1
 ```
 
 - Domain, Application, Infrastructure ve test projeleri düz `net8.0`; testler
-  Android araç zinciri gerektirmez. Yalnız `CoinFlow.App` `net8.0-android`.
+  Android araç zinciri gerektirmez. Yalnız `Mizan.App` `net8.0-android`.
 - Test projesi App'e referans vermez. App davranışı (XAML, menü seçenekleri)
   **kaynak testleriyle** sabitlenir: `*SourceTests.cs` dosyaları repo kökünü
   `CoinFlow.sln`'den bulup dosyayı metin olarak okur.
@@ -105,17 +105,17 @@ Commit mesajları İngilizce özet satırı + Türkçe gövde biçiminde (`git l
 
 | Nerede | Ne |
 |---|---|
-| `src/CoinFlow.Domain/Calculations/` | Saf motorlar: `FinancialProjectionCalculator` (tek projeksiyon, I1), `SimulationCalculator` (senaryo türleri + `Validate`), `CreditCardStatementCalculator`, `LoanAmortizationCalculator`, `LoanPaymentScheduleBuilder` |
-| `src/CoinFlow.Application/Services/CoinFlowService.cs` | UI'ın gördüğü cephe (~1.900 satır): plan okuma, projeksiyon, simüle/uygula, doğrudan giriş, review |
-| `src/CoinFlow.Application/Services/` | `PeriodProgressService` (Ana Sayfa), `PeriodReviewService`, `LoanPayoffService` / `LoanPayoffAdvisor`, `BackupService`, `ProfileService` |
-| `src/CoinFlow.Application/Models/SimulationScenarioCatalog.cs` | Plan türü grupları, tür çözümü, türün simülatör dışındaki yeri (v1.15.0) |
-| `src/CoinFlow.Application/Models/FinancialRecordEntryCatalog.cs` | Finansal Yapı "+ Ekle" türleri ve grupları (v1.16.0) |
-| `src/CoinFlow.Application/Services/PaymentReminderPlanner.cs` | Ödeme hatırlatıcısı takvimi, kartın gün satırları, erteleme saati, `DueKey` (saf); ödemeleri `CoinFlowService.GetUpcomingPaymentDuesAsync`, kartın tamamını `GetPaymentReminderBoardAsync` toplar (v1.16.0, v1.17.0) |
-| `src/CoinFlow.Application/Services/PaymentReminderPayload.cs` | Bildirimin taşıdığı ödemeler ve "Ödedim" / "Ertele" cevap kuyruğunun düz metin biçimi (v1.17.0) |
-| `src/CoinFlow.Infrastructure/Persistence/` | `SqliteCoinFlowStore` (şema + migration), `ProfileScopedCoinFlowStore` (açık profile iletir), `DevelopmentDataSeeder`, `FileSystemProfileRepository`, `ProfileBackupArchive` |
-| `src/CoinFlow.App/Pages` · `ViewModels` · `Controls` | MAUI sayfaları ve MVVM (CommunityToolkit). `Controls/ScenarioConditionFormView` Simülatör ile Finansal Yapı'nın ortak koşul formu; `EntryTypePickerView` ikisinin ortak tür seçicisi; `PaymentReminderCardView` hatırlatıcı kartı; `PaymentReminderPaidView` "Ödediklerin" |
-| `src/CoinFlow.App/Platforms/Android/PaymentReminders.cs` | Hatırlatıcı alarmı, bildirimi ve düğmeleri, cevap alıcısı ve kuyruğu, yeniden başlatma alıcısı (v1.16.0, v1.17.0) |
-| `tests/CoinFlow.Tests/` | Domain, SQLite entegrasyon ve kaynak testleri. Sözleşme testleri: `ProductContractInvariantTests`, `CultureFormattingSourceTests`, `ScenarioDirectEntryTests` (parite), `PlaceholderSourceTests`, `PeriodHistoryTests` (geçmiş dönem tarih/tutar) |
+| `src/Mizan.Domain/Calculations/` | Saf motorlar: `FinancialProjectionCalculator` (tek projeksiyon, I1), `SimulationCalculator` (senaryo türleri + `Validate`), `CreditCardStatementCalculator`, `LoanAmortizationCalculator`, `LoanPaymentScheduleBuilder` |
+| `src/Mizan.Application/Services/MizanService.cs` | UI'ın gördüğü cephe (~1.900 satır): plan okuma, projeksiyon, simüle/uygula, doğrudan giriş, review |
+| `src/Mizan.Application/Services/` | `PeriodProgressService` (Ana Sayfa), `PeriodReviewService`, `LoanPayoffService` / `LoanPayoffAdvisor`, `BackupService`, `ProfileService` |
+| `src/Mizan.Application/Models/SimulationScenarioCatalog.cs` | Plan türü grupları, tür çözümü, türün simülatör dışındaki yeri (v1.15.0) |
+| `src/Mizan.Application/Models/FinancialRecordEntryCatalog.cs` | Finansal Yapı "+ Ekle" türleri ve grupları (v1.16.0) |
+| `src/Mizan.Application/Services/PaymentReminderPlanner.cs` | Ödeme hatırlatıcısı takvimi, kartın gün satırları, erteleme saati, `DueKey` (saf); ödemeleri `MizanService.GetUpcomingPaymentDuesAsync`, kartın tamamını `GetPaymentReminderBoardAsync` toplar (v1.16.0, v1.17.0) |
+| `src/Mizan.Application/Services/PaymentReminderPayload.cs` | Bildirimin taşıdığı ödemeler ve "Ödedim" / "Ertele" cevap kuyruğunun düz metin biçimi (v1.17.0) |
+| `src/Mizan.Infrastructure/Persistence/` | `SqliteMizanStore` (şema + migration), `ProfileScopedMizanStore` (açık profile iletir), `DevelopmentDataSeeder`, `FileSystemProfileRepository`, `ProfileBackupArchive` |
+| `src/Mizan.App/Pages` · `ViewModels` · `Controls` | MAUI sayfaları ve MVVM (CommunityToolkit). `Controls/ScenarioConditionFormView` Simülatör ile Finansal Yapı'nın ortak koşul formu; `EntryTypePickerView` ikisinin ortak tür seçicisi; `PaymentReminderCardView` hatırlatıcı kartı; `PaymentReminderPaidView` "Ödediklerin" |
+| `src/Mizan.App/Platforms/Android/PaymentReminders.cs` | Hatırlatıcı alarmı, bildirimi ve düğmeleri, cevap alıcısı ve kuyruğu, yeniden başlatma alıcısı (v1.16.0, v1.17.0) |
+| `tests/Mizan.Tests/` | Domain, SQLite entegrasyon ve kaynak testleri. Sözleşme testleri: `ProductContractInvariantTests`, `CultureFormattingSourceTests`, `ScenarioDirectEntryTests` (parite), `PlaceholderSourceTests`, `PeriodHistoryTests` (geçmiş dönem tarih/tutar) |
 
 ### Tuzaklar (bu projede gerçekten yaşandı)
 
@@ -123,7 +123,7 @@ Commit mesajları İngilizce özet satırı + Türkçe gövde biçiminde (`git l
   biçimlenir. Varsayılan kültürde ay adı İngilizce çıkıyor.
   `CultureFormattingSourceTests` sağlayıcısız biçimi düşürür. Global kültür
   bilinçli olarak ayarlanmadı: Türkçe I/İ karşılaştırmalarını bozar.
-- **Store'a yeni metot** eklenirse `ProfileScopedCoinFlowStore` iletimini de
+- **Store'a yeni metot** eklenirse `ProfileScopedMizanStore` iletimini de
   ekle (`ProfileTests` her iletimi ölçer). Singleton servislere durum koyma;
   profil değişince servisler yeniden kurulmaz.
 - **XAML:** bir elemana `BindingContext="{Binding X}"` verirsen aynı elemanın
@@ -219,6 +219,8 @@ ekran doğruydu ama okunmuyordu; v1.5.0 ise eksik olan bir şeyi ekledi.
 | **v1.16.0** | **Ödeme günü hatırlatıcısı** (rahat / agresif) · Finansal Yapı ekleme alanı simülatör tasarımında · placeholder'lar · atıl kod temizliği · ödenmeyen borç yeni dönemin planından düşüyordu |
 | **v1.17.0** | **Bildirimde "Ödedim" / "Ertele"** · ertelenenler kartta kırmızı, ödenenler "Ödediklerin"de yeşil · deneme bildirimi · kart 15 Eylül'de 18 Eylül'e "bugün" diyordu |
 | **v1.18.0** | **Clean Architecture & Modern MVVM Mimarisi** · 350 satır sınıf limiti (%100 uyum, 0 kural ihlali) · Segregated Repositories (10 ISP arayüzü) · UI/Navigasyon soyutlaması (`INavigationService`) · 576/576 test yeşil |
+| v1.18.1 | ANR Bug Fix — `UserFeedbackService` ve `MauiNavigationService` UI thread kilitlenme çözümü |
+| **v1.18.2** | **Açılış Çökmesi Çözümü & İsimlendirme Refactoring** — `MainActivity` insets null emniyeti, `ProfileSelectionPage` `OnAppearing` try-catch koruması, `UserFeedbackService` hata dayanıklılığı, `MainApplication` global hata yakalayıcılar, CoinFlow -> Mizan refactoring |
 
 Grafik çalışması (Faz 1–4, v1.1.0–v1.2.0) v1.3.0'da geri alındı; ayrıntı
 aşağıdaki sürüm bölümlerinde. Anılan `DEVIR-FAZ3.md` repoda yok.
@@ -296,7 +298,7 @@ kusur.
 
 **Not — plandaki bir teşhis yanlıştı.** Plan, Ayarlar'dan mevcut tutarı
 değiştirmenin çapayı ilerletmediğini ve çift sayıma yol açtığını söylüyordu.
-Ölçüldü: `CoinFlowService.SaveSettingsAsync` tutar değiştiğinde çapayı zaten
+Ölçüldü: `MizanService.SaveSettingsAsync` tutar değiştiğinde çapayı zaten
 `clock.Today`'e normalize ediyor (`SettingsViewModel`'in eski çapayı geri
 yazması bu yüzden zararsızdı). Taşıma yine de yapıldı — gerekçe UX: kullanıcı
 uygulamaya girince ilk işi bugünkü bakiyeyi girmek. Çift sayım hatası yoktu.
@@ -721,7 +723,7 @@ Kararlar (dördü de önerilen seçenek): **korumasız** (PIN yok) · menüde
   tutmuyor. Bu yüzden izolasyon şema değişikliği olmadan, hiçbir tabloya
   `ProfileId` eklemeden sağlandı: `profiles/{id:N}/coinflow.db3` +
   `profile.json` (ad, oluşturulma, son açılış).
-- **`ProfileScopedCoinFlowStore`** uygulamanın gördüğü tek `ICoinFlowStore`;
+- **`ProfileScopedMizanStore`** uygulamanın gördüğü tek `IMizanStore`;
   çağrıları açık profilin store'una iletir. Profil kapalıyken her çağrı hata
   verir — kapanmış bir ekrandan gelen geç çağrı başka profile yazamaz.
 - **`FileSystemProfileRepository`** merkezi liste tutmaz, klasörleri okur;
@@ -914,7 +916,7 @@ kullanır.
   ortak formu açar. Maaş / Gelir Değişikliği · Bankadaki Kredimi Ekle · Kredi
   Kartı · Tarihleri Farklı Ödeme Planı kendi formlarında kalır; sonuncusu gizli
   kalmış `temporary` formudur. Ulaşılamayan ekleme dalları silindi.
-- **`CoinFlowService.AddRecordFromScenarioAsync`** `ApplySimulationAsync` ile
+- **`MizanService.AddRecordFromScenarioAsync`** `ApplySimulationAsync` ile
   aynı gövdeden geçer (doğrulama, idempotency, çakışma, plan revizyonu;
   tetikleyici "Finansal Yapı'dan eklendi"). Kendi ekranı olan türleri (gelir
   değişikliği, kart ödeme şekli, düzen değişikliği) reddeder. Form açılınca
@@ -1049,7 +1051,7 @@ formundaki "Hayır" butonları mavi zeminde görünür oldu.
   "Verileri Sil" kapatır. Eski veritabanı açılınca sütun eklenir (test sütunu
   silip v15'e indirerek doğruluyor). Yedeğe girer.
 - `PaymentReminderPlanner` (Application, saf) takvimi üretir;
-  `CoinFlowService.GetPaymentRemindersAsync(now)` ödemeleri toplar.
+  `MizanService.GetPaymentRemindersAsync(now)` ödemeleri toplar.
 - Android (`Platforms/Android/PaymentReminders.cs`): `AlarmManager` +
   `BroadcastReceiver` + bildirim kanalı "Ödeme hatırlatıcısı".
   `POST_NOTIFICATIONS` Android 13+'ta kart ilk açılınca sorulur; izin yoksa
@@ -1183,7 +1185,7 @@ Ana Sayfa kartın `AnswersChanged` olayında yeniden hesaplar.
 
 **Faz 4 — bildirim düğmeleri.**
 - `PaymentReminderActionReceiver` **veritabanını açmaz**: başka profil açıkken
-  ya da süreç ölüyken de çalışıyor ve `ProfileScopedCoinFlowStore` yalnız açık
+  ya da süreç ölüyken de çalışıyor ve `ProfileScopedMizanStore` yalnız açık
   profili tanıyor. Cevabı `files/payment-reminder-answers.txt`'ye ekler,
   "Ödedim"de o ödemelerin kalan alarmlarını iptal eder, "Ertele"de
   `yyyyMMdd-ertele` alarmını kurar, bildirimi kapatır, Toast gösterir
@@ -1245,10 +1247,10 @@ Bu projede on üçüncü kez yalnız ekranda görülen kusur.
   ve `Page` bağımlılıkları tamamen sıfırlandı. Navigasyon `INavigationService`
   ve rota sabitleri `NavigationRoutes` üzerinden yönetiliyor; diyalog ve toast
   bildirimleri `UserFeedbackService` ile UI thread garantisine alındı.
-- **Segregated Repositories (ISP).** 40+ metotlu monolitik `ICoinFlowStore` arayüzü
+- **Segregated Repositories (ISP).** 40+ metotlu monolitik `IMizanStore` arayüzü
   10 adet odaklı repository arayüzüne (`ISalaryRepository`, `ILoanRepository`,
   `ICreditCardRepository` vb.) ayrıştırıldı.
-- **Tek Sorumluluk Prensibi (SRP).** 2.113 satırlık monolitik `CoinFlowService`,
+- **Tek Sorumluluk Prensibi (SRP).** 2.113 satırlık monolitik `MizanService`,
   4 odaklı use-case servisine (`FinancialPlanQueryService`, `SimulationWorkflowService`,
   `PeriodWorkflowService`, `ObligationManagementService`) bölündü ve ince bir Facade
   ile geriye dönük tam uyumlu bırakıldı.
@@ -1301,7 +1303,7 @@ Bu projede on üçüncü kez yalnız ekranda görülen kusur.
    kayıtlarına gecikme alanı + yeni bir şema sürümü + UI rozeti gerekiyor.
    (Eski notta "şema v12" yazıyordu; v12 geçici planlara gitti, v13 izolasyona
    ayrıldı — bu iş sıradaki boş sürümü alır.)
-   İlgili: `src/CoinFlow.Application/Services/FinancialInstrumentReconciliationService.cs`
+   İlgili: `src/Mizan.Application/Services/FinancialInstrumentReconciliationService.cs`
    **Ürün kararı bekliyor — temsil şekli seçilmeli.**
 
 6. **Akbank PDF içe aktarma bozuk.** `PdfPigPdfTextExtractor` gerçek Akbank Axess
@@ -1380,7 +1382,7 @@ Bu projede on üçüncü kez yalnız ekranda görülen kusur.
    veritabanını arka planda açmak gerekiyor, bu yüzden bu tura alınmadı.
 
 17. **Dönem sihirbazı gözlem defterini okumuyor (🟠 koddan, ekranda
-   ölçülmedi).** `CoinFlowService.GetObservedReviewDraftAsync` var ve testli,
+   ölçülmedi).** `MizanService.GetObservedReviewDraftAsync` var ve testli,
    ama App tarafında hiçbir yerden çağrılmıyor: `PeriodReviewWizardViewModel`
    taslağı yalnız donmuş plandan kuruyor. I15'in "gözlem checkpoint'te
    review'ı doldurur" cümlesi servis düzeyinde doğru, ekranda değil; Ana
@@ -1494,6 +1496,18 @@ okundu ve doğru bir tutar reddedildi. Kullanıcıdan istenen her alan için
 "bu formda başka neye benzer?" diye sor. En iyi düzeltme etiketi
 netleştirmek değil, **gereksiz soruyu kaldırmaktı**: tutar zaten görüldüğü
 gün girilir.
+
+### v1.18.2 ne getirdi
+
+- **Soğuk Açılışta Anında Kapanma (Crash on Launch) Giderildi:**
+  - `MainActivity`: Bazı Android sürümlerinde pencere kontrolcüsü (`GetInsetsController`) null dönebiliyordu. `controller is not null` kontrolü ve pencere stillerini saran koruyucu try-catch eklendi.
+  - `ProfileSelectionPage`: `OnAppearing` yaşam döngüsü (`async void`) koruyucu try-catch ile sarıldı. İzin veya yükleme akışındaki hiçbir hatanın uygulamanın açılışını düşürmemesi garanti edildi.
+  - `UserFeedbackService`: `ConfirmAsync`, `PromptAsync`, `ChooseAsync` ve `ShowAlertAsync` metotlarına koruyucu hata yakalama eklendi; pencere hazır değilken veya diyalog gösterilemezken sessizce güvenli fallback dönmesi sağlandı.
+  - `MainApplication`: `AppDomain.CurrentDomain.UnhandledException`, `AndroidEnvironment.UnhandledExceptionRaiser` ve `TaskScheduler.UnobservedTaskException` dinleyicileri eklenerek fatal çökmeler loglandı ve engellendi.
+  - `MauiProgram`: `MizanService` DI kaydı açık delegeyle doğrudan modern 6 parametreli yapıcıya bağlandı.
+- **CoinFlow -> Mizan İsimlendirme Refactorü:**
+  - Tüm projeler, isim alanları, çözümler ve mimari dokümantasyon Mizan olarak güncellendi.
+- **Doğrulama:** 583/583 test yeşil; Release APK derlemesi 0 hata, 0 uyarı ile tamamlandı.
 
 ## Rol promptları
 

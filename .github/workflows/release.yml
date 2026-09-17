@@ -9,7 +9,7 @@ on:
       version:
         description: Version name for signing smoke test
         required: false
-        default: '1.18.1'
+        default: '1.18.2'
 
 permissions:
   contents: write
@@ -21,7 +21,7 @@ concurrency:
 env:
   DOTNET_NOLOGO: true
   DOTNET_CLI_TELEMETRY_OPTOUT: true
-  PROJECT: src/CoinFlow.App/CoinFlow.App.csproj
+  PROJECT: src/Mizan.App/Mizan.App.csproj
 
 jobs:
   release-apk:
@@ -74,10 +74,10 @@ jobs:
         run: dotnet workload install maui-android
 
       - name: Restore
-        run: dotnet restore CoinFlow.sln
+        run: dotnet restore Mizan.sln
 
       - name: Unit tests
-        run: dotnet test tests/CoinFlow.Tests/CoinFlow.Tests.csproj -c Release --no-restore --logger "console;verbosity=minimal"
+        run: dotnet test tests/Mizan.Tests/Mizan.Tests.csproj -c Release --no-restore --logger "console;verbosity=minimal"
 
       - name: Validate signing secrets and create temporary keystore
         shell: bash
@@ -95,7 +95,7 @@ jobs:
           printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$keystore"
           [[ -s "$keystore" ]] || { echo "Decoded keystore is empty." >&2; exit 1; }
           chmod 600 "$keystore"
-          echo "COINFLOW_KEYSTORE=$keystore" >> "$GITHUB_ENV"
+          echo "MIZAN_KEYSTORE=$keystore" >> "$GITHUB_ENV"
 
       - name: Build signed stable APK
         shell: bash
@@ -112,12 +112,12 @@ jobs:
             -c Release \
             --no-restore \
             -p:AndroidPackageFormat=apk \
-            -p:CoinFlowDevBuild=false \
-            -p:CoinFlowVersion="$version" \
-            -p:CoinFlowBuildNumber="$version_code" \
-            -p:CoinFlowCommit="${GITHUB_SHA::7}" \
+            -p:MizanDevBuild=false \
+            -p:MizanVersion="$version" \
+            -p:MizanBuildNumber="$version_code" \
+            -p:MizanCommit="${GITHUB_SHA::7}" \
             -p:AndroidKeyStore=true \
-            -p:AndroidSigningKeyStore="$COINFLOW_KEYSTORE" \
+            -p:AndroidSigningKeyStore="$MIZAN_KEYSTORE" \
             -p:AndroidSigningKeyAlias="$ANDROID_KEY_ALIAS" \
             -p:AndroidSigningKeyPass=env:ANDROID_KEY_PASSWORD \
             -p:AndroidSigningStorePass=env:ANDROID_KEYSTORE_PASSWORD
@@ -127,10 +127,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mapfile -t signed_apks < <(find src/CoinFlow.App/bin/Release/net8.0-android -type f -name '*-Signed.apk' -print)
+          mapfile -t signed_apks < <(find src/Mizan.App/bin/Release/net8.0-android -type f -name '*-Signed.apk' -print)
           if [[ ${#signed_apks[@]} -eq 0 ]]; then
             echo "No signed APK was produced; refusing to create a release." >&2
-            find src/CoinFlow.App/bin/Release/net8.0-android -type f -maxdepth 5 -print >&2
+            find src/Mizan.App/bin/Release/net8.0-android -type f -maxdepth 5 -print >&2
             exit 1
           fi
           apk="$(ls -1t "${signed_apks[@]}" | head -n 1)"
@@ -199,17 +199,18 @@ jobs:
         run: |
           version="${{ steps.version.outputs.version }}"
           cat > release-notes.md <<NOTES
-          # Mizan $version — ANR Bug Fix (Soğuk Açılış Kilitlenme Düzeltmesi)
+          # Mizan $version — Açılış Çökmesi Çözümü & İsimlendirme Refactoring
 
-          Bu sürümde, v1.18.0 mimari refactoring sonrasında uygulamanın soğuk açılışında yaşanan ANR ("Bu uygulama yanıt vermiyor") hatası düzeltilmiştir.
+          Bu sürümde, açılışta uygulamanın anında kapanmasına yol açan başlatma hataları giderilmiş, CoinFlow -> Mizan mimari isimlendirme dönüşümü tamamlanmış ve açılış yaşam döngüsü güvenceye alınmıştır.
 
           ### Düzeltmeler ve İyileştirmeler
 
-          - **UI Dispatcher ANR Kilitlenmesi Giderildi (`UserFeedbackService`):** UI thread'inde çalışırken gereksiz `InvokeOnMainThreadAsync` çağrısından kaynaklanan mesaj kuyruğu kilitlenmesi önlendi; doğrudan UI çağrısı sağlandı.
-          - **Pencere Geri Dönüşü (`CurrentPage`):** Soğuk açılışta `Shell.Current` null iken ve pencere henüz bağlanmamışken oluşan ekran referans sorunu `Application.Current.MainPage` fallback'i ile güvenceye alındı.
-          - **Modal Tamamlama Asenkron Kilidi Çözüldü (`MauiNavigationService`):** `OpenOnboardingModalAsync` ve `OpenInitialStrategyModalAsync` metotlarında modal `page.Completion` beklemesi `InvokeOnMainThreadAsync` dışına çıkarılarak ana iş parçacığının tıkanması engellendi.
-          - **Zaman Aşımı Koruma Kalkanı (`ProfileSelectionPage`):** Açılışta `Loaded` olayının kaçırılması veya gecikmesi riskine karşı 500 ms emniyet zaman aşımı eklendi.
-          - **Mimari ve Test Güvencesi:** 579/579 birim testi eksiksiz yeşildir; 0 uyarı ve 0 hata ile Release APK derlemesi doğrulanmıştır.
+          - **Android Pencere & Insets Güvenliği (`MainActivity`):** Bazı cihaz ve Android sürümlerinde pencere kontrolcüsünün null dönmesinden kaynaklanan çökme engellendi; pencere stilleri koruyucu try-catch içine alındı.
+          - **Başlangıç Yaşam Döngüsü Koruması (`ProfileSelectionPage`):** Soğuk açılışta `OnAppearing` yaşam döngüsü koruyucu try-catch ile sarılarak izin/yükleme hatalarının uygulamayı anında kapatması önlendi.
+          - **Diyalog ve Ekran Hata Dayanıklılığı (`UserFeedbackService`):** Ekran veya pencere yöneticisi hazır değilken tetiklenen diyalog çağrıları güvenli fallback değerlerine bağlandı, fatal istisnalar engellendi.
+          - **Genel Hata Yakalayıcılar (`MainApplication`):** AppDomain, AndroidEnvironment ve TaskScheduler genel istisna yakalayıcıları kaydedildi.
+          - **CoinFlow -> Mizan İsimlendirme Refactorü:** Tüm çözüm, projeler, isim alanları ve mimari dokümantasyon Mizan çatısı altında birleştirildi.
+          - **Doğrulama:** 583/583 birim testi eksiksiz yeşildir; Release APK derlemesi 0 hata ve 0 uyarı ile doğrulanmıştır.
           NOTES
 
       - name: Upload signed APK artifact
@@ -236,6 +237,6 @@ jobs:
         if: always()
         shell: bash
         run: |
-          if [[ -n "${COINFLOW_KEYSTORE:-}" && -f "$COINFLOW_KEYSTORE" ]]; then
-            rm -f -- "$COINFLOW_KEYSTORE"
+          if [[ -n "${MIZAN_KEYSTORE:-}" && -f "$MIZAN_KEYSTORE" ]]; then
+            rm -f -- "$MIZAN_KEYSTORE"
           fi

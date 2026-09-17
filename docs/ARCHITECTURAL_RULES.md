@@ -11,7 +11,7 @@ Proje bağımlılıkları kesin olarak tek yönlüdür ve tersine bağımlılık
 
 ```text
 ┌─────────────────────────────────────────────────────────────┐
-│                    CoinFlow.App                             │
+│                    Mizan.App                             │
 │   (Yalnızca XAML Views, DataTemplates, Shell & Platform)   │
 └──────────────────────────────┬──────────────────────────────┘
                                │
@@ -22,38 +22,38 @@ Proje bağımlılıkları kesin olarak tek yönlüdür ve tersine bağımlılık
 └──────────────────────────────┬──────────────────────────────┘
                                │
 ┌──────────────────────────────▼──────────────────────────────┐
-│                    CoinFlow.Application                      │
+│                    Mizan.Application                      │
 │   (Use Cases / Interactors, DTOs, Repository Interfaces)    │
 └──────────────────────────────┬──────────────────────────────┘
                                │
 ┌──────────────────────────────▼──────────────────────────────┐
-│                    CoinFlow.Domain                           │
+│                    Mizan.Domain                           │
 │   (Entities, Value Objects, Pure Calculators, Invariants)   │
 └─────────────────────────────────────────────────────────────┘
                                ▲
 ┌──────────────────────────────┴──────────────────────────────┐
-│                    CoinFlow.Infrastructure                   │
+│                    Mizan.Infrastructure                   │
 │   (SQLite Store, PDF Importers, Device Storage Adaptors)    │
 └─────────────────────────────────────────────────────────────┘
 ```
 
 ### Katman Sınır Kuralları:
-1. **`CoinFlow.Domain`**:
+1. **`Mizan.Domain`**:
    - Saf C# ve `.NET 8` olmalıdır.
    - UI, MAUI, veritabanı veya harici kütüphane bağımlılığı barındıramaz.
    - Entity'ler kendi geçerlilik kurallarını (invariants) korumalıdır.
    - Hesaplama motorları (`*Calculator`) saf domain servisleridir; durum (state) tutamazlar.
-2. **`CoinFlow.Application`**:
+2. **`Mizan.Application`**:
    - Yalnızca kullanım senaryolarını (Use Cases / Interactors), DTO'ları ve repository sözleşmelerini (interfaces) barındırır.
    - **ASLA** UI formatlaması (örn: Türkçe para formatı, tarih formatı, UI başlık metinleri) barındıramaz.
    - `SalaryPeriodDetailPresenter` gibi sınıflar Application katmanında değil, UI/Presentation katmanında yer almalıdır.
-3. **`CoinFlow.Infrastructure`**:
+3. **`Mizan.Infrastructure`**:
    - Yalnızca veritabanı, dosya sistemi, PDF okuyucu gibi dış dünya implementasyonlarını içerir.
    - İş mantığı barındıramaz.
 4. **`CoinFlow.UI` (Saf Presentation)**:
    - Tüm ViewModel'ler, `IValueConverter`'lar, `INavigationService`, `IDialogService` burada yer alır.
    - `net8.0` hedeflemeli ve platformdan bağımsız olmalıdır (MAUI Controls bağımlılığı olmamalıdır). Böylece doğrudan xUnit testleri ile izole test edilebilir.
-5. **`CoinFlow.App` (MAUI Shell & Platform Host)**:
+5. **`Mizan.App` (MAUI Shell & Platform Host)**:
    - Yalnızca XAML sayfaları, stiller, custom kontroller ve `Platforms/` altındaki platform adaptörlerini içerir.
 
 ---
@@ -92,7 +92,7 @@ Proje bağımlılıkları kesin olarak tek yönlüdür ve tersine bağımlılık
 ## 3. Application ve Veri Erişim Kuralları (Backend & Storage Invariants)
 
 ### A. No God Service
-- `CoinFlowService.cs` gibi 2.000 satırlık mega servisler yasaktır.
+- `MizanService.cs` gibi 2.000 satırlık mega servisler yasaktır.
 - Her iş akışı odaklı bir **Use Case / Interactor** (veya CQRS Command/Query Handler) olarak tanımlanmalıdır:
   - `GetDashboardProgressQueryHandler`
   - `ApplySimulationScenarioCommandHandler`
@@ -100,7 +100,7 @@ Proje bağımlılıkları kesin olarak tek yönlüdür ve tersine bağımlılık
   - vb.
 
 ### B. Interface Segregation (Arayüz Ayrışımı - ISP)
-- `ICoinFlowStore` gibi 40'tan fazla metot içeren monolitik arayüzler yasaktır.
+- `IMizanStore` gibi 40'tan fazla metot içeren monolitik arayüzler yasaktır.
 - Depolama arayüzleri varlık veya modül bazlı küçük sözleşmelere ayrılmalıdır:
   - `ISettingsRepository`
   - `ISalaryRepository`
@@ -109,7 +109,7 @@ Proje bağımlılıkları kesin olarak tek yönlüdür ve tersine bağımlılık
   - `ISimulationDraftRepository`
 
 ### C. Profil / Multi-Tenancy Yaşam Döngüsü (DI Scoping)
-- Profil değişimlerinde, tüm store çağrılarını `_current` değişkenine delege eden yapay wrapper sınıflar (`ProfileScopedCoinFlowStore`) yerine, .NET DI konteynerinin yerel **`IServiceScope`** mekanizması kullanılmalıdır.
+- Profil değişimlerinde, tüm store çağrılarını `_current` değişkenine delege eden yapay wrapper sınıflar (`ProfileScopedMizanStore`) yerine, .NET DI konteynerinin yerel **`IServiceScope`** mekanizması kullanılmalıdır.
 - Profil seçildiğinde bir child scope açılmalı, profil kapatıldığında o scope dispose edilmelidir. Store ve profile bağımlı servisler `Scoped` yaşam döngüsüne sahip olmalıdır.
 
 ---
@@ -146,7 +146,7 @@ Proje bağımlılıkları kesin olarak tek yönlüdür ve tersine bağımlılık
 ## 5. Platform ve Taşınabilirlik Standartları (Portability)
 
 - Tüm iş mantığı ve ViewModel katmanları saf `.NET 8` (`net8.0`) olmalıdır.
-- Platforma özel (Android) sınıflar (`AndroidStorageAccess`, `PaymentReminders` vb.) sadece `CoinFlow.App/Platforms/Android` altında kalmalı ve platform arayüzlerini (`IStorageAccess`, `IReminderScheduler`) implemente etmelidir.
+- Platforma özel (Android) sınıflar (`AndroidStorageAccess`, `PaymentReminders` vb.) sadece `Mizan.App/Platforms/Android` altında kalmalı ve platform arayüzlerini (`IStorageAccess`, `IReminderScheduler`) implemente etmelidir.
 - `MauiProgram.cs` içinde platform sınıfları koşulsuz olarak kaydedilmemeli, platform DI modülleri üzerinden (`#if ANDROID` veya partial class `ConfigurePlatformServices`) bağlanmalıdır.
 
 ---

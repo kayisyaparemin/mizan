@@ -1,0 +1,90 @@
+using Mizan.App.Services;
+using Mizan.App.ViewModels;
+
+namespace Mizan.App.Pages;
+
+public partial class SettingsPage : ContentPage
+{
+    private readonly SettingsViewModel _viewModel;
+    private readonly IUserFeedbackService _feedback;
+    private readonly INavigationService _navigation;
+
+    public SettingsPage(
+        SettingsViewModel viewModel,
+        IUserFeedbackService feedback,
+        INavigationService navigation)
+    {
+        InitializeComponent();
+        BindingContext = _viewModel = viewModel;
+        _feedback = feedback;
+        _navigation = navigation;
+    }
+
+    protected override async void OnAppearing()
+    {
+        base.OnAppearing();
+        await _viewModel.LoadAsync();
+    }
+
+    private async void OnClearDevelopmentDataClicked(
+        object? sender,
+        EventArgs eventArgs)
+    {
+        var confirmed = await _feedback.ConfirmAsync(
+            "Verileri Sil",
+            "Bu profilin tüm finans verileri silinecek. Diğer profiller etkilenmez. Devam etmek istiyor musun?",
+            "Verileri Sil",
+            "Vazgeç");
+        if (!confirmed)
+        {
+            return;
+        }
+
+        await _viewModel.ClearDevelopmentDataAsync();
+    }
+
+    private async void OnRequestBackupAccessClicked(
+        object? sender,
+        EventArgs eventArgs)
+    {
+        await _viewModel.RequestBackupAccessAsync();
+    }
+
+    private async void OnBackUpNowClicked(
+        object? sender,
+        EventArgs eventArgs)
+    {
+        await _viewModel.BackUpNowAsync();
+    }
+
+    private async void OnLoadCanonicalSeedClicked(
+        object? sender,
+        EventArgs eventArgs)
+    {
+        await _viewModel.LoadCanonicalSeedAsync();
+    }
+
+    private async void OnChangeStrategyClicked(
+        object? sender,
+        EventArgs eventArgs)
+    {
+        _viewModel.PrepareStrategyEditor();
+        await _navigation.OpenStrategyChangeModalAsync(_viewModel);
+    }
+
+    private async void OnDeletePendingStrategyClicked(
+        object? sender,
+        EventArgs eventArgs)
+    {
+        var confirmed = await _feedback.ConfirmAsync(
+            "Planlanan değişikliği sil",
+            "Henüz başlamamış düzen değişikliği silinsin mi?",
+            "Sil",
+            "Vazgeç");
+        if (confirmed)
+        {
+            await _viewModel.DeletePendingStrategyAsync();
+        }
+    }
+
+}

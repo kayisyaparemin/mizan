@@ -1,0 +1,313 @@
+namespace Mizan.Domain.Models;
+
+public enum CreditCardPaymentStrategy
+{
+    AskEachStatement = 0,
+    Minimum = 1,
+    FullStatement = 2,
+    FixedAmount = 3
+}
+
+public enum ProjectionFallbackStrategy
+{
+    None = 0,
+    Minimum = 1,
+    FullStatement = 2,
+    FixedAmount = 3
+}
+
+public enum CreditCardPaymentType
+{
+    FixedAmount = 0,
+    Minimum = 1,
+    FullStatement = 2
+}
+
+public enum CreditCardStatementSource
+{
+    Manual = 0,
+    PdfImport = 1
+}
+
+public enum CurrentStatementPaymentMode
+{
+    Minimum = 0,
+    Full = 1,
+    Custom = 2
+}
+
+public enum PaymentPlanKind
+{
+    Temporary = 0,
+    Installment = 1,
+    Recurring = 2,
+    OtherScheduled = 3
+}
+
+public enum PlannedExpenseStatus
+{
+    Planned = 0,
+    Completed = 1,
+    Cancelled = 2
+}
+
+public enum CashFlowAllocationMode
+{
+    UpcomingPeriod = 0,
+    PreviousPeriod = 1
+}
+
+/// <summary>
+/// Erken ödeme ücretini belirleyen kredi türü (6502 sayılı Kanun).
+/// </summary>
+public enum LoanKind
+{
+    /// <summary>İhtiyaç, taşıt — md. 27: erken ödeme ücreti alınamaz.</summary>
+    Consumer = 0,
+    /// <summary>Sabit faizli konut — md. 37: kalan vade ≤36 ay %1, üstü %2.</summary>
+    HousingFixed = 1,
+    /// <summary>Değişken faizli konut — md. 37: ücret alınamaz.</summary>
+    HousingVariable = 2
+}
+
+public sealed record CashFlowAllocationStrategy
+{
+    public Guid Id { get; init; } = Guid.NewGuid();
+    public CashFlowAllocationMode Mode { get; init; } =
+        CashFlowAllocationMode.UpcomingPeriod;
+    public DateOnly EffectiveFromPeriodDate { get; init; }
+    public DateTimeOffset CreatedAt { get; init; } = DateTimeOffset.UtcNow;
+    public string Note { get; init; } = string.Empty;
+}
+
+public sealed record SalaryScheduleEntry
+{
+    public Guid Id { get; init; } = Guid.NewGuid();
+    public decimal Amount { get; init; }
+    public DateOnly EffectiveDate { get; init; }
+    public string Description { get; init; } = string.Empty;
+}
+
+public sealed record OneTimeIncome
+{
+    public Guid Id { get; init; } = Guid.NewGuid();
+    public decimal Amount { get; init; }
+    public DateOnly ExactDate { get; init; }
+    public string Description { get; init; } = string.Empty;
+}
+
+public sealed record Loan
+{
+    public Guid Id { get; init; } = Guid.NewGuid();
+    public string Name { get; init; } = string.Empty;
+    public string Bank { get; init; } = string.Empty;
+    public decimal MonthlyPayment { get; init; }
+    public int PaymentDay { get; init; }
+    public DateOnly NextPaymentDate { get; init; }
+    public int RemainingInstallmentCount { get; init; }
+    /// <summary>
+    /// Son taksit eşit değilse tutarı. Vade kısaltan ara ödeme son taksiti
+    /// küçültür; null ise son taksit de <see cref="MonthlyPayment"/>'tır.
+    /// </summary>
+    public decimal? FinalPaymentAmount { get; init; }
+    /// <summary>
+    /// Kalan <b>anapara</b> — <see cref="NextPaymentDate"/>'teki taksitten
+    /// hemen önceki hâli. Kalan taksitlerin toplamı değildir.
+    /// </summary>
+    public decimal? RemainingDebt { get; init; }
+    /// <summary>
+    /// Bankanın verdiği kapatma tutarı. Yalnız <see cref="EarlyClosureAmountAsOf"/>
+    /// ile birlikte anlamlıdır; o gün için geçerlidir.
+    /// </summary>
+    public decimal? EarlyClosureAmount { get; init; }
+    public DateOnly? EarlyClosureAmountAsOf { get; init; }
+    public LoanKind Kind { get; init; } = LoanKind.Consumer;
+    public bool IsActive { get; init; } = true;
+
+    public decimal LastInstallmentAmount =>
+        FinalPaymentAmount ?? MonthlyPayment;
+
+    public decimal RemainingInstallmentTotal => RemainingInstallmentCount < 1
+        ? 0m
+        : MonthlyPayment * (RemainingInstallmentCount - 1) +
+          LastInstallmentAmount;
+}
+
+public enum LoanPrepaymentMode
+{
+    /// <summary>Kalan anaparanın tamamı ödenir, kredi kapanır.</summary>
+    FullClosure = 0,
+    /// <summary>Taksit aynı kalır, vade kısalır; son taksit küçülebilir.</summary>
+    ReduceTerm = 1,
+    /// <summary>Vade aynı kalır, taksit küçülür.</summary>
+    ReduceInstallment = 2
+}
+
+/// <summary>
+/// Bir krediye planlanmış erken ödeme. Kredinin kendisini değiştirmez; ödeme
+/// listesi kredinin üstüne bu olayları oynatarak üretilir. Checkpoint'te
+/// ödendiyse kanonik krediye işlenip tüketilir, ödenmediyse iptal olur.
+/// </summary>
+public sealed record LoanPrepayment
+{
+    public Guid Id { get; init; } = Guid.NewGuid();
+    public Guid LoanId { get; init; }
+    public DateOnly Date { get; init; }
+    public LoanPrepaymentMode Mode { get; init; }
+    /// <summary>
+    /// Ara ödemede anaparadan düşecek tutar. Tam kapamada null: tutar o günkü
+    /// kredi durumundan her seferinde yeniden hesaplanır.
+    /// </summary>
+    public decimal? PrincipalAmount { get; init; }
+}
+
+public sealed record TemporaryPaymentPlan
+{
+    public Guid Id { get; init; } = Guid.NewGuid();
+    public string Name { get; init; } = string.Empty;
+    public PaymentPlanKind Kind { get; init; }
+    public decimal? OriginalAmount { get; init; }
+    public decimal? TotalRepaymentAmount { get; init; }
+    public IReadOnlyList<TemporaryPaymentInstallment> Installments { get; init; } = [];
+}
+
+public sealed record TemporaryPaymentInstallment
+{
+    public Guid Id { get; init; } = Guid.NewGuid();
+    public Guid PlanId { get; init; }
+    public DateOnly DueDate { get; init; }
+    public decimal Amount { get; init; }
+    public bool IsPaid { get; init; }
+}
+
+public sealed record CreditCard
+{
+    public Guid Id { get; init; } = Guid.NewGuid();
+    public string Name { get; init; } = string.Empty;
+    public string Bank { get; init; } = string.Empty;
+    public decimal Limit { get; init; }
+    public decimal CarriedBalance { get; init; }
+    public decimal UnbilledSpending { get; init; }
+    public DateOnly BalanceAsOfDate { get; init; }
+    public int StatementClosingDay { get; init; }
+    public int PaymentDueDay { get; init; }
+    public decimal MinimumPaymentRate { get; init; }
+    public CreditCardPaymentStrategy PaymentStrategy { get; init; } = CreditCardPaymentStrategy.AskEachStatement;
+    public decimal? FixedPaymentAmount { get; init; }
+    public ProjectionFallbackStrategy ProjectionFallbackStrategy { get; init; } = ProjectionFallbackStrategy.None;
+    public decimal? ProjectionFallbackFixedAmount { get; init; }
+    public CreditCardStatement? CurrentStatement { get; init; }
+    public CurrentStatementPaymentPlan? CurrentStatementPaymentPlan { get; init; }
+    // Settled statement'tan devralınan, tek kerelik bilinen kesim/son ödeme
+    // tarihi. CurrentStatement emekliye ayrılınca bankanın bildirdiği bir
+    // sonraki tarih kaybolmasın diye burada taşınır; bir sonraki settlement'ta
+    // tüketilip yeniden hesaplanır.
+    public DateOnly? KnownNextStatementDate { get; init; }
+    public DateOnly? KnownNextDueDate { get; init; }
+    public IReadOnlyList<CardCharge> Charges { get; init; } = [];
+    public IReadOnlyList<CreditCardPaymentPlan> PaymentPlans { get; init; } = [];
+    // Kullanıcının ekstre ödeme tercihinin effective-dated geçmişi. Append-only:
+    // yeni karar eski kaydı değiştirmez, yeni bir kayıt olarak eklenir.
+    // Projection'ı beslemez; canonical karar CurrentStatementPaymentPlan'dır.
+    public IReadOnlyList<CreditCardPaymentPreference> PaymentPreferences
+    { get; init; } = [];
+
+    public decimal KnownTotalDebt => CurrentStatement is null
+        ? CarriedBalance + UnbilledSpending + Charges.Sum(x => x.Amount)
+        : CurrentStatement.StatementAmount +
+          Charges
+              .Where(x => x.PostingDate > CurrentStatement.StatementDate)
+              .Sum(x => x.Amount);
+}
+
+public sealed record CreditCardStatement
+{
+    public Guid Id { get; init; } = Guid.NewGuid();
+    public Guid CreditCardId { get; init; }
+    public DateOnly StatementDate { get; init; }
+    public DateOnly DueDate { get; init; }
+    public decimal StatementAmount { get; init; }
+    public decimal MinimumPaymentAmount { get; init; }
+    public DateOnly? NextStatementDate { get; init; }
+    public DateOnly? NextDueDate { get; init; }
+    public CreditCardStatementSource Source { get; init; } =
+        CreditCardStatementSource.Manual;
+    public string? SourceDocumentFingerprint { get; init; }
+    public DateTimeOffset? ImportedAt { get; init; }
+    public DateTimeOffset CreatedAt { get; init; } = DateTimeOffset.UtcNow;
+    public DateTimeOffset UpdatedAt { get; init; } = DateTimeOffset.UtcNow;
+}
+
+// Ekstre ödeme tercihinin tarihsel kaydı. SalaryScheduleEntry ve
+// CashFlowAllocationStrategy ile aynı effective-dated deseni izler: kayıtlar
+// üzerine yazılmaz, her yeni karar yeni bir satırdır.
+public sealed record CreditCardPaymentPreference
+{
+    public Guid Id { get; init; } = Guid.NewGuid();
+    public Guid CreditCardId { get; init; }
+    public CurrentStatementPaymentMode Mode { get; init; } =
+        CurrentStatementPaymentMode.Minimum;
+    public decimal? CustomAmount { get; init; }
+    public DateOnly EffectiveFromStatementDate { get; init; }
+    public DateTimeOffset CreatedAt { get; init; } = DateTimeOffset.UtcNow;
+    public string Note { get; init; } = string.Empty;
+}
+
+public sealed record CurrentStatementPaymentPlan
+{
+    public CurrentStatementPaymentMode Mode { get; init; } =
+        CurrentStatementPaymentMode.Minimum;
+    public decimal? CustomAmount { get; init; }
+}
+
+public sealed record CardCharge
+{
+    public Guid Id { get; init; } = Guid.NewGuid();
+    public Guid CreditCardId { get; init; }
+    public string Description { get; init; } = string.Empty;
+    public DateOnly PostingDate { get; init; }
+    public decimal Amount { get; init; }
+}
+
+public sealed record CreditCardPaymentPlan
+{
+    public Guid Id { get; init; } = Guid.NewGuid();
+    public Guid CreditCardId { get; init; }
+    public DateOnly DueDate { get; init; }
+    public CreditCardPaymentType PaymentType { get; init; }
+    public decimal? Amount { get; init; }
+}
+
+public sealed record PlannedLargeExpense
+{
+    public Guid Id { get; init; } = Guid.NewGuid();
+    public string Name { get; init; } = string.Empty;
+    public decimal Amount { get; init; }
+    public DateOnly ExactDate { get; init; }
+    public string Note { get; init; } = string.Empty;
+    public PlannedExpenseStatus Status { get; init; } = PlannedExpenseStatus.Planned;
+}
+
+public sealed record UserSettings
+{
+    public int IncomeDay { get; init; } = 10;
+    public decimal MonthlyVariableExpenseAllowance { get; init; }
+    public decimal ProjectionOpeningBalance { get; init; }
+    public DateOnly ProjectionAnchorDate { get; init; }
+    public decimal CreditCardCarryInterestRate { get; init; } = 0.05m;
+    public decimal DeficitFinancingInterestRate { get; init; } = 0.05m;
+}
+
+public sealed record FinancialPlan
+{
+    public UserSettings Settings { get; init; } = new();
+    public IReadOnlyList<SalaryScheduleEntry> Salaries { get; init; } = [];
+    public IReadOnlyList<OneTimeIncome> OtherIncomes { get; init; } = [];
+    public IReadOnlyList<Loan> Loans { get; init; } = [];
+    public IReadOnlyList<LoanPrepayment> LoanPrepayments { get; init; } = [];
+    public IReadOnlyList<TemporaryPaymentPlan> PaymentPlans { get; init; } = [];
+    public IReadOnlyList<CreditCard> CreditCards { get; init; } = [];
+    public IReadOnlyList<PlannedLargeExpense> PlannedLargeExpenses { get; init; } = [];
+    public IReadOnlyList<CashFlowAllocationStrategy>
+        PaymentAssignmentStrategies { get; init; } = [];
+}

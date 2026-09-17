@@ -15,7 +15,7 @@ concurrency:
 env:
   DOTNET_NOLOGO: true
   DOTNET_CLI_TELEMETRY_OPTOUT: true
-  PROJECT: src/CoinFlow.App/CoinFlow.App.csproj
+  PROJECT: src/Mizan.App/Mizan.App.csproj
 
 jobs:
   build-test-apk:
@@ -43,10 +43,10 @@ jobs:
         run: dotnet workload install maui-android
 
       - name: Restore
-        run: dotnet restore CoinFlow.sln
+        run: dotnet restore Mizan.sln
 
       - name: Unit tests
-        run: dotnet test tests/CoinFlow.Tests/CoinFlow.Tests.csproj -c Release --no-restore --logger "console;verbosity=minimal"
+        run: dotnet test tests/Mizan.Tests/Mizan.Tests.csproj -c Release --no-restore --logger "console;verbosity=minimal"
 
       - name: Validate development signing secrets and create temporary keystore
         shell: bash
@@ -82,10 +82,10 @@ jobs:
             --no-restore \
             -p:AndroidPackageFormat=apk \
             -p:RunAOTCompilation=false \
-            -p:CoinFlowDevBuild=true \
-            -p:CoinFlowVersion="$version_name" \
-            -p:CoinFlowBuildNumber="${GITHUB_RUN_NUMBER}" \
-            -p:CoinFlowCommit="$short_sha" \
+            -p:MizanDevBuild=true \
+            -p:MizanVersion="$version_name" \
+            -p:MizanBuildNumber="${GITHUB_RUN_NUMBER}" \
+            -p:MizanCommit="$short_sha" \
             -p:AndroidKeyStore=true \
             -p:AndroidSigningKeyStore="$MIZAN_DEV_KEYSTORE" \
             -p:AndroidSigningKeyAlias="$MIZAN_DEV_KEY_ALIAS" \
@@ -97,10 +97,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mapfile -t signed_apks < <(find src/CoinFlow.App/bin/Release/net8.0-android -type f -name '*-Signed.apk' -print)
+          mapfile -t signed_apks < <(find src/Mizan.App/bin/Release/net8.0-android -type f -name '*-Signed.apk' -print)
           if [[ ${#signed_apks[@]} -eq 0 ]]; then
             echo "No signed APK was produced." >&2
-            find src/CoinFlow.App/bin/Release/net8.0-android -type f -maxdepth 5 -print >&2
+            find src/Mizan.App/bin/Release/net8.0-android -type f -maxdepth 5 -print >&2
             exit 1
           fi
           apk="$(ls -1t "${signed_apks[@]}" | head -n 1)"
