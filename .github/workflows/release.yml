@@ -198,8 +198,8 @@ jobs:
         shell: bash
         run: |
           version="${{ steps.version.outputs.version }}"
-          cat > release-notes.md <<NOTES
-          # Mizan $version — Yaşam Gideri Havuzu ve Hatırlatıcı Geri Alma Kalıcı Düzeltmesi
+          echo "# Mizan $version — Yaşam Gideri Havuzu ve Hatırlatıcı Geri Alma Kalıcı Düzeltmesi" > release-notes.md
+          cat >> release-notes.md <<'NOTES'
 
           Bu sürümde, hatırlatıcı özelliği sonrası gözlem kaydetme (bakiye girme), erteleme, ödeme ve geri alma işlemlerinde yaşam giderinin hatalı hesaplanması ve vadesi gelen/geçen ödemelerin kaybolması sorunu kökten çözüldü.
 
@@ -210,7 +210,7 @@ jobs:
           - **UTC Zaman Dilimi Normalizasyonu:** Gözlem kayıt zamanı ile hatırlatıcı cevap zamanı (`ToUtc`) yerel saat / UTC farkı olmaksızın hatasız karşılaştırılır hale getirildi.
           - **Karta Geri Alındığında Kalanlara Dönüş (`PaymentReminderCardViewModel`):** Ödenen bir kaleme "Geri Al" denildiğinde vadesi gelen/geçen ödeme `Snoozed` durumuna alınarak hem Ana Sayfa "Kalan Ödemeler" listesine hem de hatırlatıcı kartına güvenle döndürüldü.
           - **Doğrulama:** 585/585 birim testi eksiksiz yeşildir; Android Release derlemesi 0 hata ve 0 uyarı ile doğrulanmıştır.
-          NOTES
+NOTES
 
       - name: Upload signed APK artifact
         uses: actions/upload-artifact@v4
