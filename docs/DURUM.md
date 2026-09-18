@@ -1,11 +1,11 @@
 # Mizan — Proje Durumu ve Devir Notu
 
-> Son güncelleme: 18.09.2026 · Son sürüm `v1.18.5`
+> Son güncelleme: 19.09.2026 · Son sürüm `v1.18.6`
 >
 > **Yeni bir sohbet/geliştirici buradan başlar.** Bu dosya tek devir
 > belgesidir; eski `HANDOFF.md` ve `TODO.md` kaldırıldı, hâlâ geçerli olan kısımları
 > burada (TODO tamamen bitmişti). Önce "Devir" bölümünü, sonra "Açık işler"i ve "Ürün invariant'ları"nı
-> oku. Sürüm bölümleri (v1.2.0 → v1.18.5) geriye dönük kayıttır; yalnız
+> oku. Sürüm bölümleri (v1.2.0 → v1.18.6) geriye dönük kayıttır; yalnız
 > dokunacağın alanın bölümünü oku.
 
 ## Devir
@@ -15,8 +15,8 @@
 | | |
 |---|---|
 | Branch | `main`, `origin/main` ile eşit, worktree yok (`git worktree list` yalnız `main`) |
-| Son sürüm | `v1.18.5` — Finansal Yapı Kartla Harcama Düzeltmesi (`Mizan-1.18.5.apk`) |
-| Testler | 586/586 (`dotnet test`, ~8 sn) |
+| Son sürüm | `v1.18.6` — Dondurulmuş Plan Kilitleme & Kart Harcaması İzolasyonu (`Mizan-1.18.6.apk`) |
+| Testler | 588/588 (`dotnet test`, ~9 sn) |
 | Android Release build | 0 uyarı, 0 hata |
 | Şema | v17 (`SqliteMizanStore.CurrentSchemaVersion`) |
 | Veri yeri | profil başına `files/profiles/{id:N}/coinflow.db3` (v1.12.0'dan beri) |
@@ -222,6 +222,9 @@ ekran doğruydu ama okunmuyordu; v1.5.0 ise eksik olan bir şeyi ekledi.
 | v1.18.1 | ANR Bug Fix — `UserFeedbackService` ve `MauiNavigationService` UI thread kilitlenme çözümü |
 | **v1.18.2** | **Açılış Çökmesi Çözümü & İsimlendirme Refactoring** — `MainActivity` insets null emniyeti, `ProfileSelectionPage` `OnAppearing` try-catch koruması, `UserFeedbackService` hata dayanıklılığı, `MainApplication` global hata yakalayıcılar, CoinFlow -> Mizan refactoring |
 | **v1.18.3** | **Hatırlatıcı Cevapları & Bakiye Zaman Uyumu** — Bakiye gözlemi ile bildirim ödeme cevaplarının zaman uyumlandırılması, erteleme/ödedim/geri al adımlarında yaşam gideri hesabı tutarlılığı, 584/584 test yeşil |
+| **v1.18.4** | **Yaşam Gideri Havuzu ve Hatırlatıcı Geri Alma Kalıcı Düzeltmesi** — `settledAtObservation` / `settledAfterObservation` ayrımı ile yaşam gideri hesabı ve dönem sonu projeksiyonunun tam korunması |
+| **v1.18.5** | **Finansal Yapı Kartla Harcama Düzeltmesi** — `CommitmentsViewModel` doğrudan giriş formuna `SetLookups(plan)` bağlanarak kart ve kredi seçimlerinin çalışması sağlandı |
+| **v1.18.6** | **Dondurulmuş Plan Kilitleme & Kart Harcaması İzolasyonu** — Dönem içi kart harcamasının planı ve `PLANLANAN` kolonlarını bozması engellendi; plan kilitlendi, sapma `MEVCUT` kolonunda gösterildi |
 
 Grafik çalışması (Faz 1–4, v1.1.0–v1.2.0) v1.3.0'da geri alındı; ayrıntı
 aşağıdaki sürüm bölümlerinde. Anılan `DEVIR-FAZ3.md` repoda yok.
@@ -1543,6 +1546,26 @@ gün girilir.
   - **Doğrulama & Regresyon Testi:**
     - `ScenarioEntrySourceTests.FinancialStructure_LoadsLookupsForEntryForm` sözleşme testi eklenerek Finansal Yapı'nın `EntryForm.SetLookups(plan)` çağırdığı regresyona karşı garantiye alındı.
     - 586/586 unit test eksiksiz yeşil (`dotnet test`); Android SDK ile `Mizan.App` derlemesi 0 hata ve 0 uyarı ile tamamlandı.
+
+### v1.18.6 ne getirdi
+
+- **Dondurulmuş Plan Kilitleme & Kart Harcaması İzolasyonu:**
+  - **Sorun:** Kullanıcı dönem ortasında kredi kartı harcaması/taksiti girdiğinde, sistem bunu bir plan revizyonu (`PeriodPlanRevision`) olarak işliyor ve Ana Sayfa'daki dondurulmuş planı (`openPlan`) ezerek `PLANLANAN` kolonlarını ve dönem sonu hedefini yeni harcama tutarına çekiyordu (`PLANLANAN == MEVCUT` oluyordu; plandan sapma kayboluyordu).
+  - **Dondurulmuş Plan Kilitlendi (`PeriodProgressService`):**
+    - Ana Sayfa'daki planlanan değerler (`plannedIncome`, `plannedMandatory`, `plannedLiving`, `plannedDeficitInterest`, `plannedEnding`, `planLines`), revizyonlarla ezilmeyip doğrudan dönem başında dondurulan kilitli `openPlan` nesnesinden okunur hale getirildi.
+    - Üstteki **PLAN** kutusu dondurulduğu andaki dönem sonu tutarında sabitlendi.
+    - GİDİŞAT tablosundaki **PLANLANAN** kolonları (kredi kartları, KMH faizi ve dönem sonu) dondurulan orijinal tutarlarda kilitli kaldı.
+  - **Gidişat Projeksiyonu Güncel Borcu Baz Alır (`PeriodProgressService`):**
+    - Kalan ödemeler (`remainingLines`) hesaplanırken kredi kartları için güncel borç tutarı (`currentCardPayments`) baz alındı.
+    - Dönem sonu projeksiyonu (`projectedEnding`) ve KMH faizi tahmini (`projectedDeficitInterest`), harcanan yeni kart borcunu hesaba katarak fiili sapmayı tam ve doğru olarak gösterir hale getirildi (`PLANLANAN` vs `MEVCUT`).
+  - **Dönem İçi Harcama İzolasyonu (`HistoricalPlanRevisionService`):**
+    - Dönem başladıktan sonra (`PostingDate > openPlan.PeriodStart`) girilen kart harcamaları birer gider hareketidir; baseline plan değişikliği değildir.
+    - `HistoricalPlanRevisionService`, plan imzasını (`FrozenPlanSignature`) karşılaştırırken dönem içi harcamaları filtre dışı bırakarak kart harcaması girişlerinde gereksiz `PeriodPlanRevision` üretimini durdurdu.
+  - **Sorgu Yan Etkisi Temizliği (`FinancialPlanQueryService`):**
+    - `GetFinancialPlanAsync()` okuma sorgusu içindeki `CaptureOpenPlanRevisionAsync("Açık plan otomatik güncellendi")` çağrısı kaldırılarak CQS prensibi sağlandı.
+  - **Doğrulama & Regresyon Testi:**
+    - `PeriodPlanLockTests.cs` eklenerek dönem dondurulduktan sonra karta harcama girildiğinde revizyon üretilmediği, planlanan kolonların kilitli kaldığı ve gidişat sapmasının doğru yansıdığı regresyona bağlandı.
+    - 588/588 unit test eksiksiz yeşil (`dotnet test`); Android Release derlemesi 0 hata ve 0 uyarı ile tamamlandı.
 
 ## Rol promptları
 

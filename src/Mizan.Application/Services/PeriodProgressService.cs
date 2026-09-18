@@ -104,19 +104,15 @@ public sealed class PeriodProgressService(
             .OrderBy(x => x.CreatedAtUtc)
             .ThenBy(x => x.RevisionNumber)
             .ToArray();
-        // Karar 7 — dönem içinde "planım ne" sorusunun cevabı yaşayan
-        // taahhüttür. Orijinal plan Geçmiş ekranında korunuyor.
-        var latest = revisions.LastOrDefault();
-        var plannedIncome = latest?.PlannedIncome ?? openPlan.PlannedIncome;
-        var plannedMandatory = latest?.PlannedMandatoryPayments ??
-                               openPlan.PlannedMandatoryPayments;
-        var plannedLiving = latest?.PlannedVariableExpenseAllowance ??
-                            openPlan.PlannedVariableExpenseAllowance;
-        var plannedDeficitInterest = latest?.PlannedDeficitInterest ??
-                                     openPlan.PlannedDeficitInterest;
-        var plannedEnding = latest?.PlannedEndingBalance ??
-                            openPlan.PlannedEndingBalance;
-        var planLines = latest?.PaymentLines ?? openPlan.PaymentLines;
+        // Açık dönem için ana sayfada gösterilen plan, dönem başında dondurulan
+        // kilitli plandır (openPlan). Dönem içi harcamalar veya revizyonlar
+        // bu planı bozamaz/değiştiremez (Plan değişmemeli, kilitlenmeli).
+        var plannedIncome = openPlan.PlannedIncome;
+        var plannedMandatory = openPlan.PlannedMandatoryPayments;
+        var plannedLiving = openPlan.PlannedVariableExpenseAllowance;
+        var plannedDeficitInterest = openPlan.PlannedDeficitInterest;
+        var plannedEnding = openPlan.PlannedEndingBalance;
+        var planLines = openPlan.PaymentLines;
 
         var totalDays = Math.Max(
             0,
@@ -212,6 +208,16 @@ public sealed class PeriodProgressService(
         var remainingLines = remaining
             .OrderBy(x => x.PlannedDate)
             .ThenBy(x => x.Name)
+            .Select(line =>
+            {
+                if (line.SourceType == PlanPaymentSourceType.CreditCard &&
+                    currentCardPayments.TryGetValue(line.SourceEntityId, out var currentAmount))
+                {
+                    return line with { PlannedAmount = currentAmount };
+                }
+
+                return line;
+            })
             .ToArray();
         var remainingPlannedTotal = remainingLines
             .Sum(x => x.PlannedAmount ?? 0m);

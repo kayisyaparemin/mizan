@@ -26,10 +26,6 @@ public sealed class FinancialPlanQueryService(
         await snapshotService.EnsureInitialSnapshotAsync(
             plan,
             cancellationToken);
-        await historicalPlanRevisionService.CaptureOpenPlanRevisionAsync(
-            plan,
-            "Açık plan otomatik güncellendi",
-            cancellationToken);
         return plan;
     }
 

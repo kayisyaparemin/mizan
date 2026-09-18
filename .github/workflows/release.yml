@@ -198,15 +198,17 @@ jobs:
         shell: bash
         run: |
           version="${{ steps.version.outputs.version }}"
-          echo "# Mizan $version — Finansal Yapı Kartla Harcama Düzeltmesi" > release-notes.md
+          echo "# Mizan $version — Dondurulmuş Plan Kilitleme & Kart Harcaması İzolasyonu" > release-notes.md
           echo "" >> release-notes.md
-          echo "Bu sürümde, Finansal Yapı sayfasından doğrudan \"Kartla harcama\" girilirken kredi kartı listesinin boş gelmesi ve seçilememesi sorunu giderildi." >> release-notes.md
+          echo "Bu sürümde, dönem ortasında girilen kredi kartı harcamalarının dondurulmuş planı bozması engellendi; plan kilitlendi ve harcama yalnızca MEVCUT ve GİDİŞAT (projeksiyon) alanlarına yansıtılarak sapmanın net izlenmesi sağlandı." >> release-notes.md
           echo "" >> release-notes.md
           echo "### Düzeltmeler ve İyileştirmeler" >> release-notes.md
           echo "" >> release-notes.md
-          echo "- **Finansal Yapı Formu Lookup Desteği (\`CommitmentsViewModel\`):** \`CommitmentsViewModel.LoadAsync()\` çağrısında \`EntryForm.SetLookups(plan)\` çağrılarak kayıtlı kredi kartları ve aktif kredilerin form seçicilerine aktarılması sağlandı." >> release-notes.md
-          echo "- **Kart Seçimi Güvencesi (\`ScenarioConditionForm\`):** Kartla harcama seçeneği seçildiğinde kayıtlı ilk kartın otomatik seçilmesi ve seçim listesinin senkronizasyonu sağlandı; kayıtlı kart veya kredi bulunmaması durumunda kullanıcıyı yönlendiren bilgilendirici uyarı metinleri eklendi." >> release-notes.md
-          echo "- **Doğrulama:** 586/586 birim testi eksiksiz yeşildir; Android Release derlemesi 0 hata ve 0 uyarı ile doğrulanmıştır." >> release-notes.md
+          echo "- **Dondurulmuş Plan Kilitlendi (\`PeriodProgressService\`):** Ana Sayfa'daki \`PLAN\` kartı ve \`GİDİŞAT\` tablosundaki \`PLANLANAN\` kolonları revizyonlarla ezilmeyecek şekilde doğrudan dondurulan \`openPlan\`'a kilitlendi." >> release-notes.md
+          echo "- **Gidişat Projeksiyonu ve Sapma Takibi (\`PeriodProgressService\`):** Kalan kredi kartı ödemeleri ve dönem sonu projeksiyonu güncel kart harcamalarını baz alarak fiili sapmayı (\`PLANLANAN\` vs \`MEVCUT\`) net olarak gösterecek şekilde güncellendi." >> release-notes.md
+          echo "- **Dönem İçi Harcama İzolasyonu (\`HistoricalPlanRevisionService\`):** Dönem dondurulduktan sonra girilen kart harcamaları revizyon karşılaştırmasından muaf tutularak gereksiz plan revizyonu üretilmesi engellendi." >> release-notes.md
+          echo "- **Sorgu Yan Etkisi Temizliği (\`FinancialPlanQueryService\`):** \`GetFinancialPlanAsync()\` okuma metodundan otomatik revizyon üretme çağrısı kaldırılarak CQS prensibi sağlandı." >> release-notes.md
+          echo "- **Otomatik Regresyon Testleri (\`PeriodPlanLockTests\`):** 588/588 birim testi yeşil; Android Release derlemesi 0 hata ve 0 uyarı ile tamamlandı." >> release-notes.md
 
       - name: Upload signed APK artifact
         uses: actions/upload-artifact@v4

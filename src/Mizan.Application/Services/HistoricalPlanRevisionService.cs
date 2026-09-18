@@ -45,7 +45,17 @@ public sealed class HistoricalPlanRevisionService(
                     currentSnapshot.ProjectionOpeningBalance,
                 ProjectionAnchorDate = currentSnapshot.ProjectionAnchorDate,
                 IncomeDay = currentSnapshot.IncomeDay
-            }
+            },
+            CreditCards = currentPlan.CreditCards
+                .Select(card => card with
+                {
+                    // Dönem içinde girilen kart harcamaları birer gider hareketidir,
+                    // dondurulmuş plan revizyonu değildir.
+                    Charges = card.Charges
+                        .Where(c => c.PostingDate <= openPlan.PeriodStart)
+                        .ToArray()
+                })
+                .ToArray()
         };
         var latestFrozenPlan = planSnapshotService.Freeze(
             scopedPlan,
