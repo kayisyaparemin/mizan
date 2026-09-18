@@ -199,16 +199,14 @@ jobs:
         run: |
           version="${{ steps.version.outputs.version }}"
           echo "# Mizan $version — Finansal Yapı Kartla Harcama Düzeltmesi" > release-notes.md
-          cat >> release-notes.md <<'NOTES'
-
-          Bu sürümde, Finansal Yapı sayfasından doğrudan "Kartla harcama" girilirken kredi kartı listesinin boş gelmesi ve seçilememesi sorunu giderildi.
-
-          ### Düzeltmeler ve İyileştirmeler
-
-          - **Finansal Yapı Formu Lookup Desteği (`CommitmentsViewModel`):** `CommitmentsViewModel.LoadAsync()` çağrısında `EntryForm.SetLookups(plan)` çağrılarak kayıtlı kredi kartları ve aktif kredilerin form seçicilerine aktarılması sağlandı.
-          - **Kart Seçimi Güvencesi (`ScenarioConditionForm`):** Kartla harcama seçeneği seçildiğinde kayıtlı ilk kartın otomatik seçilmesi ve seçim listesinin senkronizasyonu sağlandı; kayıtlı kart veya kredi bulunmaması durumunda kullanıcıyı yönlendiren bilgilendirici uyarı metinleri eklendi.
-          - **Doğrulama:** 586/586 birim testi eksiksiz yeşildir; Android Release derlemesi 0 hata ve 0 uyarı ile doğrulanmıştır.
-NOTES
+          echo "" >> release-notes.md
+          echo "Bu sürümde, Finansal Yapı sayfasından doğrudan \"Kartla harcama\" girilirken kredi kartı listesinin boş gelmesi ve seçilememesi sorunu giderildi." >> release-notes.md
+          echo "" >> release-notes.md
+          echo "### Düzeltmeler ve İyileştirmeler" >> release-notes.md
+          echo "" >> release-notes.md
+          echo "- **Finansal Yapı Formu Lookup Desteği (\`CommitmentsViewModel\`):** \`CommitmentsViewModel.LoadAsync()\` çağrısında \`EntryForm.SetLookups(plan)\` çağrılarak kayıtlı kredi kartları ve aktif kredilerin form seçicilerine aktarılması sağlandı." >> release-notes.md
+          echo "- **Kart Seçimi Güvencesi (\`ScenarioConditionForm\`):** Kartla harcama seçeneği seçildiğinde kayıtlı ilk kartın otomatik seçilmesi ve seçim listesinin senkronizasyonu sağlandı; kayıtlı kart veya kredi bulunmaması durumunda kullanıcıyı yönlendiren bilgilendirici uyarı metinleri eklendi." >> release-notes.md
+          echo "- **Doğrulama:** 586/586 birim testi eksiksiz yeşildir; Android Release derlemesi 0 hata ve 0 uyarı ile doğrulanmıştır." >> release-notes.md
 
       - name: Upload signed APK artifact
         uses: actions/upload-artifact@v4
