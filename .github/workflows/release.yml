@@ -199,15 +199,17 @@ jobs:
         run: |
           version="${{ steps.version.outputs.version }}"
           cat > release-notes.md <<NOTES
-          # Mizan $version — Hatırlatıcı Cevapları ve Gözlem Bakiye Zaman Uyumu
+          # Mizan $version — Yaşam Gideri Havuzu ve Hatırlatıcı Geri Alma Kalıcı Düzeltmesi
 
-          Bu sürümde, ödeme günü hatırlatıcıları (Ertele / Ödedim / Geri Al) ile anasayfadaki "Gözlemi Kaydet" (bakiye kaydı) arasındaki zaman uyumsuzluğundan kaynaklanan yaşam gideri hesaplama hatası giderilmiştir.
+          Bu sürümde, hatırlatıcı özelliği sonrası gözlem kaydetme (bakiye girme), erteleme, ödeme ve geri alma işlemlerinde yaşam giderinin hatalı hesaplanması ve vadesi gelen/geçen ödemelerin kaybolması sorunu kökten çözüldü.
 
           ### Düzeltmeler ve İyileştirmeler
 
-          - **Hatırlatıcı Cevapları & Bakiye Zaman Uyumu (`PeriodProgressService`):** Bakiye gözlemi yapıldıktan sonra bildirime tıklayıp "Ödedim" denildiğinde, bakiye gözlemi o ödemeden önce kaydedildiği için gidişattaki yaşam gideri harcamasının hatalı olarak düşmesi engellendi (`AnsweredAt <= UpdatedAtUtc` kontrolü).
-          - **Yanıtsız Satır ve Geri Al (Undo) Bütünlüğü:** Ödenen bir bildirime "Geri Al" denildiğinde yanıt silindiğinde varsayılan otomatik ödenmiş sayma mantığı yerine gerçek durum korunur; gidişattaki yaşam gideri ve dönem sonu tahmini bozulmaz.
-          - **Doğrulama:** 584/584 birim testi eksiksiz yeşildir; Release APK derlemesi 0 hata ve 0 uyarı ile doğrulanmıştır.
+          - **Gözlem Öncesi ve Sonrası Ödemeler Ayrıştırıldı (`PeriodProgressService`):** Gözlem öncesi ödemeler (`settledAtObservation`) yaşam gideri havuzundan düşülürken, gözlem sonrası yapılan ödemeler (`settledAfterObservation`) banka bakiyesini geriye dönük etkilemediği için yaşam giderini bozmayacak şekilde sadece dönem sonu nakit projeksiyonuna (`projectedEnding`) yansıtıldı.
+          - **Ödeme Günü ve Vade Davranışı Güvenceye Alındı:** Ödeme gününde henüz ödenmemiş kalemlerin yaşam gideri havuzunu sıfırlaması engellendi; geçmiş vadedeki ödemeler içinse plan varsayımı (`LinesPastTheirDueDate_CountAsPaid`) korundu.
+          - **UTC Zaman Dilimi Normalizasyonu:** Gözlem kayıt zamanı ile hatırlatıcı cevap zamanı (`ToUtc`) yerel saat / UTC farkı olmaksızın hatasız karşılaştırılır hale getirildi.
+          - **Karta Geri Alındığında Kalanlara Dönüş (`PaymentReminderCardViewModel`):** Ödenen bir kaleme "Geri Al" denildiğinde vadesi gelen/geçen ödeme `Snoozed` durumuna alınarak hem Ana Sayfa "Kalan Ödemeler" listesine hem de hatırlatıcı kartına güvenle döndürüldü.
+          - **Doğrulama:** 585/585 birim testi eksiksiz yeşildir; Android Release derlemesi 0 hata ve 0 uyarı ile doğrulanmıştır.
           NOTES
 
       - name: Upload signed APK artifact

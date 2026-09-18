@@ -245,7 +245,17 @@ public sealed partial class PaymentReminderCardViewModel(
                 return;
             }
 
-            await coordinator.UndoAsync(line.Response.DueKey);
+            if (line.Response.DueDate <= DateOnly.FromDateTime(DateTime.Now))
+            {
+                await coordinator.AnswerAsync(
+                    PaymentReminderAnswerKind.Snoozed,
+                    [new PaymentDue(line.Response.DueKey, line.Response.Name, line.Response.DueDate, line.Response.Amount)]);
+            }
+            else
+            {
+                await coordinator.UndoAsync(line.Response.DueKey);
+            }
+
             Present(await coordinator.RefreshAsync());
             SetStatus(string.Empty);
             AnswersChanged?.Invoke(this, EventArgs.Empty);

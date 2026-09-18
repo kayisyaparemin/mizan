@@ -140,9 +140,14 @@ public sealed class PeriodProgressService(
         var answers = (reminderAnswers ?? [])
             .GroupBy(x => x.DueKey, StringComparer.Ordinal)
             .ToDictionary(x => x.Key, x => x.Last(), StringComparer.Ordinal);
-        var settledTotal = 0m;
+        var settledAtObservation = 0m;
+        var settledAfterObservation = 0m;
         var remaining = new List<PeriodPlanPaymentLine>();
         var snoozedLineIds = new HashSet<Guid>();
+
+        var observationUtc = observation?.UpdatedAtUtc.UtcDateTime;
+        var observationDate = observation?.ObservedOn;
+
         foreach (var line in planLines)
         {
             if (explicitEntries.TryGetValue(line.Id, out var entry))
@@ -153,7 +158,7 @@ public sealed class PeriodProgressService(
                 }
                 else
                 {
-                    settledTotal += entry.ActualAmount;
+                    settledAtObservation += entry.ActualAmount;
                 }
 
                 continue;
@@ -167,9 +172,14 @@ public sealed class PeriodProgressService(
             {
                 if (response.Kind == PaymentReminderAnswerKind.Paid)
                 {
-                    if (observation is null || response.AnsweredAt <= observation.UpdatedAtUtc)
+                    var amount = line.PlannedAmount ?? 0m;
+                    if (observationUtc is null || ToUtc(response.AnsweredAt) <= observationUtc.Value)
                     {
-                        settledTotal += line.PlannedAmount ?? 0m;
+                        settledAtObservation += amount;
+                    }
+                    else
+                    {
+                        settledAfterObservation += amount;
                     }
                 }
                 else
@@ -181,7 +191,19 @@ public sealed class PeriodProgressService(
                 continue;
             }
 
-            if (line.PlannedDate > today)
+            if (line.PlannedDate <= today)
+            {
+                var amount = line.PlannedAmount ?? 0m;
+                if (observationDate is null || line.PlannedDate < observationDate.Value)
+                {
+                    settledAtObservation += amount;
+                }
+                else
+                {
+                    settledAfterObservation += amount;
+                }
+            }
+            else
             {
                 remaining.Add(line);
             }
@@ -203,7 +225,7 @@ public sealed class PeriodProgressService(
         {
             var spent = openPlan.OpeningBalance
                         + plannedIncome
-                        - settledTotal
+                        - settledAtObservation
                         - balance;
             // Bakiye beklenenden yüksekse harcama negatife düşemez.
             observedLivingSpend = Math.Max(0m, spent);
@@ -219,8 +241,9 @@ public sealed class PeriodProgressService(
             // Motorla birebir aynı kural (PeriodPlanSnapshotService.Freeze).
             // Kart faizi bu hesaba girmez: karta kapitalize olur, nakit dönem
             // sonunu değiştirmez (I9).
+            var effectiveCurrent = current - settledAfterObservation;
             var endingBeforeDeficitInterest =
-                current - remainingPlannedTotal - living;
+                effectiveCurrent - remainingPlannedTotal - living;
             projectedDeficitInterest = endingBeforeDeficitInterest < 0m
                 ? RoundMoney(
                     Math.Abs(endingBeforeDeficitInterest) *
@@ -273,4 +296,12 @@ public sealed class PeriodProgressService(
 
     private static decimal RoundMoney(decimal amount) =>
         decimal.Round(amount, 2, MidpointRounding.AwayFromZero);
+
+    private static DateTime ToUtc(DateTime value) =>
+        value.Kind switch
+        {
+            DateTimeKind.Utc => value,
+            DateTimeKind.Local => value.ToUniversalTime(),
+            _ => DateTime.SpecifyKind(value, DateTimeKind.Local).ToUniversalTime()
+        };
 }

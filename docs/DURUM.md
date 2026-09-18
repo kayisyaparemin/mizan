@@ -1,11 +1,11 @@
 # Mizan — Proje Durumu ve Devir Notu
 
-> Son güncelleme: 18.09.2026 · Son sürüm `v1.18.3`
+> Son güncelleme: 18.09.2026 · Son sürüm `v1.18.4`
 >
 > **Yeni bir sohbet/geliştirici buradan başlar.** Bu dosya tek devir
 > belgesidir; eski `HANDOFF.md` ve `TODO.md` kaldırıldı, hâlâ geçerli olan kısımları
 > burada (TODO tamamen bitmişti). Önce "Devir" bölümünü, sonra "Açık işler"i ve "Ürün invariant'ları"nı
-> oku. Sürüm bölümleri (v1.2.0 → v1.18.3) geriye dönük kayıttır; yalnız
+> oku. Sürüm bölümleri (v1.2.0 → v1.18.4) geriye dönük kayıttır; yalnız
 > dokunacağın alanın bölümünü oku.
 
 ## Devir
@@ -15,8 +15,8 @@
 | | |
 |---|---|
 | Branch | `main`, `origin/main` ile eşit, worktree yok (`git worktree list` yalnız `main`) |
-| Son sürüm | `v1.18.3` — Hatırlatıcı Cevapları & Bakiye Zaman Uyumu (`Mizan-1.18.3.apk`) |
-| Testler | 584/584 (`dotnet test`, ~8 sn) |
+| Son sürüm | `v1.18.4` — Yaşam Gideri Havuzu ve Hatırlatıcı Geri Alma Kalıcı Düzeltmesi (`Mizan-1.18.4.apk`) |
+| Testler | 585/585 (`dotnet test`, ~8 sn) |
 | Android Release build | 0 uyarı, 0 hata |
 | Şema | v17 (`SqliteMizanStore.CurrentSchemaVersion`) |
 | Veri yeri | profil başına `files/profiles/{id:N}/coinflow.db3` (v1.12.0'dan beri) |
@@ -1518,6 +1518,18 @@ gün girilir.
   - **Workflow Servis Güncellemeleri:** `PeriodWorkflowService` üzerindeki `RecordPaymentReminderAnswerAsync` ve `UndoPaymentReminderAnswerAsync` servis çağrıları zaman damgası ve bakiye tutarlılığı açısından pekiştirildi.
   - **Regresyon Testi:** `PaymentReminderAnswerTests.cs` içerisine `UserBugReproduction_ObserveBalance_Snooze_Paid_Undo_PreservesLivingExpenseCalculation` testi eklenerek Bakiye Kaydı -> Ertele -> Ödedim -> Geri Al döngüsü ve yaşam gideri tutarlılığı doğrulandı.
 - **Doğrulama:** 584/584 unit test yeşil (`dotnet test`); Release notları `.github/workflows/release.yml` dosyasına eklendi.
+
+### v1.18.4 ne getirdi
+
+- **Yaşam Gideri Havuzu ve Hatırlatıcı Geri Alma Kalıcı Düzeltmesi:**
+  - **Kök Neden & Regresyon Çözümü:** v1.18.3'te `if (line.PlannedDate <= today) settledTotal += line.PlannedAmount` bloğu silindiği için hatırlatıcı cevabı olmayan vadesi gelmiş/geçmiş satırlar hem ödenenlerden hem de kalan ödemelerden tamamen yok oluyordu ve `LinesPastTheirDueDate_CountAsPaid` testi hacklenmişti. Bu hack geri alındı, plan invariant'ı restore edildi.
+  - **Gözlem Öncesi ve Sonrası Ödemeler Ayrıştırıldı (`PeriodProgressService`):**
+    - `settledAtObservation`: Kullanıcının banka bakiyesini girdiği andan önce veya tam o anda ödenmiş tutarlar. Yaşam gideri havuzundan (`spent = openPlan.OpeningBalance + plannedIncome - settledAtObservation - balance`) yalnız bu tutar düşülür.
+    - `settledAfterObservation`: Bakiye girildikten sonra bildirimden veya karttan "Ödedim" denilen tutarlar. Geçmişte girilen banka bakiyesini geriye dönük etkilemediği için yaşam giderini bozmaz. Dönem sonu nakit projeksiyonunda (`effectiveCurrent = current - settledAfterObservation`) düşülerek nakit tutarlılığı tam korunur.
+  - **Ödeme Günü Davranışı Güvenceye Alındı:** Ödeme gününde henüz ödenmemiş kalemler `settledAfterObservation`'a yönlendirildi; böylece kullanıcı gün içinde bakiye girdiğinde yaşam gideri sıfırlanmaz veya bozulmaz. Vadesi geçmiş (`line.PlannedDate < observationDate`) ve ertelenmemiş olanlar ise plan varsayımı gereği `settledAtObservation` sayılır.
+  - **Zaman Dilimi (UTC / Yerel Saat) Normalizasyonu:** `ToUtc(DateTime)` ile `AnsweredAt` değerleri UTC'ye normalize edilerek `observation.UpdatedAtUtc` ile hatasız karşılaştırılır hale getirildi.
+  - **Karta Geri Alındığında Kalanlara Dönüş (`PaymentReminderCardViewModel`):** Ödenen bir kaleme "Geri Al" denildiğinde vadesi gelen/geçen ödeme `Snoozed` durumuna alınarak hem Ana Sayfa "Kalan Ödemeler" listesine hem de hatırlatıcı kartına (kırmızı) güvenle döndürüldü.
+  - **Doğrulama:** 585/585 unit test eksiksiz yeşil (`dotnet test`); Android Release derlemesi 0 hata ve 0 uyarı ile tamamlandı.
 
 ## Rol promptları
 

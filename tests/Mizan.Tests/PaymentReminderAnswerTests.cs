@@ -388,23 +388,26 @@ public sealed class PaymentReminderAnswerTests
             var plan = Assert.Single((await store.GetFinancialHistoryAsync()).Plans);
             var startingPosition = plan.OpeningBalance + plan.PlannedIncome;
 
-            // 1. Kullanıcı banka bakiyesini girer (15.000 TL yaşam gideri harcamış, henüz borç ödememiş).
-            var observation = await service.ObserveCurrentBalanceAsync(startingPosition - 15_000m);
-
-            // 2. Ödemeleri Ertele der (15:30).
+            // Ödemeler ödeme gününde (2026-09-07) ertelenmişti.
             var loan = await LoanLineAsync(store);
             var card = plan.PaymentLines.Single(x => x.SourceType == PlanPaymentSourceType.CreditCard && x.PlannedDate == LoanDue);
-            var snoozeTime = Time("2026-09-08T15:30");
+            var snoozeTime = Time("2026-09-07T15:30");
             await service.RecordPaymentReminderAnswerAsync(new PaymentReminderAnswer(
                 PaymentReminderAnswerKind.Snoozed,
                 snoozeTime,
                 snoozeTime.AddHours(3),
                 [Due(loan), Due(card)]));
 
+            // 1. Ertesi gün (08.09) kullanıcı banka bakiyesini girer (15.000 TL yaşam gideri harcamış, henüz borç ödememiş).
+            var observation = await service.ObserveCurrentBalanceAsync(startingPosition - 15_000m);
+            var progress1 = (await service.GetPeriodProgressAsync())!;
+            Assert.Equal(15_000m, progress1.ObservedLivingSpend);
+
+            // 2. Ödemelerin hâlâ ertelenmiş ve yaşam giderinin korunduğu doğrulanır.
             var progress2 = (await service.GetPeriodProgressAsync())!;
             Assert.Equal(15_000m, progress2.ObservedLivingSpend);
 
-            // 3. Ertelenen kırmızı karta tıklayıp 16:00'da Ödedim der.
+            // 3. Ertelenen kırmızı karta tıklayıp 16:00'da (gözlemden sonra) Ödedim der.
             var paidTime = Time("2026-09-08T16:00");
             await service.RecordPaymentReminderAnswerAsync(new PaymentReminderAnswer(
                 PaymentReminderAnswerKind.Paid,
@@ -417,10 +420,62 @@ public sealed class PaymentReminderAnswerTests
             Assert.Equal(15_000m, progress3.ObservedLivingSpend);
 
             // 4. Yeşil ödenen karta tıklayıp 16:05'te Geri Al der.
-            await service.UndoPaymentReminderAnswerAsync(Due(loan).Key);
+            // Karttan geri alınınca vadesi gelen/geçen ödeme Kalan Ödemeler'e dönebilmek için ertelenir.
+            await service.RecordPaymentReminderAnswerAsync(new PaymentReminderAnswer(
+                PaymentReminderAnswerKind.Snoozed,
+                Time("2026-09-08T16:05"),
+                Time("2026-09-08T19:05"),
+                [Due(loan)]));
 
             var progress4 = (await service.GetPeriodProgressAsync())!;
             // Yaşam gideri yine 15.000 TL olarak kalır, bozulmaz.
+            Assert.Equal(15_000m, progress4.ObservedLivingSpend);
+        });
+    }
+
+    [Fact]
+    public async Task UserBugReproduction_OnPaymentDay_ObserveBalance_Snooze_Paid_Undo_PreservesLivingExpenseCalculation()
+    {
+        await WithCanonical(async store =>
+        {
+            // Ödeme gününde (LoanDue = 2026-09-07) kullanıcı akışı:
+            var service = TestFactory.Service(store, LoanDue);
+            var plan = Assert.Single((await store.GetFinancialHistoryAsync()).Plans);
+            var startingPosition = plan.OpeningBalance + plan.PlannedIncome;
+
+            // 1. Ödeme gününde kullanıcı mevcut bakiyeyi kaydeder (15:00 TRT / 12:00 UTC).
+            await service.ObserveCurrentBalanceAsync(startingPosition - 15_000m);
+            var progress1 = (await service.GetPeriodProgressAsync())!;
+            Assert.Equal(15_000m, progress1.ObservedLivingSpend);
+
+            // 2. Ertele der (15:30 TRT).
+            var loan = await LoanLineAsync(store);
+            var card = plan.PaymentLines.Single(x => x.SourceType == PlanPaymentSourceType.CreditCard && x.PlannedDate == LoanDue);
+            var snoozeTime = Time("2026-09-07T15:30");
+            await service.RecordPaymentReminderAnswerAsync(new PaymentReminderAnswer(
+                PaymentReminderAnswerKind.Snoozed,
+                snoozeTime,
+                snoozeTime.AddHours(3),
+                [Due(loan), Due(card)]));
+
+            var progress2 = (await service.GetPeriodProgressAsync())!;
+            Assert.Equal(15_000m, progress2.ObservedLivingSpend);
+
+            // 3. Ödedim der (16:00 TRT, gözlemden sonra).
+            var paidTime = Time("2026-09-07T16:00");
+            await service.RecordPaymentReminderAnswerAsync(new PaymentReminderAnswer(
+                PaymentReminderAnswerKind.Paid,
+                paidTime,
+                null,
+                [Due(loan)]));
+
+            var progress3 = (await service.GetPeriodProgressAsync())!;
+            Assert.Equal(15_000m, progress3.ObservedLivingSpend);
+
+            // 4. Geri al der.
+            await service.UndoPaymentReminderAnswerAsync(Due(loan).Key);
+
+            var progress4 = (await service.GetPeriodProgressAsync())!;
             Assert.Equal(15_000m, progress4.ObservedLivingSpend);
         });
     }
