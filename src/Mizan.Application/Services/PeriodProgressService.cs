@@ -104,15 +104,19 @@ public sealed class PeriodProgressService(
             .OrderBy(x => x.CreatedAtUtc)
             .ThenBy(x => x.RevisionNumber)
             .ToArray();
-        // Açık dönem için ana sayfada gösterilen plan, dönem başında dondurulan
-        // kilitli plandır (openPlan). Dönem içi harcamalar veya revizyonlar
-        // bu planı bozamaz/değiştiremez (Plan değişmemeli, kilitlenmeli).
-        var plannedIncome = openPlan.PlannedIncome;
-        var plannedMandatory = openPlan.PlannedMandatoryPayments;
-        var plannedLiving = openPlan.PlannedVariableExpenseAllowance;
-        var plannedDeficitInterest = openPlan.PlannedDeficitInterest;
-        var plannedEnding = openPlan.PlannedEndingBalance;
-        var planLines = openPlan.PaymentLines;
+        // Karar 7 — dönem içinde "planım ne" sorusunun cevabı yaşayan
+        // taahhüttür. Orijinal plan Geçmiş ekranında korunuyor.
+        var latest = revisions.LastOrDefault();
+        var plannedIncome = latest?.PlannedIncome ?? openPlan.PlannedIncome;
+        var plannedMandatory = latest?.PlannedMandatoryPayments ??
+                               openPlan.PlannedMandatoryPayments;
+        var plannedLiving = latest?.PlannedVariableExpenseAllowance ??
+                            openPlan.PlannedVariableExpenseAllowance;
+        var plannedDeficitInterest = latest?.PlannedDeficitInterest ??
+                                     openPlan.PlannedDeficitInterest;
+        var plannedEnding = latest?.PlannedEndingBalance ??
+                            openPlan.PlannedEndingBalance;
+        var planLines = latest?.PaymentLines ?? openPlan.PaymentLines;
 
         var totalDays = Math.Max(
             0,
@@ -208,19 +212,20 @@ public sealed class PeriodProgressService(
         var remainingLines = remaining
             .OrderBy(x => x.PlannedDate)
             .ThenBy(x => x.Name)
-            .Select(line =>
-            {
-                if (line.SourceType == PlanPaymentSourceType.CreditCard &&
-                    currentCardPayments.TryGetValue(line.SourceEntityId, out var currentAmount))
-                {
-                    return line with { PlannedAmount = currentAmount };
-                }
-
-                return line;
-            })
             .ToArray();
         var remainingPlannedTotal = remainingLines
             .Sum(x => x.PlannedAmount ?? 0m);
+        var remainingProjectedTotal = remainingLines
+            .Sum(x =>
+            {
+                if (x.SourceType == PlanPaymentSourceType.CreditCard &&
+                    currentCardPayments.TryGetValue(x.SourceEntityId, out var currentAmount))
+                {
+                    return currentAmount;
+                }
+
+                return x.PlannedAmount ?? 0m;
+            });
 
         // YAŞAM GİDERİ HAVUZU. Bakiyedeki düşüş, işaretlenen ödemeler
         // çıkarıldıktan sonra yaşam giderine sayılır. Günlere bölünmez:
@@ -249,7 +254,7 @@ public sealed class PeriodProgressService(
             // sonunu değiştirmez (I9).
             var effectiveCurrent = current - settledAfterObservation;
             var endingBeforeDeficitInterest =
-                effectiveCurrent - remainingPlannedTotal - living;
+                effectiveCurrent - remainingProjectedTotal - living;
             projectedDeficitInterest = endingBeforeDeficitInterest < 0m
                 ? RoundMoney(
                     Math.Abs(endingBeforeDeficitInterest) *

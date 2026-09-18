@@ -1,11 +1,11 @@
 # Mizan — Proje Durumu ve Devir Notu
 
-> Son güncelleme: 19.09.2026 · Son sürüm `v1.18.6`
+> Son güncelleme: 19.09.2026 · Son sürüm `v1.18.7`
 >
 > **Yeni bir sohbet/geliştirici buradan başlar.** Bu dosya tek devir
 > belgesidir; eski `HANDOFF.md` ve `TODO.md` kaldırıldı, hâlâ geçerli olan kısımları
 > burada (TODO tamamen bitmişti). Önce "Devir" bölümünü, sonra "Açık işler"i ve "Ürün invariant'ları"nı
-> oku. Sürüm bölümleri (v1.2.0 → v1.18.6) geriye dönük kayıttır; yalnız
+> oku. Sürüm bölümleri (v1.2.0 → v1.18.7) geriye dönük kayıttır; yalnız
 > dokunacağın alanın bölümünü oku.
 
 ## Devir
@@ -15,8 +15,8 @@
 | | |
 |---|---|
 | Branch | `main`, `origin/main` ile eşit, worktree yok (`git worktree list` yalnız `main`) |
-| Son sürüm | `v1.18.6` — Dondurulmuş Plan Kilitleme & Kart Harcaması İzolasyonu (`Mizan-1.18.6.apk`) |
-| Testler | 588/588 (`dotnet test`, ~9 sn) |
+| Son sürüm | `v1.18.7` — Plan Kilitleme & 12 Dönem Kart Harcaması İzolasyonu Hotfix (`Mizan-1.18.7.apk`) |
+| Testler | 589/589 (`dotnet test`, ~8 sn) |
 | Android Release build | 0 uyarı, 0 hata |
 | Şema | v17 (`SqliteMizanStore.CurrentSchemaVersion`) |
 | Veri yeri | profil başına `files/profiles/{id:N}/coinflow.db3` (v1.12.0'dan beri) |
@@ -225,6 +225,7 @@ ekran doğruydu ama okunmuyordu; v1.5.0 ise eksik olan bir şeyi ekledi.
 | **v1.18.4** | **Yaşam Gideri Havuzu ve Hatırlatıcı Geri Alma Kalıcı Düzeltmesi** — `settledAtObservation` / `settledAfterObservation` ayrımı ile yaşam gideri hesabı ve dönem sonu projeksiyonunun tam korunması |
 | **v1.18.5** | **Finansal Yapı Kartla Harcama Düzeltmesi** — `CommitmentsViewModel` doğrudan giriş formuna `SetLookups(plan)` bağlanarak kart ve kredi seçimlerinin çalışması sağlandı |
 | **v1.18.6** | **Dondurulmuş Plan Kilitleme & Kart Harcaması İzolasyonu** — Dönem içi kart harcamasının planı ve `PLANLANAN` kolonlarını bozması engellendi; plan kilitlendi, sapma `MEVCUT` kolonunda gösterildi |
+| **v1.18.7** | **Plan Kilitleme & 12 Dönem Kart Harcaması İzolasyonu Hotfix** — Taahhüt edilen plan (Karar 7) korundu; 12 Dönem ve Ana Sayfa plan tutarları kilitlendi; dönem içi harcama sadece MEVCUT kolonuna ve gidişata yansıtıldı |
 
 Grafik çalışması (Faz 1–4, v1.1.0–v1.2.0) v1.3.0'da geri alındı; ayrıntı
 aşağıdaki sürüm bölümlerinde. Anılan `DEVIR-FAZ3.md` repoda yok.
@@ -1566,6 +1567,25 @@ gün girilir.
   - **Doğrulama & Regresyon Testi:**
     - `PeriodPlanLockTests.cs` eklenerek dönem dondurulduktan sonra karta harcama girildiğinde revizyon üretilmediği, planlanan kolonların kilitli kaldığı ve gidişat sapmasının doğru yansıdığı regresyona bağlandı.
     - 588/588 unit test eksiksiz yeşil (`dotnet test`); Android Release derlemesi 0 hata ve 0 uyarı ile tamamlandı.
+
+### v1.18.7 ne getirdi
+
+- **Plan Kilitleme & 12 Dönem Kart Harcaması İzolasyonu Hotfix:**
+  - **Sorun:** v1.18.6'da yapılan plan kilitleme çalışmasında, Ana Sayfa'da `latest = revisions.LastOrDefault()` revizyon okuması baypas edilip doğrudan raw `openPlan` okunduğu için, kullanıcının taahhüt ettiği plan revizyonu (24 bin TL) yerine dönemin dondurulduğu anki ham tahmin (9 bin TL) görünüyordu. Aynı anda 12 Dönem projeksiyonunda (`GetFuturePeriodsAsync`) dönem içi kart harcaması filtrelenmediği için 12 Dönem'de 26 bin TL görünüyordu.
+  - **Karar 7 Taahhüt Edilen Plan Korundu (`PeriodProgressService`):**
+    - `latest = revisions.LastOrDefault()` geri getirilerek açık dönemin yaşayan taahhüdü (`latest ?? openPlan`) baz alındı. Böylece Ana Sayfa'da taahhüt edilen kart planı 9 bin TL'ye düşmek yerine 24 bin TL olarak sabit kaldı.
+  - **Kalan Satırlarda Plan Tutarı Koruması (`PeriodProgressService`):**
+    - `remainingLines` üzerindeki `.Select(...)` mutasyonu geri alındı. Kalan plan satırlarının `PlannedAmount` değeri değiştirilmeden bırakıldı. Gidişat projeksiyonu için `remainingProjectedTotal` hesaplanarak fiili kart borcu (`currentCardPayments`) sadece `MEVCUT` ve dönem sonu gidişat sapmasına yansıtıldı.
+  - **12 Dönem Projeksiyonunda Dönem İçi Harcama İzolasyonu (I16) (`FinancialPlanQueryService`):**
+    - `GetProjectionPlanAsync` içinde `openPlan` mevcutken açık döneme ait harcamalar (`PostingDate > openPlan.PeriodStart && PostingDate <= openPlan.PeriodEnd`) filtrelenerek projeksiyon hesaplayıcısına iletildi.
+    - Böylece 12 Dönem (Gelecek Dönemler) projeksiyonunda açık dönem kart ödemesi plansız harcamalarla 26 bin TL'ye fırlamaz; kilitli baseline plan (24 bin TL) aynen gösterilir (I16: 12 Dönem checkpoint planını gösterir ve kaymaz).
+  - **Gelecek Taksitlerin Korunması (`HistoricalPlanRevisionService`):**
+    - Dönem içi harcamalar filtrelenirken yalnızca açık döneme ait harcamalar izole edildi (`c.PostingDate <= openPlan.PeriodStart || c.PostingDate > openPlan.PeriodEnd`); gelecekteki taksitlerin sessizce kaybolması engellendi.
+  - **Otomatik Revizyon Senkronizasyonu (`FinancialPlanQueryService`):**
+    - `GetFinancialPlanAsync()` içinde açık plan revizyon yakalama mekanizması restore edildi.
+  - **Doğrulama & Regresyon Testi:**
+    - `PeriodPlanLockTests.cs` altına `RevisedCommittedPlan_IsPreservedOnBothDashboardAndFutureMonths_WhenMidPeriodExpenseIsAdded` testi eklenerek hem Ana Sayfa hem 12 Dönem ekranlarında taahhüt edilen planın kilitli kaldığı ve harcamanın yalnızca `MEVCUT` kolonuna yansıdığı tam uçtan uca test edildi.
+    - 589/589 unit test eksiksiz yeşil (`dotnet test`); Android Release derlemesi 0 hata ve 0 uyarı ile tamamlandı.
 
 ## Rol promptları
 

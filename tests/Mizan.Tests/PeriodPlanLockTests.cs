@@ -32,6 +32,10 @@ public sealed class PeriodPlanLockTests
             var card = cards.First(c => c.Id == AxessCardId);
             var cardBefore = progressBefore!.Cards.First(pc => pc.CardId == card.Id);
 
+            var periodsBefore = await service.GetFuturePeriodsAsync(periodCount: 12);
+            var cardObligationBefore = periodsBefore[0].MandatoryItems
+                .First(x => x.PaymentId == card.Id);
+
             var extraChargeAmount = 2_095m;
             var chargeDate = plan.PeriodStart.AddDays(2);
             var updatedCard = card with
@@ -66,14 +70,89 @@ public sealed class PeriodPlanLockTests
             Assert.Equal(cardBefore.Planned, cardAfter.Planned);
             Assert.Equal(cardBefore.Current + extraChargeAmount, cardAfter.Current);
 
-            // 4. Gidişat Dönem Sonu (MEVCUT) yeni harcamayı yansıtmalı (sapma görünmeli)
+            // 4. Kalan ödemeler listesindeki (KALAN) kart satırı planlanan tutarı korumalı
+            var remainingCard = progressAfter.RemainingLines.FirstOrDefault(x => x.SourceEntityId == card.Id);
+            if (remainingCard is not null)
+            {
+                Assert.Equal(cardBefore.Planned, remainingCard.PlannedAmount);
+            }
+
+            // 5. 12 Dönem projeksiyonunda mevcut dönem (Period 0) kilitli kalmalı, harcama planı kirletmemeli (I16)
+            var periodsAfter = await service.GetFuturePeriodsAsync(periodCount: 12);
+            var cardObligationAfter = periodsAfter[0].MandatoryItems
+                .First(x => x.PaymentId == card.Id);
+            Assert.Equal(cardObligationBefore.Amount, cardObligationAfter.Amount);
+            Assert.Equal(periodsBefore[0].EndingProjectedBalance, periodsAfter[0].EndingProjectedBalance);
+
+            // 6. Gidişat Dönem Sonu (MEVCUT) yeni harcamayı yansıtmalı (sapma görünmeli)
             Assert.NotNull(progressAfter.ProjectedEndingSavings);
             Assert.NotNull(progressBefore.ProjectedEndingSavings);
             Assert.True(progressAfter.ProjectedEndingSavings < progressBefore.ProjectedEndingSavings);
 
-            // 5. KMH faizi MEVCUT değeri artan açık nedeniyle güncellenmeli
+            // 7. KMH faizi MEVCUT değeri artan açık nedeniyle güncellenmeli
             Assert.NotNull(progressAfter.ProjectedDeficitInterest);
             Assert.True(progressAfter.ProjectedDeficitInterest >= progressBefore.ProjectedDeficitInterest);
+        });
+    }
+
+    [Fact]
+    public async Task RevisedCommittedPlan_IsPreservedOnBothDashboardAndFutureMonths_WhenMidPeriodExpenseIsAdded()
+    {
+        await WithDeficitPlan(async (store, initialPlan) =>
+        {
+            var service = ServiceAt(store, initialPlan, 1);
+
+            var progressInitial = await service.GetPeriodProgressAsync();
+            Assert.NotNull(progressInitial);
+            var cardInitial = progressInitial!.Cards.First(c => c.CardId == AxessCardId);
+
+            // Kart için bir ekstre / ödeme planı kaydederek planı revize et (örn. 15.000 TL planlandı)
+            var plannedAmount = 15_000m;
+            await service.SaveCreditCardPaymentPlanAsync(
+                cardInitial.CardId,
+                cardInitial.DueDate,
+                CreditCardPaymentType.FixedAmount,
+                plannedAmount);
+
+            // Revizyonun olustugunu teyit et
+            var progressWithRevision = await service.GetPeriodProgressAsync();
+            Assert.NotNull(progressWithRevision);
+            var revisedCard = progressWithRevision!.Cards.First(c => c.CardId == AxessCardId);
+            Assert.Equal(plannedAmount, revisedCard.Planned);
+
+            // 12 Donem'de donem baslangic kart yukumlulugunu al
+            var periodsBefore = await service.GetFuturePeriodsAsync(periodCount: 12);
+            var period0CardBefore = periodsBefore[0].MandatoryItems.First(x => x.PaymentId == AxessCardId);
+
+            // Simdi donem ortasinda plansiz kart harcamasi ekle (+2.747 TL)
+            var midPeriodCharge = 2_747m;
+            var currentCards = await store.GetCreditCardsAsync();
+            var currentCard = currentCards.First(c => c.Id == AxessCardId);
+            await service.SaveCreditCardAsync(currentCard with
+            {
+                Charges = [.. currentCard.Charges, new CardCharge
+                {
+                    Id = Guid.NewGuid(),
+                    CreditCardId = AxessCardId,
+                    PostingDate = initialPlan.PeriodStart.AddDays(5),
+                    Amount = midPeriodCharge,
+                    Description = "Plansız Harcama"
+                }]
+            });
+
+            // 1. Ana Sayfa: PLANLANAN 15.000 TL kalmali (plansiz harcama plani degistirmemeli)
+            var progressAfterCharge = await service.GetPeriodProgressAsync();
+            Assert.NotNull(progressAfterCharge);
+            var cardAfter = progressAfterCharge!.Cards.First(c => c.CardId == AxessCardId);
+            Assert.Equal(plannedAmount, cardAfter.Planned);
+
+            // 2. 12 Donem: Period 0 Kredi Kartlari plansiz harcama ile kirletilmemeli (I16)
+            var periodsAfter = await service.GetFuturePeriodsAsync(periodCount: 12);
+            var period0CardAfter = periodsAfter[0].MandatoryItems.First(x => x.PaymentId == AxessCardId);
+            Assert.Equal(period0CardBefore.Amount, period0CardAfter.Amount);
+
+            // 3. Sabit tutarlı ödeme planında MEVCUT ödeme taahhüt edilen 15.000 TL kalır (ekstra harcama sonraki ekstreye devreder)
+            Assert.Equal(plannedAmount, cardAfter.Current);
         });
     }
 

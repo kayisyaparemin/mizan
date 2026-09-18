@@ -26,6 +26,10 @@ public sealed class FinancialPlanQueryService(
         await snapshotService.EnsureInitialSnapshotAsync(
             plan,
             cancellationToken);
+        await historicalPlanRevisionService.CaptureOpenPlanRevisionAsync(
+            plan,
+            "Açık plan otomatik güncellendi",
+            cancellationToken);
         return plan;
     }
 
@@ -286,6 +290,25 @@ public sealed class FinancialPlanQueryService(
             currentSnapshot,
             plan.Settings,
             asOf);
+        var openPlan = PeriodProgressService.ResolveOpenPlan(history);
+        if (openPlan is not null)
+        {
+            plan = plan with
+            {
+                CreditCards = plan.CreditCards
+                    .Select(card => card with
+                    {
+                        // Dönem içinde girilen kart harcamaları birer gider hareketidir,
+                        // açık dönemin baseline planını kirletmez (I16).
+                        Charges = card.Charges
+                            .Where(c => c.PostingDate <= openPlan.PeriodStart ||
+                                        c.PostingDate > openPlan.PeriodEnd)
+                            .ToArray()
+                    })
+                    .ToArray()
+            };
+        }
+
         return new ProjectionQueryPlan(
             ApplyProjectionBoundary(plan, boundary),
             boundary);

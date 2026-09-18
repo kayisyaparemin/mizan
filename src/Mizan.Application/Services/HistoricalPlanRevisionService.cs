@@ -52,7 +52,8 @@ public sealed class HistoricalPlanRevisionService(
                     // Dönem içinde girilen kart harcamaları birer gider hareketidir,
                     // dondurulmuş plan revizyonu değildir.
                     Charges = card.Charges
-                        .Where(c => c.PostingDate <= openPlan.PeriodStart)
+                        .Where(c => c.PostingDate <= openPlan.PeriodStart ||
+                                    c.PostingDate > openPlan.PeriodEnd)
                         .ToArray()
                 })
                 .ToArray()
