@@ -10,6 +10,9 @@ public sealed partial class ScenarioConditionForm
 {
     public void SetLookups(FinancialPlan plan)
     {
+        var currentCardId = SelectedCreditCard?.Value;
+        var currentLoanId = SelectedLoan?.Value;
+
         CreditCards.Clear();
         foreach (var card in plan.CreditCards)
         {
@@ -28,8 +31,11 @@ public sealed partial class ScenarioConditionForm
             _loans[loan.Id] = loan;
         }
 
-        SelectedCreditCard ??= CreditCards.FirstOrDefault();
-        SelectedLoan ??= Loans.FirstOrDefault();
+        HasNoCreditCards = CreditCards.Count == 0;
+        HasNoLoans = Loans.Count == 0;
+
+        SelectedCreditCard = CreditCards.FirstOrDefault(x => x.Value == currentCardId) ?? CreditCards.FirstOrDefault();
+        SelectedLoan = Loans.FirstOrDefault(x => x.Value == currentLoanId) ?? Loans.FirstOrDefault();
     }
 
     public void SetStrategyLookups(
@@ -54,6 +60,8 @@ public sealed partial class ScenarioConditionForm
         Loans.Clear();
         _loans.Clear();
         StrategySalaryDates.Clear();
+        HasNoCreditCards = true;
+        HasNoLoans = true;
     }
 
     [RelayCommand]

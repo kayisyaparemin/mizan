@@ -135,6 +135,7 @@ public partial class CommitmentsViewModel(
 
         PopulateAllItems(plan);
         RefreshGroupedItems();
+        EntryForm.SetLookups(plan);
     }
 
     private RecordEntryPicker CreateEntryPicker()

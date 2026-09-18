@@ -63,6 +63,13 @@ public sealed class ScenarioEntrySourceTests
         Assert.Equal(buildable.Order(), mapped.Values.Order());
     }
 
+    [Fact]
+    public void FinancialStructure_LoadsLookupsForEntryForm()
+    {
+        var viewModel = Read("ViewModels", "CommitmentsViewModel.cs");
+        Assert.Contains("EntryForm.SetLookups(plan);", viewModel);
+    }
+
     private static string Read(string folder, string name) =>
         File.ReadAllText(Path.Combine(
             RepositoryRoot(),

@@ -79,7 +79,8 @@
       }
     ],
     "direction": "horizontal",
-    "width": 300
+    "width": 300,
+    "collapsed": true
   },
   "right": {
     "id": "89e7c43326dc9dc2",
@@ -184,6 +185,8 @@
   },
   "active": "b7055ff931370878",
   "lastOpenFiles": [
+    "05 - Tasks & Roadmap/TASK-02 - Otomatik Regresyon Test Paketi ve CI-CD Kalite Kapisi.md",
+    "03 - ADR/ADR-004 - Cift Katmanli Regresyon Test Stratejisi ve CI-CD Kalite Kapisi.md",
     "01 - Business Rules/BR-RECON-01 - Donem Mutabakati ve Gozlem Noktasi.md",
     "02 - Architecture & Classes/PeriodWorkflowService.md",
     "04 - Canvases/Mizan Genel Mimari.canvas",

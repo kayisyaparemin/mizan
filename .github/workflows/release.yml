@@ -198,18 +198,16 @@ jobs:
         shell: bash
         run: |
           version="${{ steps.version.outputs.version }}"
-          echo "# Mizan $version — Yaşam Gideri Havuzu ve Hatırlatıcı Geri Alma Kalıcı Düzeltmesi" > release-notes.md
+          echo "# Mizan $version — Finansal Yapı Kartla Harcama Düzeltmesi" > release-notes.md
           cat >> release-notes.md <<'NOTES'
 
-          Bu sürümde, hatırlatıcı özelliği sonrası gözlem kaydetme (bakiye girme), erteleme, ödeme ve geri alma işlemlerinde yaşam giderinin hatalı hesaplanması ve vadesi gelen/geçen ödemelerin kaybolması sorunu kökten çözüldü.
+          Bu sürümde, Finansal Yapı sayfasından doğrudan "Kartla harcama" girilirken kredi kartı listesinin boş gelmesi ve seçilememesi sorunu giderildi.
 
           ### Düzeltmeler ve İyileştirmeler
 
-          - **Gözlem Öncesi ve Sonrası Ödemeler Ayrıştırıldı (`PeriodProgressService`):** Gözlem öncesi ödemeler (`settledAtObservation`) yaşam gideri havuzundan düşülürken, gözlem sonrası yapılan ödemeler (`settledAfterObservation`) banka bakiyesini geriye dönük etkilemediği için yaşam giderini bozmayacak şekilde sadece dönem sonu nakit projeksiyonuna (`projectedEnding`) yansıtıldı.
-          - **Ödeme Günü ve Vade Davranışı Güvenceye Alındı:** Ödeme gününde henüz ödenmemiş kalemlerin yaşam gideri havuzunu sıfırlaması engellendi; geçmiş vadedeki ödemeler içinse plan varsayımı (`LinesPastTheirDueDate_CountAsPaid`) korundu.
-          - **UTC Zaman Dilimi Normalizasyonu:** Gözlem kayıt zamanı ile hatırlatıcı cevap zamanı (`ToUtc`) yerel saat / UTC farkı olmaksızın hatasız karşılaştırılır hale getirildi.
-          - **Karta Geri Alındığında Kalanlara Dönüş (`PaymentReminderCardViewModel`):** Ödenen bir kaleme "Geri Al" denildiğinde vadesi gelen/geçen ödeme `Snoozed` durumuna alınarak hem Ana Sayfa "Kalan Ödemeler" listesine hem de hatırlatıcı kartına güvenle döndürüldü.
-          - **Doğrulama:** 585/585 birim testi eksiksiz yeşildir; Android Release derlemesi 0 hata ve 0 uyarı ile doğrulanmıştır.
+          - **Finansal Yapı Formu Lookup Desteği (`CommitmentsViewModel`):** `CommitmentsViewModel.LoadAsync()` çağrısında `EntryForm.SetLookups(plan)` çağrılarak kayıtlı kredi kartları ve aktif kredilerin form seçicilerine aktarılması sağlandı.
+          - **Kart Seçimi Güvencesi (`ScenarioConditionForm`):** Kartla harcama seçeneği seçildiğinde kayıtlı ilk kartın otomatik seçilmesi ve seçim listesinin senkronizasyonu sağlandı; kayıtlı kart veya kredi bulunmaması durumunda kullanıcıyı yönlendiren bilgilendirici uyarı metinleri eklendi.
+          - **Doğrulama:** 586/586 birim testi eksiksiz yeşildir; Android Release derlemesi 0 hata ve 0 uyarı ile doğrulanmıştır.
 NOTES
 
       - name: Upload signed APK artifact

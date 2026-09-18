@@ -1,11 +1,11 @@
 # Mizan — Proje Durumu ve Devir Notu
 
-> Son güncelleme: 18.09.2026 · Son sürüm `v1.18.4`
+> Son güncelleme: 18.09.2026 · Son sürüm `v1.18.5`
 >
 > **Yeni bir sohbet/geliştirici buradan başlar.** Bu dosya tek devir
 > belgesidir; eski `HANDOFF.md` ve `TODO.md` kaldırıldı, hâlâ geçerli olan kısımları
 > burada (TODO tamamen bitmişti). Önce "Devir" bölümünü, sonra "Açık işler"i ve "Ürün invariant'ları"nı
-> oku. Sürüm bölümleri (v1.2.0 → v1.18.4) geriye dönük kayıttır; yalnız
+> oku. Sürüm bölümleri (v1.2.0 → v1.18.5) geriye dönük kayıttır; yalnız
 > dokunacağın alanın bölümünü oku.
 
 ## Devir
@@ -15,8 +15,8 @@
 | | |
 |---|---|
 | Branch | `main`, `origin/main` ile eşit, worktree yok (`git worktree list` yalnız `main`) |
-| Son sürüm | `v1.18.4` — Yaşam Gideri Havuzu ve Hatırlatıcı Geri Alma Kalıcı Düzeltmesi (`Mizan-1.18.4.apk`) |
-| Testler | 585/585 (`dotnet test`, ~8 sn) |
+| Son sürüm | `v1.18.5` — Finansal Yapı Kartla Harcama Düzeltmesi (`Mizan-1.18.5.apk`) |
+| Testler | 586/586 (`dotnet test`, ~8 sn) |
 | Android Release build | 0 uyarı, 0 hata |
 | Şema | v17 (`SqliteMizanStore.CurrentSchemaVersion`) |
 | Veri yeri | profil başına `files/profiles/{id:N}/coinflow.db3` (v1.12.0'dan beri) |
@@ -1530,6 +1530,19 @@ gün girilir.
   - **Zaman Dilimi (UTC / Yerel Saat) Normalizasyonu:** `ToUtc(DateTime)` ile `AnsweredAt` değerleri UTC'ye normalize edilerek `observation.UpdatedAtUtc` ile hatasız karşılaştırılır hale getirildi.
   - **Karta Geri Alındığında Kalanlara Dönüş (`PaymentReminderCardViewModel`):** Ödenen bir kaleme "Geri Al" denildiğinde vadesi gelen/geçen ödeme `Snoozed` durumuna alınarak hem Ana Sayfa "Kalan Ödemeler" listesine hem de hatırlatıcı kartına (kırmızı) güvenle döndürüldü.
   - **Doğrulama:** 585/585 unit test eksiksiz yeşil (`dotnet test`); Android Release derlemesi 0 hata ve 0 uyarı ile tamamlandı.
+
+### v1.18.5 ne getirdi
+
+- **Finansal Yapı Sayfasında Doğrudan Harcama / Ödeme Formu Düzeltmesi:**
+  - **Kök Neden:** `CommitmentsViewModel` doğrudan giriş formu olan `EntryForm` (`ScenarioConditionForm`) nesnesine `SetLookups(plan)` çağrısı yapmıyordu. Bu nedenle Simülatör sayfasında çalışan kart/kredi seçicileri Finansal Yapı sayfasında "Kartla harcama" (`CardSpending`) veya "Krediye erken ödeme" seçildiğinde boş geliyordu.
+  - **Lookups ve Seçim Desteği (`CommitmentsViewModel` & `ScenarioConditionForm`):**
+    - `CommitmentsViewModel.LoadAsync()` içerisine `EntryForm.SetLookups(plan)` eklendi; plan yüklenip güncellendikçe kart ve kredi listeleri forma beslenir hale getirildi.
+    - `ScenarioConditionForm.RefreshFields()` içerisinde kart harcaması seçildiğinde `SelectedCreditCard ??= CreditCards.FirstOrDefault();` atanarak ilk kartın varsayılan seçilmesi sağlandı.
+    - `ScenarioConditionForm.Lookups.cs` içerisinde `SetLookups()` çağrılarında mevcut seçili kart ve kredi id'si korunarak liste yenilendiğinde seçimin kaybolması engellendi.
+    - Kayıtlı kart veya kredi olmaması durumunda formda açıklayıcı hata mesajları (`HasNoCreditCards`, `HasNoLoans`) gösterildi ve `BuildRequest` istisnaları netleştirildi.
+  - **Doğrulama & Regresyon Testi:**
+    - `ScenarioEntrySourceTests.FinancialStructure_LoadsLookupsForEntryForm` sözleşme testi eklenerek Finansal Yapı'nın `EntryForm.SetLookups(plan)` çağırdığı regresyona karşı garantiye alındı.
+    - 586/586 unit test eksiksiz yeşil (`dotnet test`); Android SDK ile `Mizan.App` derlemesi 0 hata ve 0 uyarı ile tamamlandı.
 
 ## Rol promptları
 

@@ -88,6 +88,8 @@ public sealed partial class ScenarioConditionForm : ViewModelBase
     [ObservableProperty] private string startDateLabel = "Başlangıç / işlem tarihi";
     [ObservableProperty] private string amountLabel = "Tutar";
     [ObservableProperty] private string scenarioDescription = string.Empty;
+    [ObservableProperty] private bool hasNoCreditCards;
+    [ObservableProperty] private bool hasNoLoans;
 
     public SimulationScenarioType? EditingType { get; private set; }
 
@@ -160,6 +162,11 @@ public sealed partial class ScenarioConditionForm : ViewModelBase
         IsCardPayoff = option.Key == SimulationScenarioCatalog.CardPaymentMode.Key;
         IsLoanPrepayment = option.Key == SimulationScenarioCatalog.LoanPrepayment.Key;
 
+        if (IsCard)
+        {
+            SelectedCreditCard ??= CreditCards.FirstOrDefault();
+        }
+
         if (IsLoanPrepayment)
         {
             SelectedLoan ??= Loans.FirstOrDefault();
@@ -212,14 +219,14 @@ public sealed partial class ScenarioConditionForm : ViewModelBase
                 : DateOnly.FromDateTime(StartDate),
             count,
             NeedsFirstPayment ? DateOnly.FromDateTime(FirstPaymentDate) : null,
-            IsCard ? SelectedCreditCard?.Value ?? throw new InvalidOperationException("Bir kredi kartı seçmelisin.") : null,
+            IsCard ? SelectedCreditCard?.Value ?? throw new InvalidOperationException(CreditCards.Count == 0 ? "Kayıtlı bir kredi kartı bulunamadı. Önce kredi kartını eklemelisin." : "Bir kredi kartı seçmelisin.") : null,
             repayment,
             IsStrategyChange ? SelectedStrategyMode?.Value : null,
             IsStrategyChange ? SelectedStrategySalaryDate?.Value : null,
             scenarioId,
             IsCardPayoff ? SelectedCardPaymentMode?.Value ?? throw new InvalidOperationException("Kart ödeme şeklini seçmelisin.") : null,
             IsCardPayoff && SelectedCardPaymentScope?.Value == true,
-            IsLoanPrepayment ? SelectedLoan?.Value ?? throw new InvalidOperationException("Bir kredi seçmelisin.") : null,
+            IsLoanPrepayment ? SelectedLoan?.Value ?? throw new InvalidOperationException(Loans.Count == 0 ? "Kayıtlı bir kredi bulunamadı. Önce kredini eklemelisin." : "Bir kredi seçmelisin.") : null,
             IsPartialPrepayment ? SelectedPrepaymentMode?.Value : null);
     }
 

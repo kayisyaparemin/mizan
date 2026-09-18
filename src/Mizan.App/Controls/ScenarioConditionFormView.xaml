@@ -23,6 +23,10 @@
             <Picker ItemsSource="{Binding Loans}"
                     SelectedItem="{Binding SelectedLoan}"
                     Title="Kredi seç" />
+            <Label Text="Kayıtlı aktif kredi bulunamadı. Erken ödeme yapmak için önce bir kredi eklemelisin."
+                   Style="{StaticResource MutedText}"
+                   TextColor="{StaticResource Error}"
+                   IsVisible="{Binding HasNoLoans}" />
             <Label Text="Ödeme şekli" Style="{StaticResource FieldLabel}" />
             <Picker ItemsSource="{Binding PrepaymentModes}"
                     SelectedItem="{Binding SelectedPrepaymentMode}" />
@@ -48,6 +52,10 @@
         <VerticalStackLayout IsVisible="{Binding IsCard}" Spacing="7">
             <Label Text="Kredi kartı" Style="{StaticResource FieldLabel}" />
             <Picker ItemsSource="{Binding CreditCards}" SelectedItem="{Binding SelectedCreditCard}" Title="Kart seç" />
+            <Label Text="Kayıtlı kredi kartı bulunamadı. Kartla harcama girmek için önce bir kredi kartı eklemelisin."
+                   Style="{StaticResource MutedText}"
+                   TextColor="{StaticResource Error}"
+                   IsVisible="{Binding HasNoCreditCards}" />
         </VerticalStackLayout>
 
         <VerticalStackLayout IsVisible="{Binding IsCardPayoff}" Spacing="7">
