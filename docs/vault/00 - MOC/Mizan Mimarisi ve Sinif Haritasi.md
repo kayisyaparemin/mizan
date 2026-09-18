@@ -56,29 +56,29 @@ flowchart TD
 ### 1. Dönem Döngüsü ve Mutabakat (Plan vs. Gerçek)
 Mikro harcama fişi girmeden, dondurulmuş plan ile dönem sonundaki gerçekleşmelerin tek kalemde mutabakatını sağlar.
 - 📐 **Domain:** [[CashFlowPeriodCalculator]], [[CashFlowAllocationPlanner]]
-- ⚙️ **Application:** [[PeriodWorkflowService]], `PeriodReviewService`
-- 📱 **UI / ViewModel:** `PeriodReviewWizardViewModel`
+- ⚙️ **Application:** [[PeriodWorkflowService]], [[PeriodReviewService]]
+- 📱 **UI / ViewModel:** [[PeriodReviewWizardViewModel]]
 - 📜 **İş Kuralı:** [[BR-RECON-01 - Donem Mutabakati ve Gozlem Noktasi|BR-RECON-01: Dönem Mutabakatı ve Gözlem Noktası]]
 
 ### 2. İleriye Dönük 12 Aylık Projeksiyon
 Anchor snapshot noktasından başlayarak tam 365 gün boyunca kümülatif likiditeyi ve finansman açıklarını gün gün simüle eder.
 - 📐 **Domain:** [[FinancialProjectionCalculator]], [[IncomeProjectionCalculator]], `CalendarRules`
-- ⚙️ **Application:** `FinancialProjectionService`, `FinancialPlanQueryService`
-- 📱 **UI / ViewModel:** `DashboardViewModel`, `FutureMonthsViewModel`
+- ⚙️ **Application:** [[FinancialProjectionService]], `FinancialPlanQueryService`
+- 📱 **UI / ViewModel:** [[DashboardViewModel]], [[FutureMonthsViewModel]]
 - 📜 **İş Kuralı:** [[BR-PROJ-01 - 12 Aylik Kumulatif Likidite ve Finansman Acigi|BR-PROJ-01: 12 Aylık Kümülatif Likidite ve Finansman Açığı]]
 
 ### 3. Akıllı Senaryo Simülatörü (What-If Motoru)
 Canlı bütçeyi bozmadan geçici planlar oluşturur; koşulları bağımsız açıp kapatarak test etmeyi ve tek tıkla canlıya aktarmayı sağlar.
 - 📐 **Domain:** [[SimulationCalculator]], [[LoanAmortizationCalculator]]
-- ⚙️ **Application:** `SimulationWorkflowService`, `SimulatorInsightService`, `LoanPayoffAdvisor`
-- 📱 **UI / ViewModel:** `SimulationViewModel`
+- ⚙️ **Application:** [[SimulationWorkflowService]], `SimulatorInsightService`, [[LoanPayoffAdvisor]]
+- 📱 **UI / ViewModel:** [[SimulationViewModel]]
 - 📜 **İş Kuralı:** [[BR-SIM-01 - Senaryo Kosul Izolasyonu ve Canliya Aktarim|BR-SIM-01: Senaryo Koşul İzolasyonu ve Canlıya Aktarım]]
 
 ### 4. Gerçekçi Bankacılık Faiz & Kart Modellemesi
 Kredi kartı ekstre carry faizleri ve açık faizlerini gerçek bankacılık yuvarlama ve kurallarıyla hesaplayarak açık maliyetini öngörür.
 - 📐 **Domain:** [[CreditCardStatementCalculator]], `CreditCardActualPaymentReconciler`
-- ⚙️ **Application:** `CreditCardObligationService`, `LoanPayoffService`
-- 📱 **UI / ViewModel:** `CardControlViewModel`
+- ⚙️ **Application:** [[CreditCardObligationService]], `LoanPayoffService`
+- 📱 **UI / ViewModel:** [[CardControlViewModel]]
 - 📜 **İş Kuralı:** [[BR-CARD-01 - Kredi Karti Carry Faizi ve Asgari Tutar Mantigi|BR-CARD-01: Kredi Kartı Carry Faizi ve Asgari Tutar Mantığı]]
 
 ### 5. Operasyonel Takip ve Hatırlatıcı

@@ -378,6 +378,53 @@ public sealed class PaymentReminderAnswerTests
         }
     }
 
+    [Fact]
+    public async Task UserBugReproduction_ObserveBalance_Snooze_Paid_Undo_PreservesLivingExpenseCalculation()
+    {
+        await WithCanonical(async store =>
+        {
+            var testDate = new DateOnly(2026, 9, 8);
+            var service = TestFactory.Service(store, testDate);
+            var plan = Assert.Single((await store.GetFinancialHistoryAsync()).Plans);
+            var startingPosition = plan.OpeningBalance + plan.PlannedIncome;
+
+            // 1. Kullanıcı banka bakiyesini girer (15.000 TL yaşam gideri harcamış, henüz borç ödememiş).
+            var observation = await service.ObserveCurrentBalanceAsync(startingPosition - 15_000m);
+
+            // 2. Ödemeleri Ertele der (15:30).
+            var loan = await LoanLineAsync(store);
+            var card = plan.PaymentLines.Single(x => x.SourceType == PlanPaymentSourceType.CreditCard && x.PlannedDate == LoanDue);
+            var snoozeTime = Time("2026-09-08T15:30");
+            await service.RecordPaymentReminderAnswerAsync(new PaymentReminderAnswer(
+                PaymentReminderAnswerKind.Snoozed,
+                snoozeTime,
+                snoozeTime.AddHours(3),
+                [Due(loan), Due(card)]));
+
+            var progress2 = (await service.GetPeriodProgressAsync())!;
+            Assert.Equal(15_000m, progress2.ObservedLivingSpend);
+
+            // 3. Ertelenen kırmızı karta tıklayıp 16:00'da Ödedim der.
+            var paidTime = Time("2026-09-08T16:00");
+            await service.RecordPaymentReminderAnswerAsync(new PaymentReminderAnswer(
+                PaymentReminderAnswerKind.Paid,
+                paidTime,
+                null,
+                [Due(loan)]));
+
+            var progress3 = (await service.GetPeriodProgressAsync())!;
+            // Bakiye kaydı (15:00 TRT) Ödedim cevabından (16:00 TRT) ÖNCE alındığı için yaşam gideri 15.000 TL olarak korunur.
+            Assert.Equal(15_000m, progress3.ObservedLivingSpend);
+
+            // 4. Yeşil ödenen karta tıklayıp 16:05'te Geri Al der.
+            await service.UndoPaymentReminderAnswerAsync(Due(loan).Key);
+
+            var progress4 = (await service.GetPeriodProgressAsync())!;
+            // Yaşam gideri yine 15.000 TL olarak kalır, bozulmaz.
+            Assert.Equal(15_000m, progress4.ObservedLivingSpend);
+        });
+    }
+
     private static async Task<PeriodPlanPaymentLine> LoanLineAsync(SqliteMizanStore store) =>
         (await store.GetFinancialHistoryAsync()).Plans.Single().PaymentLines
             .Single(x => x.SourceType == PlanPaymentSourceType.Loan && x.PlannedDate == LoanDue);

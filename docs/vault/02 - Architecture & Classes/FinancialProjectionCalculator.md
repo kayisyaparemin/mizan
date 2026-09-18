@@ -35,7 +35,7 @@ Mizan'ın kalbi olan, dondurulmuş plan veya dinamik finansal durumdan yola çı
 - [[PaymentAllocationStrategyResolver]] — Tahsis stratejisi kurallarını doğrular.
 
 ## 👥 Kimler Tarafından Kullanılıyor? (Referenced By)
-- `FinancialProjectionService` — Application katmanında veritabanı ve snapshot'ları bağlayarak projeksiyonu sunar.
+- [[FinancialProjectionService]] — Application katmanında veritabanı ve snapshot'ları bağlayarak projeksiyonu sunar.
 - [[SimulationCalculator]] — What-If senaryolarında baseline ve senaryo planlarını karşılaştırmak için çalıştırır.
 
 ---

@@ -1,11 +1,11 @@
 # Mizan — Proje Durumu ve Devir Notu
 
-> Son güncelleme: 18.09.2026 · Son sürüm `v1.18.2`
+> Son güncelleme: 18.09.2026 · Son sürüm `v1.18.3`
 >
 > **Yeni bir sohbet/geliştirici buradan başlar.** Bu dosya tek devir
 > belgesidir; eski `HANDOFF.md` ve `TODO.md` kaldırıldı, hâlâ geçerli olan kısımları
 > burada (TODO tamamen bitmişti). Önce "Devir" bölümünü, sonra "Açık işler"i ve "Ürün invariant'ları"nı
-> oku. Sürüm bölümleri (v1.2.0 → v1.18.2) geriye dönük kayıttır; yalnız
+> oku. Sürüm bölümleri (v1.2.0 → v1.18.3) geriye dönük kayıttır; yalnız
 > dokunacağın alanın bölümünü oku.
 
 ## Devir
@@ -15,8 +15,8 @@
 | | |
 |---|---|
 | Branch | `main`, `origin/main` ile eşit, worktree yok (`git worktree list` yalnız `main`) |
-| Son sürüm | `v1.18.2` — Açılış Çökmesi Çözümü & İsimlendirme Refactoring (`Mizan-1.18.2.apk`) |
-| Testler | 583/583 (`dotnet test`, ~8 sn) |
+| Son sürüm | `v1.18.3` — Hatırlatıcı Cevapları & Bakiye Zaman Uyumu (`Mizan-1.18.3.apk`) |
+| Testler | 584/584 (`dotnet test`, ~8 sn) |
 | Android Release build | 0 uyarı, 0 hata |
 | Şema | v17 (`SqliteMizanStore.CurrentSchemaVersion`) |
 | Veri yeri | profil başına `files/profiles/{id:N}/coinflow.db3` (v1.12.0'dan beri) |
@@ -221,6 +221,7 @@ ekran doğruydu ama okunmuyordu; v1.5.0 ise eksik olan bir şeyi ekledi.
 | **v1.18.0** | **Clean Architecture & Modern MVVM Mimarisi** · 350 satır sınıf limiti (%100 uyum, 0 kural ihlali) · Segregated Repositories (10 ISP arayüzü) · UI/Navigasyon soyutlaması (`INavigationService`) · 576/576 test yeşil |
 | v1.18.1 | ANR Bug Fix — `UserFeedbackService` ve `MauiNavigationService` UI thread kilitlenme çözümü |
 | **v1.18.2** | **Açılış Çökmesi Çözümü & İsimlendirme Refactoring** — `MainActivity` insets null emniyeti, `ProfileSelectionPage` `OnAppearing` try-catch koruması, `UserFeedbackService` hata dayanıklılığı, `MainApplication` global hata yakalayıcılar, CoinFlow -> Mizan refactoring |
+| **v1.18.3** | **Hatırlatıcı Cevapları & Bakiye Zaman Uyumu** — Bakiye gözlemi ile bildirim ödeme cevaplarının zaman uyumlandırılması, erteleme/ödedim/geri al adımlarında yaşam gideri hesabı tutarlılığı, 584/584 test yeşil |
 
 Grafik çalışması (Faz 1–4, v1.1.0–v1.2.0) v1.3.0'da geri alındı; ayrıntı
 aşağıdaki sürüm bölümlerinde. Anılan `DEVIR-FAZ3.md` repoda yok.
@@ -1508,6 +1509,15 @@ gün girilir.
 - **CoinFlow -> Mizan İsimlendirme Refactorü:**
   - Tüm projeler, isim alanları, çözümler ve mimari dokümantasyon Mizan olarak güncellendi.
 - **Doğrulama:** 583/583 test yeşil; Release APK derlemesi 0 hata, 0 uyarı ile tamamlandı.
+
+### v1.18.3 ne getirdi
+
+- **Hatırlatıcı Cevapları ve Gözlem Bakiye Zaman Uyumu (Yaşam Gideri Hesaplama Düzeltmesi):**
+  - **Sorun:** Ana sayfada bakiye gözlemi ("Gözlemi Kaydet") yapıldıktan sonra ertelenen bir ödeme bildirimi ödedim veya geri al olarak işaretlendiğinde, `PeriodProgressService` geçmişte kalan ama henüz işaretlenmemiş son vadeli borcu ödenmiş sayarak hesaptan düşüyordu. Bu durum gözlenen bakiyeye dayalı yaşam gideri hesabını yanlış düşürüyordu (örneğin 15.000 TL yerine 5.000 TL).
+  - **Çözüm:** `PeriodProgressService.cs` içerisinde bakiye gözlemi anında düşülecek ödenmiş hatırlatıcı cevapları için `response.AnsweredAt <= observation.UpdatedAtUtc` koşulu eklendi. Gözlem tarihinden *sonra* verilen ödeme kararları, gözlem anındaki banka bakiyesinde para henüz mevcut olduğundan o geçmiş gözlemin `settledTotal` hesabına retroaktif düşülmez.
+  - **Workflow Servis Güncellemeleri:** `PeriodWorkflowService` üzerindeki `RecordPaymentReminderAnswerAsync` ve `UndoPaymentReminderAnswerAsync` servis çağrıları zaman damgası ve bakiye tutarlılığı açısından pekiştirildi.
+  - **Regresyon Testi:** `PaymentReminderAnswerTests.cs` içerisine `UserBugReproduction_ObserveBalance_Snooze_Paid_Undo_PreservesLivingExpenseCalculation` testi eklenerek Bakiye Kaydı -> Ertele -> Ödedim -> Geri Al döngüsü ve yaşam gideri tutarlılığı doğrulandı.
+- **Doğrulama:** 584/584 unit test yeşil (`dotnet test`); Release notları `.github/workflows/release.yml` dosyasına eklendi.
 
 ## Rol promptları
 

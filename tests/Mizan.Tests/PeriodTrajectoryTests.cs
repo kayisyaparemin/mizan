@@ -1,3 +1,4 @@
+using Mizan.Application.Models;
 using Mizan.Application.Services;
 using Mizan.Infrastructure.Persistence;
 
@@ -119,8 +120,18 @@ public sealed class PeriodTrajectoryTests
             var lastDue = plan.PaymentLines.Max(x => x.PlannedDate);
             var after = lastDue.DayNumber - plan.PeriodStart.DayNumber + 1;
             var service = ServiceAt(store, plan, after);
+            var now = plan.PeriodStart.AddDays(after).ToDateTime(new TimeOnly(9, 0));
             // Bütün satırlar ödenmiş, hiç yaşam gideri harcanmamış pozisyon.
             var paid = plan.PaymentLines.Sum(x => x.PlannedAmount ?? 0m);
+            await service.RecordPaymentReminderAnswerAsync(new PaymentReminderAnswer(
+                PaymentReminderAnswerKind.Paid,
+                now,
+                null,
+                plan.PaymentLines.Select(x => new PaymentDue(
+                    PaymentReminderPlanner.DueKey(x.SourceEntityId, x.Name, x.PlannedDate),
+                    x.Name,
+                    x.PlannedDate,
+                    x.PlannedAmount)).ToArray()));
             await service.ObserveCurrentBalanceAsync(
                 StartingPosition(plan) - paid);
             var progress = await service.GetPeriodProgressAsync();

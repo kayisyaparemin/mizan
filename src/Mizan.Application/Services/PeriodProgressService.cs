@@ -139,7 +139,7 @@ public sealed class PeriodProgressService(
             new Dictionary<Guid, PeriodObservationPayment>();
         var answers = (reminderAnswers ?? [])
             .GroupBy(x => x.DueKey, StringComparer.Ordinal)
-            .ToDictionary(x => x.Key, x => x.Last().Kind, StringComparer.Ordinal);
+            .ToDictionary(x => x.Key, x => x.Last(), StringComparer.Ordinal);
         var settledTotal = 0m;
         var remaining = new List<PeriodPlanPaymentLine>();
         var snoozedLineIds = new HashSet<Guid>();
@@ -163,11 +163,14 @@ public sealed class PeriodProgressService(
                 line.SourceEntityId,
                 line.Name,
                 line.PlannedDate);
-            if (answers.TryGetValue(dueKey, out var answer))
+            if (answers.TryGetValue(dueKey, out var response))
             {
-                if (answer == PaymentReminderAnswerKind.Paid)
+                if (response.Kind == PaymentReminderAnswerKind.Paid)
                 {
-                    settledTotal += line.PlannedAmount ?? 0m;
+                    if (observation is null || response.AnsweredAt <= observation.UpdatedAtUtc)
+                    {
+                        settledTotal += line.PlannedAmount ?? 0m;
+                    }
                 }
                 else
                 {
@@ -178,11 +181,7 @@ public sealed class PeriodProgressService(
                 continue;
             }
 
-            if (line.PlannedDate <= today)
-            {
-                settledTotal += line.PlannedAmount ?? 0m;
-            }
-            else
+            if (line.PlannedDate > today)
             {
                 remaining.Add(line);
             }

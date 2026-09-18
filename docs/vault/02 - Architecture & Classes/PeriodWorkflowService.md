@@ -1,4 +1,4 @@
-﻿---
+---
 title: PeriodWorkflowService
 type: use-case
 layer: Application
@@ -30,7 +30,7 @@ Dönem döngüsü, dönem içi gözlem noktası (checkpoint) kaydı ve dönem so
 ## 🔗 Bağımlılıklar (Depends On)
 - `IMizanStore` — Veri erişim soyutlaması.
 - `IClock` — Sistem saati soyutlaması.
-- `PeriodReviewService` — Mutabakat hesaplamaları ve doğrulama.
+- [[PeriodReviewService]] — Mutabakat hesaplamaları ve doğrulama.
 - `PeriodProgressService` — Dönem içi gün ve harcama ilerleme yüzdesi.
 - `IFinancialPlanQueryService` — Aktif finansal plan sorguları.
 - [[CashFlowPeriodCalculator]] — Dönem sınırları.

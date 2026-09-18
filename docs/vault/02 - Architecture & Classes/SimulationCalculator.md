@@ -1,4 +1,4 @@
-﻿---
+---
 title: SimulationCalculator
 type: class
 layer: Domain
@@ -32,7 +32,7 @@ Kullanıcının canlı bütçesine dokunmadan, "What-If" senaryoları kurgulamas
 - `LoanPaymentScheduleBuilder` & `LoanAmortizationCalculator` — Simüle edilen yeni krediler ve erken kapatma faiz tasarrufu için.
 
 ## 👥 Kimler Tarafından Kullanılıyor? (Referenced By)
-- `SimulationWorkflowService` — Senaryo durumunu yöneten ve "Planı Uygula" (Apply Plan) aksiyonunu yürüten servis.
+- [[SimulationWorkflowService]] — Senaryo durumunu yöneten ve "Planı Uygula" (Apply Plan) aksiyonunu yürüten servis.
 - `SimulatorInsightService` — Simülasyonun toplam maliyet/tasarruf içgörülerini çıkaran servis.
 - `SimulationViewModel` — Simülasyon ekranı.
 
