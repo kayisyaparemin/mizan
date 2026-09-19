@@ -157,6 +157,33 @@ public sealed class ArchitecturalInvariantTests
             $"Mimari Kural İhlali (Kural 4A): Yeni sahte string arayan test dosyası (*SourceTests.cs) eklenemez! Gerçek xUnit davranış testleri yazılmalıdır. Mevcut sayı: {sourceTestFiles.Count}, İzin verilen max: {LegacyBaseline}");
     }
 
+    [Fact]
+    public void DataTemplates_MustNotUse_Fragile_PageRoot_XReference_For_Commands()
+    {
+        var appDir = Path.Combine(SolutionRoot, "src", "Mizan.App");
+        if (!Directory.Exists(appDir))
+        {
+            return;
+        }
+
+        var xamlFiles = Directory.GetFiles(appDir, "*.xaml", SearchOption.AllDirectories);
+        var violations = new List<string>();
+
+        foreach (var file in xamlFiles)
+        {
+            var content = File.ReadAllText(file);
+            if (content.Contains("<DataTemplate>", StringComparison.Ordinal) &&
+                content.Contains("x:Reference PageRoot", StringComparison.Ordinal))
+            {
+                violations.Add($"{Path.GetFileName(file)}: DataTemplate içinde 'x:Reference PageRoot' kullanımı Release AOT modda kırılganlığa yol açar. RelativeSource AncestorType kullanın.");
+            }
+        }
+
+        Assert.True(
+            violations.Count == 0,
+            $"Mimari Kural İhlali: DataTemplate içinde x:Reference PageRoot kullanımı yasaktır!\n{string.Join("\n", violations)}");
+    }
+
     private static string ResolveSolutionRoot()
     {
         var current = AppContext.BaseDirectory;

@@ -15,3 +15,8 @@ artifacts/
 *.db-shm
 *.db-wal
 local.properties
+
+# Local agent overrides
+RULES.local.md
+.antigravity/RULES.local.md
+*.local.md

@@ -2,6 +2,7 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:controls="clr-namespace:Mizan.App.Controls"
+             xmlns:vm="clr-namespace:Mizan.App.ViewModels"
              x:Class="Mizan.App.Pages.CashFlowPeriodDetailPage"
              x:Name="PageRoot"
              Title="Dönem Detayı"
@@ -102,6 +103,23 @@
 
     <ScrollView>
         <VerticalStackLayout Padding="20,18,20,42" Spacing="22">
+            <!-- Hata veya Detay Bulunamadı Durumu -->
+            <Border IsVisible="{Binding HasNoDetail}"
+                    Padding="16"
+                    BackgroundColor="{StaticResource WarningSurface}">
+                <VerticalStackLayout Spacing="10">
+                    <Label Text="Dönem Detayı Yüklenemedi"
+                           Style="{StaticResource SectionTitle}"
+                           TextColor="{StaticResource Error}" />
+                    <Label Text="{Binding StatusMessage}"
+                           TextColor="{StaticResource WarningText}" />
+                    <Button Text="← Geri Dön"
+                            Style="{StaticResource LinkButton}"
+                            HorizontalOptions="Start"
+                            Command="{Binding NavigateBackCommand}" />
+                </VerticalStackLayout>
+            </Border>
+
             <VerticalStackLayout IsVisible="{Binding HasDetail}" Spacing="22">
                 <VerticalStackLayout Spacing="8">
                     <Label Text="DÖNEM DETAYI" Style="{StaticResource Eyebrow}" />
@@ -532,13 +550,13 @@
                                                 <Button Text="Tamamını öde"
                                                         FontSize="13"
                                                         IsEnabled="{Binding IsMinimumSelected}"
-                                                        Command="{Binding Source={x:Reference PageRoot}, Path=BindingContext.PayFullStatementCommand}"
+                                                        Command="{Binding Source={RelativeSource AncestorType={x:Type vm:CashFlowPeriodDetailViewModel}}, Path=PayFullStatementCommand}"
                                                         CommandParameter="{Binding .}" />
                                                 <Button Grid.Column="1"
                                                         Text="Asgari öde"
                                                         FontSize="13"
                                                         IsEnabled="{Binding IsFullStatementSelected}"
-                                                        Command="{Binding Source={x:Reference PageRoot}, Path=BindingContext.PayMinimumCommand}"
+                                                        Command="{Binding Source={RelativeSource AncestorType={x:Type vm:CashFlowPeriodDetailViewModel}}, Path=PayMinimumCommand}"
                                                         CommandParameter="{Binding .}"
                                                         Style="{StaticResource SecondaryButton}" />
                                             </Grid>

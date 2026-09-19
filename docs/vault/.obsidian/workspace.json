@@ -11,10 +11,14 @@
             "id": "b7055ff931370878",
             "type": "leaf",
             "state": {
-              "type": "graph",
-              "state": {},
-              "icon": "lucide-git-fork",
-              "title": "Grafik Görünümü"
+              "type": "markdown",
+              "state": {
+                "file": "02 - Architecture & Classes/PeriodReviewWizardViewModel.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "PeriodReviewWizardViewModel"
             }
           }
         ]
@@ -185,36 +189,38 @@
   },
   "active": "b7055ff931370878",
   "lastOpenFiles": [
-    "05 - Tasks & Roadmap/TASK-02 - Otomatik Regresyon Test Paketi ve CI-CD Kalite Kapisi.md",
-    "03 - ADR/ADR-004 - Cift Katmanli Regresyon Test Stratejisi ve CI-CD Kalite Kapisi.md",
+    "00 - MOC/Mizan Mimarisi ve Sinif Haritasi.md",
     "01 - Business Rules/BR-RECON-01 - Donem Mutabakati ve Gozlem Noktasi.md",
-    "02 - Architecture & Classes/PeriodWorkflowService.md",
-    "04 - Canvases/Mizan Genel Mimari.canvas",
+    "01 - Business Rules/BR-SIM-01 - Senaryo Kosul Izolasyonu ve Canliya Aktarim.md",
+    "01 - Business Rules/BR-PROJ-01 - 12 Aylik Kumulatif Likidite ve Finansman Acigi.md",
+    "02 - Architecture & Classes/FinancialProjectionCalculator.md",
+    "01 - Business Rules/BR-REMIND-01 - Operasyonel Hatirlatici ve Vade Erteleme.md",
+    "02 - Architecture & Classes/CardControlViewModel.md",
+    "03 - ADR/ADR-004 - Cift Katmanli Regresyon Test Stratejisi ve CI-CD Kalite Kapisi.md",
+    "03 - ADR/ADR-003 - Offline-First Kimlik ve Finansal Veri Izolasyonu.md",
     "03 - ADR/ADR-002 - Deterministik Offline-First Projeksiyon Motoru.md",
     "03 - ADR/ADR-001 - Makro Denge vs Mikro Fis Takibi.md",
-    "01 - Business Rules/BR-PROJ-01 - 12 Aylik Kumulatif Likidite ve Finansman Acigi.md",
-    "01 - Business Rules/BR-CARD-01 - Kredi Karti Carry Faizi ve Asgari Tutar Mantigi.md",
-    "00 - MOC/Mizan Mimarisi ve Sinif Haritasi.md",
+    "04 - Canvases/Mizan Genel Mimari.canvas",
+    "05 - Tasks & Roadmap/TASK-01 - Google Auth ve Offline-First Abonelik Altyapisi.md",
     "00 - MOC/Is Kurallari Indeksi.md",
+    "00 - MOC/Gorev Panosu.md",
+    "01 - Business Rules/BR-ALLOC-01 - Nakit Akisi Tahsis Stratejisi ve Gecis Yonetimi.md",
+    "01 - Business Rules/BR-CARD-01 - Kredi Karti Carry Faizi ve Asgari Tutar Mantigi.md",
+    "01 - Business Rules/BR-CALENDAR-01 - Ay Sonu ve Artik Yil Tarih Sabitleme.md",
+    "05 - Tasks & Roadmap/TASK-02 - Otomatik Regresyon Test Paketi ve CI-CD Kalite Kapisi.md",
+    "02 - Architecture & Classes/LoanPayoffAdvisor.md",
+    "02 - Architecture & Classes/PeriodWorkflowService.md",
     "02 - Architecture & Classes/FutureMonthsViewModel.md",
-    "02 - Architecture & Classes/CardControlViewModel.md",
     "02 - Architecture & Classes/PeriodReviewWizardViewModel.md",
     "02 - Architecture & Classes/SimulationViewModel.md",
     "02 - Architecture & Classes/DashboardViewModel.md",
     "2026-09-18.md",
     "02 - Architecture & Classes/PeriodReviewService.md",
-    "02 - Architecture & Classes/LoanPayoffAdvisor.md",
-    "02 - Architecture & Classes/CreditCardObligationService.md",
-    "02 - Architecture & Classes/SimulationWorkflowService.md",
-    "02 - Architecture & Classes/FinancialProjectionService.md",
-    "02 - Architecture & Classes/CashFlowPeriodCalculator.md",
-    "02 - Architecture & Classes/SimulationCalculator.md",
     "Başlıksız.canvas",
     "04 - Canvases",
     "03 - ADR",
     "02 - Architecture & Classes",
     "01 - Business Rules",
-    "00 - MOC",
-    "Hoş geldiniz.md"
+    "00 - MOC"
   ]
 }

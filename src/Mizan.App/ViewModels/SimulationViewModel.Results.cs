@@ -299,4 +299,28 @@ public partial class SimulationViewModel
         TargetResult = string.Empty;
         HasTargetResult = false;
     }
+
+    [RelayCommand]
+    private async Task OpenPeriodDetailAsync(SimulatorPeriodView? period)
+    {
+        if (period is null)
+        {
+            return;
+        }
+
+        var baseline = _lastBaselineProjection.FirstOrDefault(x =>
+            x.PeriodStart == period.Projection.PeriodStart);
+
+        await navigation.NavigateToAsync(
+            NavigationRoutes.SalaryPeriodDetail,
+            new Dictionary<string, object>
+            {
+                [CashFlowPeriodDetailViewModel.DetailQueryKey] =
+                    new SalaryPeriodDetailRequest(
+                        period.Projection,
+                        baseline,
+                        IsSimulationScenario: true)
+            });
+        _preserveOnNextAppearance = true;
+    }
 }

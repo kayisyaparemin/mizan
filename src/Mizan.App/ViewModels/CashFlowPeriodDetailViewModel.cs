@@ -10,15 +10,22 @@ namespace Mizan.App.ViewModels;
 public partial class CashFlowPeriodDetailViewModel(
     CashFlowPeriodDetailPresenter presenter,
     MizanService service,
-    PaymentReminderCardViewModel reminders) :
+    PaymentReminderCardViewModel reminders,
+    INavigationService navigation) :
     ViewModelBase,
     IQueryAttributable
 {
     public const string DetailQueryKey = "periodDetail";
 
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(HasNoDetail))]
+    private bool hasDetail;
+    public bool HasNoDetail => !HasDetail;
+
     [ObservableProperty] private SalaryPeriodDetailData? detail;
-    [ObservableProperty] private bool hasDetail;
     [ObservableProperty] private bool showReminders;
+
+    [RelayCommand]
+    private Task NavigateBackAsync() => navigation.NavigateBackAsync();
 
     /// <summary>Ana Sayfa'daki hatırlatıcı kartının aynısı.</summary>
     public PaymentReminderCardViewModel Reminders { get; } = reminders;

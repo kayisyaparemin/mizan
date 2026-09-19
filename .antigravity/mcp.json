@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json.schemastore.org/mcp-settings.json",
+  "mcpServers": {
+    "sqlite": {
+      "command": "uvx",
+      "args": [
+        "mcp-server-sqlite",
+        "--db-path",
+        "${workspaceFolder}/src/Mizan.App/bin/Debug/net8.0/mizan.db"
+      ],
+      "env": {},
+      "disabled": true,
+      "description": "Mizan SQLite veritabanını incelemek ve sorgulamak için MCP sunucusu"
+    },
+    "git": {
+      "command": "uvx",
+      "args": [
+        "mcp-server-git",
+        "--repository",
+        "${workspaceFolder}"
+      ],
+      "env": {},
+      "disabled": true,
+      "description": "Git geçmişi, dallar ve commit operasyonları için MCP sunucusu"
+    },
+    "filesystem": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "${workspaceFolder}"
+      ],
+      "env": {},
+      "disabled": true,
+      "description": "Dosya sistemi erişimi ve yönetimi için MCP sunucusu"
+    }
+  }
+}

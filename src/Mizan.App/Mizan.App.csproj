@@ -21,6 +21,7 @@
     <DefineConstants Condition="'$(MizanDevBuild)' == 'true'">$(DefineConstants);MIZAN_DEV_BUILD</DefineConstants>
     <SupportedOSPlatformVersion>21.0</SupportedOSPlatformVersion>
     <AndroidPackageFormat>apk</AndroidPackageFormat>
+    <EmbedAssembliesIntoApk>true</EmbedAssembliesIntoApk>
   </PropertyGroup>
 
   <ItemGroup>

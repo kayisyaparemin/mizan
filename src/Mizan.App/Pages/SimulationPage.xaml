@@ -2,6 +2,7 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:controls="clr-namespace:Mizan.App.Controls"
+             xmlns:vm="clr-namespace:Mizan.App.ViewModels"
              x:Class="Mizan.App.Pages.SimulationPage"
              x:Name="PageRoot"
              Title="Simülatör">
@@ -82,11 +83,11 @@
                                                                    Spacing="6"
                                                                    VerticalOptions="Center">
                                                 <Button Text="Düzenle"
-                                                        Command="{Binding Source={x:Reference PageRoot}, Path=BindingContext.EditConditionCommand}"
+                                                        Command="{Binding Source={RelativeSource AncestorType={x:Type vm:SimulationViewModel}}, Path=EditConditionCommand}"
                                                         CommandParameter="{Binding .}"
                                                         Style="{StaticResource SecondaryButton}" />
                                                 <Button Text="Sil"
-                                                        Command="{Binding Source={x:Reference PageRoot}, Path=BindingContext.RemoveConditionCommand}"
+                                                        Command="{Binding Source={RelativeSource AncestorType={x:Type vm:SimulationViewModel}}, Path=RemoveConditionCommand}"
                                                         CommandParameter="{Binding .}"
                                                         Style="{StaticResource SecondaryButton}" />
                                             </HorizontalStackLayout>
@@ -158,7 +159,7 @@
                                                 Text="Yükle"
                                                 Padding="12,4"
                                                 MinimumHeightRequest="40"
-                                                Command="{Binding Source={x:Reference PageRoot}, Path=BindingContext.LoadDraftCommand}"
+                                                Command="{Binding Source={RelativeSource AncestorType={x:Type vm:SimulationViewModel}}, Path=LoadDraftCommand}"
                                                 CommandParameter="{Binding .}" />
                                         <Button Grid.Column="2"
                                                 Grid.RowSpan="2"
@@ -166,7 +167,7 @@
                                                 Padding="12,4"
                                                 MinimumHeightRequest="40"
                                                 Style="{StaticResource SecondaryButton}"
-                                                Command="{Binding Source={x:Reference PageRoot}, Path=BindingContext.DeleteDraftCommand}"
+                                                Command="{Binding Source={RelativeSource AncestorType={x:Type vm:SimulationViewModel}}, Path=DeleteDraftCommand}"
                                                 CommandParameter="{Binding .}" />
                                     </Grid>
                                 </Border>
@@ -360,89 +361,89 @@
                 <VerticalStackLayout BindableLayout.ItemsSource="{Binding Results}" Spacing="8">
                     <BindableLayout.ItemTemplate>
                         <DataTemplate>
-                            <Border Padding="14">
-                                <Border.GestureRecognizers>
-                                    <TapGestureRecognizer
-                                        Command="{Binding Source={x:Reference PageRoot}, Path=BindingContext.OpenPeriodDetailCommand}"
-                                        CommandParameter="{Binding .}" />
-                                </Border.GestureRecognizers>
-                                <VerticalStackLayout Spacing="9">
-                                    <Label Text="{Binding Period}"
-                                           FontFamily="OpenSansSemibold"
-                                           FontSize="17" />
-                                    <Label Text="{Binding Assignment}"
-                                           Style="{StaticResource MutedText}" />
-                                    <Grid ColumnDefinitions="*,Auto"
-                                          RowDefinitions="Auto,Auto,Auto,Auto"
-                                          RowSpacing="6">
-                                        <Label Text="Dönem gelirleri" Style="{StaticResource MutedText}" />
-                                        <Label Grid.Column="1" Text="{Binding IncomeText}" />
-                                        <Label Grid.Row="1" Text="Bu dönem gereken" Style="{StaticResource MutedText}" />
-                                        <Label Grid.Row="1"
-                                               Grid.Column="1"
-                                               Text="{Binding NeedText}"
-                                               FontFamily="OpenSansSemibold" />
-                                        <Label Grid.Row="2" Text="{Binding CoverageLabel}" Style="{StaticResource MutedText}" />
-                                        <Label Grid.Row="2"
-                                               Grid.Column="1"
-                                               Text="{Binding CoverageAmountText}"
-                                               FontFamily="OpenSansSemibold" />
-                                        <Label Grid.Row="3" Text="Dönem sonu durumu" Style="{StaticResource MutedText}" />
-                                        <Label Grid.Row="3"
-                                               Grid.Column="1"
-                                               Text="{Binding EndingText}"
+                            <Grid>
+                                <Border Padding="14">
+                                    <VerticalStackLayout Spacing="9">
+                                        <Label Text="{Binding Period}"
                                                FontFamily="OpenSansSemibold"
-                                               TextColor="{StaticResource PositiveText}">
-                                            <Label.Triggers>
-                                                <DataTrigger TargetType="Label"
-                                                             Binding="{Binding EndingIsNegative}"
-                                                             Value="True">
-                                                    <Setter Property="TextColor" Value="{StaticResource Error}" />
-                                                </DataTrigger>
-                                            </Label.Triggers>
-                                        </Label>
-                                    </Grid>
-                                    <FlexLayout Wrap="Wrap" Direction="Row">
-                                        <Border Padding="9,4"
-                                                Margin="0,0,6,3"
-                                                IsVisible="{Binding HasPrimaryInsight}"
-                                                BackgroundColor="{StaticResource WarningSurface}">
-                                            <Label Text="{Binding PrimaryInsight}"
-                                                   FontSize="11"
-                                                   TextColor="{StaticResource WarningText}" />
-                                        </Border>
-                                        <Border Padding="9,4"
-                                                Margin="0,0,6,3"
-                                                IsVisible="{Binding HasSecondaryInsight}"
-                                                BackgroundColor="{StaticResource ProjectionSurface}">
-                                            <Label Text="{Binding SecondaryInsight}"
-                                                   FontSize="11"
-                                                   TextColor="{StaticResource ProjectionText}" />
-                                        </Border>
-                                    </FlexLayout>
-                                    <Border Padding="9,4"
-                                            HorizontalOptions="Start"
-                                            IsVisible="{Binding Projection.HasUndeterminedCardPayment}"
-                                            BackgroundColor="{StaticResource InterestSurface}">
-                                        <Label Text="Kart ödeme planı bekliyor"
-                                               FontSize="11"
-                                               TextColor="{StaticResource InterestText}" />
-                                    </Border>
-                                    <Grid ColumnDefinitions="*,Auto">
-                                        <Label Text="Bu dönemde ne olacak?"
+                                               FontSize="17" />
+                                        <Label Text="{Binding Assignment}"
                                                Style="{StaticResource MutedText}" />
-                                        <HorizontalStackLayout Grid.Column="1" Spacing="7">
-                                            <Label Text="Detayı Gör"
+                                        <Grid ColumnDefinitions="*,Auto"
+                                              RowDefinitions="Auto,Auto,Auto,Auto"
+                                              RowSpacing="6">
+                                            <Label Text="Dönem gelirleri" Style="{StaticResource MutedText}" />
+                                            <Label Grid.Column="1" Text="{Binding IncomeText}" />
+                                            <Label Grid.Row="1" Text="Bu dönem gereken" Style="{StaticResource MutedText}" />
+                                            <Label Grid.Row="1"
+                                                   Grid.Column="1"
+                                                   Text="{Binding NeedText}"
+                                                   FontFamily="OpenSansSemibold" />
+                                            <Label Grid.Row="2" Text="{Binding CoverageLabel}" Style="{StaticResource MutedText}" />
+                                            <Label Grid.Row="2"
+                                                   Grid.Column="1"
+                                                   Text="{Binding CoverageAmountText}"
+                                                   FontFamily="OpenSansSemibold" />
+                                            <Label Grid.Row="3" Text="Dönem sonu durumu" Style="{StaticResource MutedText}" />
+                                            <Label Grid.Row="3"
+                                                   Grid.Column="1"
+                                                   Text="{Binding EndingText}"
                                                    FontFamily="OpenSansSemibold"
-                                                   TextColor="{StaticResource ProjectionText}" />
-                                            <Label Text="›"
-                                                   FontSize="21"
-                                                   VerticalTextAlignment="Center"
-                                                   TextColor="{StaticResource ProjectionText}" />
-                                        </HorizontalStackLayout>
-                                    </Grid>
-                                </VerticalStackLayout>
-                            </Border>
+                                                   TextColor="{StaticResource PositiveText}">
+                                                <Label.Triggers>
+                                                    <DataTrigger TargetType="Label"
+                                                                 Binding="{Binding EndingIsNegative}"
+                                                                 Value="True">
+                                                        <Setter Property="TextColor" Value="{StaticResource Error}" />
+                                                    </DataTrigger>
+                                                </Label.Triggers>
+                                            </Label>
+                                        </Grid>
+                                        <FlexLayout Wrap="Wrap" Direction="Row">
+                                            <Border Padding="9,4"
+                                                    Margin="0,0,6,3"
+                                                    IsVisible="{Binding HasPrimaryInsight}"
+                                                    BackgroundColor="{StaticResource WarningSurface}">
+                                                <Label Text="{Binding PrimaryInsight}"
+                                                       FontSize="11"
+                                                       TextColor="{StaticResource WarningText}" />
+                                            </Border>
+                                            <Border Padding="9,4"
+                                                    Margin="0,0,6,3"
+                                                    IsVisible="{Binding HasSecondaryInsight}"
+                                                    BackgroundColor="{StaticResource ProjectionSurface}">
+                                                <Label Text="{Binding SecondaryInsight}"
+                                                       FontSize="11"
+                                                       TextColor="{StaticResource ProjectionText}" />
+                                            </Border>
+                                        </FlexLayout>
+                                        <Border Padding="9,4"
+                                                HorizontalOptions="Start"
+                                                IsVisible="{Binding Projection.HasUndeterminedCardPayment}"
+                                                BackgroundColor="{StaticResource InterestSurface}">
+                                            <Label Text="Kart ödeme planı bekliyor"
+                                                   FontSize="11"
+                                                   TextColor="{StaticResource InterestText}" />
+                                        </Border>
+                                        <Grid ColumnDefinitions="*,Auto">
+                                            <Label Text="Bu dönemde ne olacak?"
+                                                   Style="{StaticResource MutedText}"
+                                                   VerticalOptions="Center" />
+                                            <Button Grid.Column="1"
+                                                    Text="Detayı Gör →"
+                                                    Style="{StaticResource LinkButton}"
+                                                    Command="{Binding Source={RelativeSource AncestorType={x:Type vm:SimulationViewModel}}, Path=OpenPeriodDetailCommand}"
+                                                    CommandParameter="{Binding .}" />
+                                        </Grid>
+                                    </VerticalStackLayout>
+                                </Border>
+                                <!-- Android'de ScrollView içinde %100 güvenilir tıklama için yerel Button katmanı -->
+                                <Button BackgroundColor="Transparent"
+                                        BorderColor="Transparent"
+                                        CornerRadius="8"
+                                        Command="{Binding Source={RelativeSource AncestorType={x:Type vm:SimulationViewModel}}, Path=OpenPeriodDetailCommand}"
+                                        CommandParameter="{Binding .}" />
+                            </Grid>
                         </DataTemplate>
                     </BindableLayout.ItemTemplate>
                 </VerticalStackLayout>

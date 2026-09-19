@@ -15,8 +15,10 @@ Bir ajan herhangi bir göreve başladığında ve görevi bitirdiğinde şu adı
    - Bir servisin, modelin veya hesaplayıcının nasıl çalıştığını tahmin etmeyin; ilgili domain hesaplayıcısını (`Mizan.Domain/Calculations`) ve servis sözleşmesini (`Mizan.Application`) inceleyin.
 3. **Core Business Regresyon Testi Zorunluluğu:**
    - Nakit akışı, dönem ilerlemesi (PeriodProgress), kredi kartı ekstre/ödeme, kredi itfa (amortization) veya projeksiyon kodlarına dokunduysanız; mutlaka `tests/Mizan.Tests/Regression/CoreBusinessRegressionTests.cs` testlerini çalıştırın.
-4. **Asla Kırık Kod / Kırık Test Bırakılamaz:**
-   - Görevi tamamlamadan önce tüm test paketinin (`dotnet test`) eksiksiz yeşil (0 hata) olduğunu doğrulamadan kullanıcıya "tamamlandı" yanıtı verilemez.
+4. **Emülatör Üzerinde E2E Regresyon Testi Zorunluluğu:**
+   - Projede yapılan her geliştirme ve değişiklikten sonra, tüm uygulama akışlarını (Onboarding/Profil, Dashboard/Nakit Akışı, 12 Dönem Projeksiyonu, Finansal Yapı/Kart/Kredi, Dönem Detayı, Simülatör, Dönem Kapatma/Geçmiş, Ayarlar) emülatör üzerinde baştan sona çalıştıran regresyon test paketi (`powershell ./scripts/run-emulator-regression-tests.ps1`) mutlaka koşturulmalıdır. Emülatör testi %100 başarılı olmadan görev tamamlandı sayılamaz.
+5. **Asla Kırık Kod / Kırık Test Bırakılamaz:**
+   - Görevi tamamlamadan önce tüm test paketinin (`dotnet test` ve emülatör regresyon testi) eksiksiz yeşil (0 hata) olduğunu doğrulamadan kullanıcıya "tamamlandı" yanıtı verilemez.
 
 ---
 

@@ -13,7 +13,8 @@ namespace Mizan.App.ViewModels;
 public partial class SimulationViewModel(
     MizanService service,
     SimulatorInsightService simulatorInsightService,
-    IUserFeedbackService feedback) : ViewModelBase
+    IUserFeedbackService feedback,
+    INavigationService navigation) : ViewModelBase
 {
     public ScenarioConditionForm Form { get; } = new(directEntryOnly: false);
 
