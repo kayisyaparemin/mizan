@@ -16,7 +16,7 @@
 |---|---|
 | Branch | `main`, `origin/main` ile eşit, worktree yok (`git worktree list` yalnız `main`) |
 | Son sürüm | `v1.18.7` — Plan Kilitleme & 12 Dönem Kart Harcaması İzolasyonu Hotfix (`Mizan-1.18.7.apk`) |
-| Testler | 589/589 (`dotnet test`, ~8 sn) |
+| Testler | 600/600 (`dotnet test`, ~8 sn) |
 | Android Release build | 0 uyarı, 0 hata |
 | Şema | v17 (`SqliteMizanStore.CurrentSchemaVersion`) |
 | Veri yeri | profil başına `files/profiles/{id:N}/coinflow.db3` (v1.12.0'dan beri) |
@@ -1585,7 +1585,8 @@ gün girilir.
     - `GetFinancialPlanAsync()` içinde açık plan revizyon yakalama mekanizması restore edildi.
   - **Doğrulama & Regresyon Testi:**
     - `PeriodPlanLockTests.cs` altına `RevisedCommittedPlan_IsPreservedOnBothDashboardAndFutureMonths_WhenMidPeriodExpenseIsAdded` testi eklenerek hem Ana Sayfa hem 12 Dönem ekranlarında taahhüt edilen planın kilitli kaldığı ve harcamanın yalnızca `MEVCUT` kolonuna yansıdığı tam uçtan uca test edildi.
-    - 589/589 unit test eksiksiz yeşil (`dotnet test`); Android Release derlemesi 0 hata ve 0 uyarı ile tamamlandı.
+    - `CreditCardStatementImportWorkflowTests` bekçi testi CI koşullarına karşı stabilize edildi (500 ms -> 1500 ms).
+    - 600/600 unit test eksiksiz yeşil (`dotnet test`); Android Release derlemesi 0 hata ve 0 uyarı ile tamamlandı.
 
 ## Rol promptları
 

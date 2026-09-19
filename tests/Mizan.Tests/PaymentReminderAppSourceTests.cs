@@ -87,7 +87,8 @@ public sealed class PaymentReminderAppSourceTests
     [Fact]
     public void SnoozedPayments_AreTranslucentRedInTheCard_AndAskIfPaidWhenTapped()
     {
-        var card = Read("ViewModels", "PaymentReminderCardViewModel.cs");
+        var card = Read("ViewModels", "PaymentReminderCardViewModel.cs") + "\n" +
+                   Read("ViewModels", "PaymentReminderCardViewModel.Operations.cs");
         var view = Read("Controls", "PaymentReminderCardView.xaml");
         var colors = Read("Resources", "Styles", "Colors.xaml");
 

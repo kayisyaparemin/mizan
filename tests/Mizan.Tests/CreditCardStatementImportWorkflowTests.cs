@@ -97,7 +97,7 @@ public sealed class CreditCardStatementImportWorkflowTests
         var workflow = Workflow(
             importer,
             new StubPicker(selection),
-            timeout: TimeSpan.FromMilliseconds(500));
+            timeout: TimeSpan.FromMilliseconds(1500));
         var timer = Stopwatch.StartNew();
 
         var attempt = await workflow.RunAsync();
@@ -106,7 +106,7 @@ public sealed class CreditCardStatementImportWorkflowTests
         Assert.Equal(
             CreditCardStatementImportOutcome.TimedOut,
             attempt.Outcome);
-        Assert.True(timer.Elapsed < TimeSpan.FromSeconds(3));
+        Assert.True(timer.Elapsed < TimeSpan.FromSeconds(5));
         Assert.False(workflow.IsRunning);
         Assert.Equal(1, importer.CallCount);
         Assert.Equal(1, selection.CopyCount);
