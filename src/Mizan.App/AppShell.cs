@@ -62,6 +62,7 @@ public sealed class AppShell : Shell
         Items.Add(new MenuItem
         {
             Text = "Profil Değiştir",
+            AutomationId = "flyout-item-switch-profile",
             Command = new Command(async () =>
                 await services.GetRequiredService<ProfileNavigator>()
                     .SwitchProfileAsync())
@@ -112,12 +113,14 @@ public sealed class AppShell : Shell
         var item = new FlyoutItem
         {
             Title = title,
-            Route = route
+            Route = route,
+            AutomationId = $"flyout-item-{route}"
         };
         item.Items.Add(new ShellContent
         {
             Title = title,
             Route = contentRoute,
+            AutomationId = $"flyout-content-{contentRoute}",
             ContentTemplate = new DataTemplate(factory)
         });
         return item;

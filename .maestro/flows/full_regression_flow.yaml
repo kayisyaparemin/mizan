@@ -1,0 +1,97 @@
+appId: com.coinflow.mobile.dev
+---
+# ============================================================
+# Mizan Production-Grade E2E Regresyon Test Paketi (Maestro Flow)
+# ============================================================
+
+# SENARYO 1: Profil Seçimi ve Onboarding
+- launchApp:
+    clearState: false
+
+- runFlow:
+    when:
+      visible: "Şimdi Değil"
+    commands:
+      - tapOn: "Şimdi Değil"
+
+- runFlow:
+    when:
+      visible: "btn-profile-clean-start"
+    commands:
+      - tapOn:
+          id: "btn-profile-clean-start"
+      - inputText: "RegresyonTesti"
+      - tapOn: "Oluştur"
+
+- runFlow:
+    when:
+      visible: "btn-onboarding-sample"
+    commands:
+      - tapOn:
+          id: "btn-onboarding-sample"
+      - tapOn:
+          id: "btn-onboarding-start"
+      - tapOn: "Tamam"
+
+# SENARYO 2: Ayarlar ve Kanonik Test Verisi Yükleme
+- tapOn:
+    id: "Open navigation drawer"
+- tapOn: "Ayarlar"
+- scrollUntilVisible:
+    element:
+      id: "btn-load-canonical-seed"
+    direction: DOWN
+- tapOn:
+    id: "btn-load-canonical-seed"
+- tapOn: "Tamam"
+
+# SENARYO 3: Dashboard & Bakiye Gözlemi (Invariant I16)
+- tapOn:
+    id: "Open navigation drawer"
+- tapOn: "Ana Sayfa"
+- tapOn:
+    id: "input-today-balance"
+- inputText: "50000"
+- tapOn:
+    id: "btn-save-observation"
+- assertVisible:
+    id: "lbl-plan-header"
+
+# SENARYO 4: 12 Dönem Projeksiyonu
+- tapOn:
+    id: "Open navigation drawer"
+- tapOn: "12 Dönem"
+- assertVisible: "12 Dönem"
+
+# SENARYO 5: Dönem Detayı Akışı
+- scrollUntilVisible:
+    element:
+      id: "btn-period-detail"
+    direction: DOWN
+- tapOn:
+    id: "btn-period-detail"
+- back
+
+# SENARYO 6: Finansal Yapı (Kartlar ve Krediler)
+- tapOn:
+    id: "Open navigation drawer"
+- tapOn: "Finansal Yapı"
+- assertVisible: "Finansal Yapı"
+
+# SENARYO 7: Simülatör
+- tapOn:
+    id: "Open navigation drawer"
+- tapOn: "Simülatör"
+- assertVisible: "Simülatör"
+
+# SENARYO 8: Geçmiş (History)
+- tapOn:
+    id: "Open navigation drawer"
+- tapOn: "Geçmiş"
+- assertVisible: "Geçmiş"
+
+# SENARYO 9: Profil Değiştirme
+- tapOn:
+    id: "Open navigation drawer"
+- tapOn: "Profil Değiştir"
+- assertVisible: "Profil Seç"

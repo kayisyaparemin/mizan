@@ -130,6 +130,7 @@
                                 <Label Text="Bu profilin tüm finans verilerini siler ve profili boş başlangıç durumuna döndürür. Diğer profiller etkilenmez."
                                        Style="{StaticResource MutedText}" />
                                 <Button Text="Verileri Sil"
+                                        AutomationId="btn-clear-dev-data"
                                         Clicked="OnClearDevelopmentDataClicked"
                                         BackgroundColor="{StaticResource SoftPink}" />
                             </VerticalStackLayout>
@@ -140,6 +141,7 @@
                                 <Label Text="Örnek finans kayıtlarını yükler. Aynı kayıtları yeniden oluşturmaz."
                                        Style="{StaticResource MutedText}" />
                                 <Button Text="Test Verisini Yükle"
+                                        AutomationId="btn-load-canonical-seed"
                                         Clicked="OnLoadCanonicalSeedClicked" />
                             </VerticalStackLayout>
                         </Border>
@@ -158,6 +160,7 @@
                        IsVisible="{Binding HasStatus}"
                        TextColor="{StaticResource Error}" />
                 <Button Text="Değişiklikleri Kaydet"
+                        AutomationId="btn-save-settings"
                         Command="{Binding SaveCommand}" />
             </VerticalStackLayout>
         </Border>

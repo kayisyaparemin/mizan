@@ -16,6 +16,7 @@
                     </VerticalStackLayout>
                     <Button Grid.Column="1"
                             Text="Daha Sonra"
+                            AutomationId="btn-onboarding-skip"
                             Clicked="OnSkipClicked"
                             Padding="12,8"
                             MinimumHeightRequest="40"
@@ -32,11 +33,14 @@
                         <Label Text="Mizan ilk planını gerçek kayıtlarınla kurar."
                                Style="{StaticResource SectionTitle}" />
                         <Button Text="Başlayalım"
+                                AutomationId="btn-onboarding-begin"
                                 Command="{Binding BeginCommand}" />
                         <Button Text="Boş Kurulum"
+                                AutomationId="btn-onboarding-empty"
                                 Command="{Binding EmptySetupCommand}"
                                 Style="{StaticResource SecondaryButton}" />
                         <Button Text="Örnek Kurulumla Doldur"
+                                AutomationId="btn-onboarding-sample"
                                 Command="{Binding FillSampleCommand}"
                                 IsVisible="{Binding IsDevelopment}"
                                 BackgroundColor="{StaticResource SoftPink}" />
@@ -421,6 +425,7 @@
                                    FontSize="18" />
                         </Grid>
                         <Button Text="Mizan'ı Başlat"
+                                AutomationId="btn-onboarding-start"
                                 Command="{Binding StartMizanCommand}"
                                 IsEnabled="{Binding CanInteract}" />
                     </VerticalStackLayout>

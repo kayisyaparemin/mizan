@@ -65,9 +65,11 @@
                         </Label.FormattedText>
                     </Label>
                     <Button Text="Yedekten Geri Yükle"
+                            AutomationId="btn-profile-restore"
                             IsEnabled="{Binding CanInteract}"
                             Clicked="OnRestoreClicked" />
                     <Button Text="Temiz Başla"
+                            AutomationId="btn-profile-clean-start"
                             Style="{StaticResource SecondaryButton}"
                             IsEnabled="{Binding CanInteract}"
                             Clicked="OnCreateClicked" />
@@ -75,10 +77,12 @@
             </Border>
 
             <Button Text="Yeni Profil"
+                    AutomationId="btn-new-profile"
                     IsVisible="{Binding HasProfiles}"
                     IsEnabled="{Binding CanInteract}"
                     Clicked="OnCreateClicked" />
             <Button Text="Yedekten Ekle"
+                    AutomationId="btn-add-from-backup"
                     Style="{StaticResource SecondaryButton}"
                     IsVisible="{Binding HasProfiles}"
                     IsEnabled="{Binding CanInteract}"

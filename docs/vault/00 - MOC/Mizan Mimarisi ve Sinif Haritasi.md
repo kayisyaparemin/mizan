@@ -59,6 +59,7 @@ Mikro harcama fişi girmeden, dondurulmuş plan ile dönem sonundaki gerçekleş
 - ⚙️ **Application:** [[PeriodWorkflowService]], [[PeriodReviewService]]
 - 📱 **UI / ViewModel:** [[PeriodReviewWizardViewModel]]
 - 📜 **İş Kuralı:** [[BR-RECON-01 - Donem Mutabakati ve Gozlem Noktasi|BR-RECON-01: Dönem Mutabakatı ve Gözlem Noktası]]
+- 🌊 **Özellik Akışı:** [[FLOW-01 - Donem Kapatma ve Gecmis Kayit Akisi|FLOW-01: Dönem Kapatma ve Geçmiş Kayıt Akışı]]
 
 ### 2. İleriye Dönük 12 Aylık Projeksiyon
 Anchor snapshot noktasından başlayarak tam 365 gün boyunca kümülatif likiditeyi ve finansman açıklarını gün gün simüle eder.

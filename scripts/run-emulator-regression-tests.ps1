@@ -166,28 +166,82 @@ function To-RegexPattern([string]$text) {
     return $p
 }
 
+function Get-ScreenDimensions {
+    $sizeStr = & $Adb shell wm size 2>$null
+    if ($sizeStr -match '(\d+)x(\d+)') {
+        return @{ Width = [int]$matches[1]; Height = [int]$matches[2] }
+    }
+    return @{ Width = 1080; Height = 2400 }
+}
+
+function Scroll-Down {
+    $dims = Get-ScreenDimensions
+    $x = [int]($dims.Width / 2)
+    $y1 = [int]($dims.Height * 0.75)
+    $y2 = [int]($dims.Height * 0.25)
+    & $Adb shell input swipe $x $y1 $x $y2 300
+    Start-Sleep -Milliseconds 600
+}
+
+function Scroll-Up {
+    $dims = Get-ScreenDimensions
+    $x = [int]($dims.Width / 2)
+    $y1 = [int]($dims.Height * 0.25)
+    $y2 = [int]($dims.Height * 0.75)
+    & $Adb shell input swipe $x $y1 $x $y2 300
+    Start-Sleep -Milliseconds 600
+}
+
 function Find-NodeCoordinates([string]$xml, [string]$textOrId) {
     $safePattern = To-RegexPattern $textOrId
 
-    if ($xml -match "text=`"([^`"]*?$safePattern[^`"]*?)`"[^>]*bounds=`"\[(\d+),(\d+)\]\[(\d+),(\d+)\]`"") {
-        $x1 = [int]$matches[2]
-        $y1 = [int]$matches[3]
-        $x2 = [int]$matches[4]
-        $y2 = [int]$matches[5]
-        $cx = [int](($x1 + $x2) / 2)
-        $cy = [int](($y1 + $y2) / 2)
-        return @{ X = $cx; Y = $cy; Found = $true; Text = $matches[1] }
-    }
-    if ($xml -match "content-desc=`"([^`"]*?$safePattern[^`"]*?)`"[^>]*bounds=`"\[(\d+),(\d+)\]\[(\d+),(\d+)\]`"") {
-        $x1 = [int]$matches[2]
-        $y1 = [int]$matches[3]
-        $x2 = [int]$matches[4]
-        $y2 = [int]$matches[5]
-        $cx = [int](($x1 + $x2) / 2)
-        $cy = [int](($y1 + $y2) / 2)
-        return @{ X = $cx; Y = $cy; Found = $true; Text = $matches[1] }
+    # Match each <node ... /> or <node ...> tag individually to be immune to attribute ordering
+    $pattern = '<node\b([^>]+)>'
+    $regexMatches = [regex]::Matches($xml, $pattern)
+
+    foreach ($m in $regexMatches) {
+        $tag = $m.Groups[1].Value
+        $hasMatch = $false
+        $matchedText = $textOrId
+
+        if ($tag -match 'resource-id="([^"]*?' + $safePattern + '[^"]*?)"') {
+            $hasMatch = $true
+            $matchedText = $matches[1]
+        }
+        elseif ($tag -match 'content-desc="([^"]*?' + $safePattern + '[^"]*?)"') {
+            $hasMatch = $true
+            $matchedText = $matches[1]
+        }
+        elseif ($tag -match 'text="([^"]*?' + $safePattern + '[^"]*?)"') {
+            $hasMatch = $true
+            $matchedText = $matches[1]
+        }
+
+        if ($hasMatch -and $tag -match 'bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"') {
+            $x1 = [int]$matches[1]
+            $y1 = [int]$matches[2]
+            $x2 = [int]$matches[3]
+            $y2 = [int]$matches[4]
+            if ($x2 -gt $x1 -and $y2 -gt $y1) {
+                $cx = [int](($x1 + $x2) / 2)
+                $cy = [int](($y1 + $y2) / 2)
+                return @{ X = $cx; Y = $cy; Found = $true; Text = $matchedText }
+            }
+        }
     }
     return @{ Found = $false }
+}
+
+function Scroll-To-Element([string]$textOrId, [int]$maxSwipes = 6) {
+    for ($i = 0; $i -lt $maxSwipes; $i++) {
+        $xml = Dump-Layout
+        $coords = Find-NodeCoordinates $xml $textOrId
+        if ($coords.Found) {
+            return $true
+        }
+        Scroll-Down
+    }
+    return $false
 }
 
 function Tap-Element([string]$textOrId, [string]$stepName) {
@@ -235,26 +289,80 @@ function Ensure-DismissDialogs {
     return $xml
 }
 
+function Find-HamburgerCoordinates([string]$xml, $dims) {
+    $pattern = '<node\b([^>]+)>'
+    $regexMatches = [regex]::Matches($xml, $pattern)
+    foreach ($m in $regexMatches) {
+        $tag = $m.Groups[1].Value
+        if (($tag -match 'class=".*Image(Button|View)"' -or $tag -match 'content-desc=".*(drawer|navigation|çekmece).*') -and $tag -match 'bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"') {
+            $x1 = [int]$matches[1]
+            $y1 = [int]$matches[2]
+            $x2 = [int]$matches[3]
+            $y2 = [int]$matches[4]
+            if ($y1 -lt ($dims.Height * 0.15) -and $x1 -lt ($dims.Width * 0.3)) {
+                $cx = [int](($x1 + $x2) / 2)
+                $cy = [int](($y1 + $y2) / 2)
+                return @{ X = $cx; Y = $cy; Found = $true }
+            }
+        }
+    }
+    return @{ Found = $false }
+}
+
 function Ensure-FlyoutOpen {
     Ensure-DismissDialogs | Out-Null
+    $dims = Get-ScreenDimensions
     
     for ($attempt = 0; $attempt -lt 4; $attempt++) {
         $xml = Dump-Layout
-        # Çekmece açıksa [195,Y1][882,Y2] koordinatlı menü elemanları mevcuttur
-        if ($xml -match 'bounds="\[195,\d+\]\[882,\d+\]"') {
+        # Çekmece açıksa AppShell FlyoutHeader ("PROFİL") veya NavigationView satırları mevcuttur
+        if ($xml -match 'text="PROF[İI\.]L"' -or $xml -match 'bounds="\[195,\d+\]\[882,\d+\]"') {
             return $true
         }
 
-        # Hamburger butonu sol üsttedir (Toolbar içinde X=75, Y=136)
-        Write-Host "    Hamburger butonuna tıklanıyor (75, 136)..." -ForegroundColor Gray
-        & $Adb shell input tap 75 136
+        # Toolbar içindeki hamburger butonunu ara veya sol üste tıkla
+        $coords = Find-HamburgerCoordinates $xml $dims
+        if ($coords.Found) {
+            Write-Host "    Hamburger butonuna dinamik tıklanıyor ($($coords.X), $($coords.Y))..." -ForegroundColor Gray
+            & $Adb shell input tap $coords.X $coords.Y
+        } else {
+            Write-Host "    Hamburger butonuna tıklanıyor (75, 136)..." -ForegroundColor Gray
+            & $Adb shell input tap 75 136
+        }
         Start-Sleep -Seconds 1
     }
     return $false
 }
 
 function Navigate-Flyout([string]$menuKey) {
-    $y = switch ($menuKey.ToLowerInvariant()) {
+    Ensure-FlyoutOpen | Out-Null
+    Start-Sleep -Milliseconds 600
+
+    $targetText = switch ($menuKey.ToLowerInvariant()) {
+        "dashboard"     { "Ana Sayfa" }
+        "home"          { "Ana Sayfa" }
+        "periods"       { "12 Dönem" }
+        "simulation"    { "Simülatör" }
+        "commitments"   { "Finansal Yapı" }
+        "history"       { "Geçmiş" }
+        "settings"      { "Ayarlar" }
+        "switchprofile" { "Profil Değiştir" }
+        default         { $menuKey }
+    }
+
+    $autoId = switch ($menuKey.ToLowerInvariant()) {
+        "dashboard"     { "flyout-item-dashboard" }
+        "home"          { "flyout-item-dashboard" }
+        "periods"       { "flyout-item-projection" }
+        "simulation"    { "flyout-item-simulation" }
+        "commitments"   { "flyout-item-commitments" }
+        "history"       { "flyout-item-history" }
+        "settings"      { "flyout-item-settings" }
+        "switchprofile" { "flyout-item-switch-profile" }
+        default         { "" }
+    }
+
+    $fallbackY = switch ($menuKey.ToLowerInvariant()) {
         "dashboard"     { 364 }
         "home"          { 364 }
         "periods"       { 496 }
@@ -265,17 +373,23 @@ function Navigate-Flyout([string]$menuKey) {
         "switchprofile" { 1156 }
         default         { 0 }
     }
-    if ($y -eq 0) {
-        throw "Bilinmeyen menü anahtarı: $menuKey"
+
+    Write-Host "    Flyout Menü Tıklanıyor: '$targetText' ($menuKey)..." -ForegroundColor Cyan
+    $tapped = $false
+    if ($autoId) {
+        $tapped = Tap-Element $autoId "Flyout Menü (AutomationId): $autoId"
+    }
+    if (-not $tapped) {
+        $tapped = Tap-Element $targetText "Flyout Menü: $targetText"
+    }
+    if (-not $tapped -and $fallbackY -gt 0) {
+        Write-Host "    Flyout fallback koordinatına tıklanıyor (538, $fallbackY)..." -ForegroundColor Cyan
+        & $Adb shell input tap 538 $fallbackY
+        $tapped = $true
     }
 
-    Ensure-FlyoutOpen | Out-Null
-    Start-Sleep -Milliseconds 600
-
-    Write-Host "    Flyout Menü Tıklanıyor: '$menuKey' (538, $y)" -ForegroundColor Cyan
-    & $Adb shell input tap 538 $y
     Start-Sleep -Seconds 2
-    return $true
+    return $tapped
 }
 
 # 5. E2E Regresyon Test Senaryoları
@@ -323,8 +437,11 @@ function Run-AllFlows {
                 Tap-Element "RegresyonTesti" "Senaryo 1: Mevcut Profil" | Out-Null
                 Start-Sleep -Seconds 3
                 $xml = Dump-Layout
-            } elseif ($xml -match (To-RegexPattern "Temiz Başla")) {
-                Tap-Element "Temiz Başla" "Senaryo 1: Temiz Başla" | Out-Null
+            } elseif ($xml -match (To-RegexPattern "Temiz Başla|btn-profile-clean-start")) {
+                $tappedClean = Tap-Element "btn-profile-clean-start" "Senaryo 1: Temiz Başla (AutomationId)"
+                if (-not $tappedClean) {
+                    Tap-Element "Temiz Başla" "Senaryo 1: Temiz Başla (Text)" | Out-Null
+                }
                 Start-Sleep -Seconds 2
                 Input-Text "RegresyonTesti"
                 Start-Sleep -Milliseconds 500
@@ -334,13 +451,19 @@ function Run-AllFlows {
             }
 
             # 3. Onboarding Ekranı (İlk kurulumda örnek veriyle doldurma)
-            if ($xml -match (To-RegexPattern "Örnek Kurulumla Doldur|Mizan'ı sana göre hazırlayalım")) {
-                Tap-Element "Örnek Kurulumla Doldur" "Senaryo 1: Örnek Kurulum" | Out-Null
+            if ($xml -match (To-RegexPattern "Örnek Kurulumla Doldur|btn-onboarding-sample|Mizan'ı sana göre hazırlayalım")) {
+                $tappedSample = Tap-Element "btn-onboarding-sample" "Senaryo 1: Örnek Kurulum (AutomationId)"
+                if (-not $tappedSample) {
+                    Tap-Element "Örnek Kurulumla Doldur" "Senaryo 1: Örnek Kurulum (Text)" | Out-Null
+                }
                 Start-Sleep -Seconds 3
                 $xml = Dump-Layout
 
-                if ($xml -match (To-RegexPattern "Mizan'ı Başlat")) {
-                    Tap-Element "Mizan'ı Başlat" "Senaryo 1: Mizan'ı Başlat" | Out-Null
+                if ($xml -match (To-RegexPattern "Mizan'ı Başlat|btn-onboarding-start")) {
+                    $tappedStart = Tap-Element "btn-onboarding-start" "Senaryo 1: Mizan'ı Başlat (AutomationId)"
+                    if (-not $tappedStart) {
+                        Tap-Element "Mizan'ı Başlat" "Senaryo 1: Mizan'ı Başlat (Text)" | Out-Null
+                    }
                     Start-Sleep -Seconds 2
                     $xml = Dump-Layout
                 }
@@ -353,7 +476,9 @@ function Run-AllFlows {
             }
 
             # Eğer "Geçen dönemi güncelleyelim mi?" dialogu çıktıysa kapat
-            Ensure-DismissDialogs | Out-Null
+            $xml = Ensure-DismissDialogs
+            Start-Sleep -Seconds 1
+            $xml = Dump-Layout
 
             Capture-Screen "02_dashboard_ready" | Out-Null
             $hasDashboard = $xml -match (To-RegexPattern "Mevcut tutar|PLAN|Dönem sonu|Bugünkü tutar")
@@ -369,17 +494,15 @@ function Run-AllFlows {
         Start-Sleep -Seconds 2
         Capture-Screen "03_settings_page" | Out-Null
 
-        # Test Verisini Yükle butonuna ulaşmak için 4 kez kaydır
-        for ($s = 0; $s -lt 4; $s++) {
-            & $Adb shell input swipe 500 1800 500 300 200
-            Start-Sleep -Milliseconds 400
+        # Test Verisini Yükle butonuna ulaşmak için dinamik kaydır
+        $foundSeed = Scroll-To-Element "btn-load-canonical-seed"
+        if (-not $foundSeed) {
+            $foundSeed = Scroll-To-Element "Test Verisini Yükle"
         }
 
-        $loadedSeed = Tap-Element "Test Verisini Yükle" "Senaryo 2: Test Verisi Yükle"
+        $loadedSeed = Tap-Element "btn-load-canonical-seed" "Senaryo 2: Test Verisi Yükle (AutomationId)"
         if (-not $loadedSeed) {
-            Write-Host "    Doğrudan buton koordinatına tıklanıyor (541, 1698)..." -ForegroundColor Cyan
-            & $Adb shell input tap 541 1698
-            $loadedSeed = $true
+            $loadedSeed = Tap-Element "Test Verisini Yükle" "Senaryo 2: Test Verisi Yükle (Text)"
         }
 
         if ($loadedSeed) {
@@ -402,11 +525,17 @@ function Run-AllFlows {
         Ensure-DismissDialogs | Out-Null
         $xml = Dump-Layout
 
-        # Bakiye girişi yap ve gözlemi kaydet
-        if ($xml -match (To-RegexPattern "Bugünkü tutar")) {
-            Tap-Element "Bugünkü tutar" "Senaryo 3: Bugünkü Tutar Girişi" | Out-Null
+        # Bakiye girişi yap ve gözlemi kaydet (AutomationId veya Text)
+        $inputTapped = Tap-Element "input-today-balance" "Senaryo 3: Bugünkü Tutar Girişi (AutomationId)"
+        if (-not $inputTapped) {
+            $inputTapped = Tap-Element "Bugünkü tutar" "Senaryo 3: Bugünkü Tutar Girişi (Text)"
+        }
+        if ($inputTapped) {
             Input-Text "50000"
-            Tap-Element "Gözlemi Kaydet" "Senaryo 3: Gözlemi Kaydet" | Out-Null
+            $saved = Tap-Element "btn-save-observation" "Senaryo 3: Gözlemi Kaydet (AutomationId)"
+            if (-not $saved) {
+                Tap-Element "Gözlemi Kaydet" "Senaryo 3: Gözlemi Kaydet (Text)" | Out-Null
+            }
             Start-Sleep -Seconds 2
             $xml = Dump-Layout
         }
@@ -436,17 +565,23 @@ function Run-AllFlows {
     # SENARYO 5: Dönem Detayı Akışı (12 Dönemden Dönem Kartına Giriş)
     try {
         Write-Host "    12 Dönem ekranı aşağı kaydırılarak dönem kartı görünür yapılıyor..." -ForegroundColor Cyan
-        & $Adb shell input swipe 540 1800 540 900 300
-        Start-Sleep -Milliseconds 1000
+        Scroll-Down
 
         Write-Host "    Dönem detayına gitmek için ilk dönem kartına tıklanıyor..." -ForegroundColor Cyan
-        $tappedPeriod = Tap-Element "Bu dönemin ödeme ayrıntısı" "Senaryo 5: Dönem Kartı Tıklama"
+        $tappedPeriod = Tap-Element "btn-period-detail" "Senaryo 5: Dönem Kartı (AutomationId)"
         if (-not $tappedPeriod) {
-            $tappedPeriod = Tap-Element "Dönem sonu" "Senaryo 5: Dönem Kartı Tıklama"
+            $tappedPeriod = Tap-Element "card-period-overlay" "Senaryo 5: Dönem Kartı Overlay"
         }
         if (-not $tappedPeriod) {
-            Write-Host "    Koordinat üzerinden tıklanıyor (438, 1400)..." -ForegroundColor Cyan
+            $tappedPeriod = Tap-Element "Bu dönemin ödeme ayrıntısı" "Senaryo 5: Dönem Kartı Link"
+        }
+        if (-not $tappedPeriod) {
+            $tappedPeriod = Tap-Element "Dönem sonu" "Senaryo 5: Dönem Kartı Bakiye"
+        }
+        if (-not $tappedPeriod) {
+            Write-Host "    Dönem kartı fallback koordinatına tıklanıyor (438, 1400)..." -ForegroundColor Cyan
             & $Adb shell input tap 438 1400
+            $tappedPeriod = $true
         }
         Start-Sleep -Seconds 2
         $xml = Dump-Layout

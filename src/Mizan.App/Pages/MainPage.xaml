@@ -110,11 +110,13 @@
                                Style="{StaticResource CardHeading}" />
                         <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
                             <Entry Text="{Binding CurrentBalanceInput}"
+                                   AutomationId="input-today-balance"
                                    Placeholder="Bugünkü tutar"
                                    Keyboard="Numeric"
                                    controls:SignedNumericEntry.AllowNegative="True" />
                             <Button Grid.Column="1"
                                     Text="Gözlemi Kaydet"
+                                    AutomationId="btn-save-observation"
                                     Padding="16,10"
                                     MinimumHeightRequest="44"
                                     IsEnabled="{Binding CanSaveCurrentBalance}"
@@ -130,7 +132,9 @@
                 <!-- PLAN — dönem başında dondurulan taahhüt -->
                 <Border>
                     <VerticalStackLayout Spacing="6">
-                        <Label Text="PLAN" Style="{StaticResource Eyebrow}" />
+                        <Label Text="PLAN"
+                               AutomationId="lbl-plan-header"
+                               Style="{StaticResource Eyebrow}" />
                         <Label Text="{Binding PlanFrozenText}"
                                Style="{StaticResource MutedText}"
                                FontSize="12" />

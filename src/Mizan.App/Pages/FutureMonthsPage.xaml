@@ -201,6 +201,7 @@
                                         </Border>
                                     </FlexLayout>
                                     <Button Text="Bu dönemin ödeme ayrıntısı →"
+                                            AutomationId="btn-period-detail"
                                             Style="{StaticResource LinkButton}"
                                             HorizontalOptions="End"
                                             Command="{Binding Source={RelativeSource AncestorType={x:Type vm:FutureMonthsViewModel}}, Path=OpenPeriodDetailCommand}"
@@ -210,6 +211,7 @@
                             <!-- Android'de ScrollView içinde %100 güvenilir tıklama için yerel Button katmanı -->
                             <Button BackgroundColor="Transparent"
                                     BorderColor="Transparent"
+                                    AutomationId="card-period-overlay"
                                     CornerRadius="8"
                                     Command="{Binding Source={RelativeSource AncestorType={x:Type vm:FutureMonthsViewModel}}, Path=OpenPeriodDetailCommand}"
                                     CommandParameter="{Binding .}" />

@@ -20,6 +20,17 @@ public static class MauiProgram
         var builder = MauiApp.CreateBuilder();
         builder
             .UseMauiApp<App>()
+            .UseSentry(options =>
+            {
+                options.Dsn = Environment.GetEnvironmentVariable("MIZAN_SENTRY_DSN") ??
+                              "https://examplePublicKey@o0.ingest.sentry.io/0";
+                options.TracesSampleRate = 1.0;
+                options.AttachScreenshot = true;
+                options.SetBeforeSend((sentryEvent, _) =>
+                {
+                    return SentryPiiMasker.FilterSensitiveData(sentryEvent);
+                });
+            })
             .ConfigureFonts(fonts =>
             {
                 fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
@@ -29,6 +40,7 @@ public static class MauiProgram
         // Her profil açılışında yeniden kurulur; bkz. ProfileNavigator.
         builder.Services.AddTransient<AppShell>();
         builder.Services.AddSingleton<IClock, SystemClock>();
+        builder.Services.AddSingleton<ITelemetryService, SentryTelemetryService>();
 #if MIZAN_DEV_BUILD
         const bool developmentFeaturesEnabled = true;
 #else
